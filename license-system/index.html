@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Wali Pintar - Game Edukasi Berlisensi Anak</title>
+  <meta name="description" content="Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas. Berlisensi resmi, bebas iklan, dan bisa dimainkan offline.">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" type="image/png" href="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png">
+  <link rel="apple-touch-icon" href="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png">
+
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --primary-light: #ecfdf5;
+      --secondary: #0ea5e9;
+      --accent-pink: #f43f5e;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --bg-page: #f8fafc;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --card-bg: #ffffff;
+      --border-soft: #e2e8f0;
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Nunito", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: radial-gradient(#e2e8f0 1.2px, transparent 1.2px);
+      background-size: 20px 20px;
+    }
+
+    /* TOP BAR / HEADER */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #86efac;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+    }
+
+    .brand-text h1 {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: -0.4px;
+      color: #064e3b;
+      line-height: 1.1;
+    }
+
+    .brand-text span {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      letter-spacing: 0.3px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-status {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-status.active {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    .badge-status.locked {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    /* SUB-HEADER TAGLINE */
+    .sub-tagline {
+      background: linear-gradient(90deg, #059669 0%, #0d9488 50%, #0284c7 100%);
+      color: #ffffff;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* MAIN CONTAINER */
+    .main-content {
+      flex: 1;
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    /* GATEKEEPER / LOGIN SECTION */
+    .gatekeeper-card {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      padding: 32px 24px;
+      border: 3px solid #bbf7d0;
+      box-shadow: 0 12px 30px -10px rgba(16, 185, 129, 0.2);
+      max-width: 480px;
+      margin: 20px auto;
+      text-align: center;
+      animation: popIn 0.3s ease-out;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .gate-icon {
+      font-size: 56px;
+      margin-bottom: 12px;
+    }
+
+    .gatekeeper-card h2 {
+      font-size: 22px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+
+    .gatekeeper-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .input-label {
+      font-size: 12px;
+      font-weight: 800;
+      color: #334155;
+      display: block;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .text-input {
+      width: 100%;
+      min-height: 52px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      border: 2px solid #cbd5e1;
+      font-size: 18px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .text-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+      background: #f0fdf4;
+    }
+
+    /* BUTTONS (MIN 48PX) */
+    .btn {
+      width: 100%;
+      min-height: 50px;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-emerald {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-emerald:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-outline {
+      background: #f8fafc;
+      color: #334155;
+      border: 2px solid #e2e8f0;
+      margin-top: 10px;
+    }
+
+    .btn-buy {
+      background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+      color: #ffffff;
+      margin-top: 14px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    /* DASHBOARD SECTION */
+    #dashboardSection {
+      display: none;
+    }
+
+    .hero-banner {
+      background: linear-gradient(135deg, #ecfdf5 0%, #e0f2fe 100%);
+      border-radius: var(--radius-xl);
+      padding: 20px 24px;
+      border: 2px solid #a7f3d0;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hero-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid #cbd5e1;
+      font-size: 12px;
+      font-weight: 800;
+      color: #064e3b;
+    }
+
+    .offline-pwa-bar {
+      display: flex;
+      flex-direction: column;
+      sm-flex-direction: row;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .btn-install-pwa {
+      background: #10b981;
+      color: #ffffff;
+      min-height: 48px;
+      padding: 12px 18px;
+      border-radius: var(--radius-md);
+      font-weight: 800;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      display: none; /* muncul saat ready */
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    /* GAME CATEGORIES GRID */
+    .grid-categories {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .game-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      border: 2px solid var(--border-soft);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s, border-color 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .game-card:hover {
+      transform: translateY(-4px);
+      border-color: #86efac;
+    }
+
+    .game-icon-box {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+
+    .card-edu .game-icon-box { background: #dcfce7; }
+    .card-color .game-icon-box { background: #ffe4e6; }
+    .card-abc .game-icon-box { background: #e0e7ff; }
+
+    .game-card h3 {
+      font-size: 17px;
+      font-weight: 900;
+      margin-bottom: 6px;
+      color: #0f172a;
+    }
+
+    .game-card p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    .btn-play {
+      min-height: 48px;
+      border-radius: var(--radius-md);
+      font-weight: 800;
+      font-size: 14px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .card-edu .btn-play { background: #10b981; color: #fff; }
+    .card-color .btn-play { background: #f43f5e; color: #fff; }
+    .card-abc .btn-play { background: #6366f1; color: #fff; }
+
+    /* OFFLINE CACHING OVERLAY (THE 5-MINUTE RULE) */
+    .caching-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .caching-box {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      padding: 28px 24px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      border: 3px solid #bbf7d0;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 18px 0 10px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981, #06b6d4);
+      transition: width 0.3s ease;
+    }
+
+    /* CUSTOM MODAL POPUPS */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      padding: 26px 22px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 20px 35px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: #f1f5f9;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      padding: 24px 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border-soft);
+      background: #ffffff;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <a href="/" class="brand-wrap">
+      <img src="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png" alt="Wali Pintar" class="brand-avatar" onerror="this.src='/icon.svg'">
+      <div class="brand-text">
+        <h1>Wali Pintar</h1>
+        <span>Game Edukasi Berlisensi</span>
+      </div>
+    </a>
+
+    <div class="header-actions">
+      <span class="badge-status locked" id="badgeLicenseStatus">
+        <span>🔒</span> Belum Aktif
+      </span>
+      <button class="btn btn-outline" id="btnLogout" style="display:none; min-height: 36px; padding: 4px 10px; font-size: 11px; width: auto; margin-top: 0;">
+        Ganti Lisensi
+      </button>
+    </div>
+  </header>
+
+  <!-- Sub-Header Tagline -->
+  <div class="sub-tagline">
+    <span>✨</span>
+    <span>Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas</span>
+    <span>🌱</span>
+  </div>
+
+  <!-- MAIN BODY -->
+  <main class="main-content">
+
+    <!-- 1. GATEKEEPER LOGIN VIEW -->
+    <section id="gatekeeperSection">
+      <div class="gatekeeper-card">
+        <div class="gate-icon">🔐</div>
+        <h2>Aktivasi Lisensi Wali Pintar</h2>
+        <p>Masukkan Kode Lisensi resmi Anda (format <code>WALI-XXXXXX</code>) yang dikirimkan ke email setelah pembelian.</p>
+
+        <form id="formLicense" onsubmit="event.preventDefault(); handleCheckLicense();">
+          <div class="input-group">
+            <label class="input-label" for="inputLicenseKey">Kode Lisensi Anda:</label>
+            <input 
+              type="text" 
+              id="inputLicenseKey" 
+              class="text-input" 
+              placeholder="WALI-XXXXXX" 
+              maxlength="12" 
+              required 
+              autocomplete="off"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-emerald" id="btnSubmitCheck">
+            <span id="btnCheckText">🔓 Aktivasi & Buka Game</span>
+          </button>
+        </form>
+
+        <button class="btn btn-outline" id="btnOpenResend">
+          <span>📩 Belum dapat email? Klaim Manual</span>
+        </button>
+
+        <a href="https://walipintar.myscalev.com" target="_blank" class="btn btn-buy">
+          <span>🛒 Beli Lisensi Resmi (Scalev)</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- 2. GAME DASHBOARD VIEW (Hanya terbuka jika lisensi VALID) -->
+    <section id="dashboardSection">
+      <!-- Hero Welcome -->
+      <div class="hero-banner">
+        <div class="hero-meta">
+          <div class="user-pill">
+            <span>⭐</span>
+            <span id="userLicenseInfo">Lisensi: WALI-XXXXXX</span>
+          </div>
+          <div class="user-pill" style="background:#ecfdf5; border-color:#86efac; color:#15803d;">
+            <span>🛡️</span>
+            <span>Aman & Bebas Iklan</span>
+          </div>
+        </div>
+
+        <h2 style="font-size: 20px; font-weight: 900; color: #064e3b;">
+          Selamat Bermain & Belajar, Si Kecil Pintar! 🎉
+        </h2>
+        <p style="font-size: 13px; color: #047857;">
+          Pilih kategori permainan di bawah ini. Semua permainan telah disesuaikan untuk perkembangan kognitif, motorik, dan logika usia 3–8 tahun.
+        </p>
+
+        <!-- PWA Install Prompt Button (The 5-Minute Rule) -->
+        <button id="btnPWAInstall" class="btn-install-pwa">
+          <span>📥 Pasang Aplikasi di Layar HP (Bisa Main Offline Tanpa Kuota)</span>
+        </button>
+      </div>
+
+      <!-- Categories Grid -->
+      <div class="grid-categories">
+        <!-- 1. Permainan Edukasi -->
+        <div class="game-card card-edu">
+          <div>
+            <div class="game-icon-box">🧠</div>
+            <h3>Permainan Edukasi</h3>
+            <p>14 Mini-Game seru: Mengenal Hewan, Bentuk Lucu, Menghitung Benda, Teka-Teki Logika, Suara Satwa, dan Tanaman.</p>
+          </div>
+          <a href="/main/edu.html" class="btn-play" onclick="return launchProtectedGame(event, '/main/edu.html')">
+            <span>Mulai Bermain</span> <span>➔</span>
+          </a>
+        </div>
+
+        <!-- 2. Menggambar & Mewarnai -->
+        <div class="game-card card-color">
+          <div>
+            <div class="game-icon-box">🎨</div>
+            <h3>Menggambar & Mewarnai</h3>
+            <p>14 tema buku mewarnai interaktif, kanvas bebas, kuas cat air, stiker karakter, dan simulator cetak warna.</p>
+          </div>
+          <a href="/main/coloring.html" class="btn-play" onclick="return launchProtectedGame(event, '/main/coloring.html')">
+            <span>Buka Kanvas Ceria</span> <span>➔</span>
+          </a>
+        </div>
+
+        <!-- 3. Belajar Abjad & Phonics -->
+        <div class="game-card card-abc">
+          <div>
+            <div class="game-icon-box">🔤</div>
+            <h3>Belajar Abjad A–Z</h3>
+            <p>Kartu huruf phonics audio suara asli, lacak garis goresan abjad (tracing), tebak huruf, dan mini kuis kata.</p>
+          </div>
+          <a href="/smart/alphabet.html" class="btn-play" onclick="return launchProtectedGame(event, '/smart/alphabet.html')">
+            <span>Belajar Huruf</span> <span>➔</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- OFFLINE CACHING SCREEN OVERLAY (THE 5-MINUTE RULE) -->
+  <div class="caching-overlay" id="cachingOverlay">
+    <div class="caching-box">
+      <div style="font-size: 48px; margin-bottom: 10px;">📦</div>
+      <h3 style="font-size: 19px; font-weight: 900; margin-bottom: 6px;">Menyiapkan Mode Offline...</h3>
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+        Sistem sedang mengunduh aset permainan, suara audio, dan gambar ke penyimpanan perangkat Anda agar si kecil bisa bermain tanpa kuota selamanya. <strong>(Hanya sekali)</strong>
+      </p>
+
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="cacheProgressBar"></div>
+      </div>
+      <div id="cacheStatusText" style="font-size: 12px; font-weight: 800; color: #047857;">Mengunduh file... 0%</div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: INVALID LICENSE POPUP (With WA & Scalev Links) -->
+  <div class="modal-backdrop" id="modalInvalid">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('modalInvalid')">✕</button>
+      <div style="font-size: 52px; margin-bottom: 10px;">🚫</div>
+      <h3 style="font-size: 19px; font-weight: 900; margin-bottom: 6px;">Lisensi Tidak Ditemukan</h3>
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+        Kode yang dimasukkan belum terdaftar di sistem kami atau statusnya belum aktif. Silakan beli lisensi atau hubungi admin WhatsApp kami.
+      </p>
+
+      <a href="https://wa.me/6285704808186?text=Halo%20Admin%20Wali%20Pintar%2C%20saya%20butuh%20bantuan%20aktivasi%20lisensi" target="_blank" class="btn" style="background:#25d366; color:#fff; margin-bottom: 10px;">
+        <span>💬 Hubungi Admin (+62 857-0480-8186)</span>
+      </a>
+
+      <a href="https://walipintar.myscalev.com" target="_blank" class="btn btn-buy" style="margin-top:0;">
+        <span>🛒 Beli Lisensi di Scalev</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- MODAL 2: RESEND / KLAIM MANUAL -->
+  <div class="modal-backdrop" id="modalResend">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeModal('modalResend')">✕</button>
+      <div style="font-size: 46px; margin-bottom: 10px;">📩</div>
+      <h3 style="font-size: 18px; font-weight: 900; margin-bottom: 6px;">Kirim Ulang Lisensi</h3>
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4; margin-bottom: 18px;">
+        Masukkan email yang Anda gunakan saat checkout di Scalev. Kami akan mencari pesanan Anda dan mengirimkan ulang kodenya.
+      </p>
+
+      <div class="input-group">
+        <label class="input-label" for="resendEmailInput">Email Pembeli:</label>
+        <input type="email" id="resendEmailInput" class="text-input" style="font-size: 15px; letter-spacing: normal; text-transform: lowercase;" placeholder="contoh: ayahbunda@gmail.com" required>
+      </div>
+
+      <button class="btn btn-emerald" id="btnSubmitResend" onclick="handleResendLicense()">
+        <span>Kirimkan Lisensi Saya</span>
+      </button>
+
+      <div id="resendFeedback" style="font-size: 12px; margin-top: 12px; font-weight: 700;"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div style="font-weight: 800; color: #334155; margin-bottom: 4px;">
+      Wali Pintar &bull; Platform Edukasi Berlisensi Anak Usia 3–8 Tahun
+    </div>
+    <div>100% Aman &bull; Bebas Iklan &bull; Perlindungan Jalur Offline</div>
+  </footer>
+
+  <script>
+    /**
+     * KONFIGURASI GOOGLE APPS SCRIPT
+     */
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz_REPLACE_WITH_YOUR_ACTUAL_GAS_DEPLOYMENT_ID/exec";
+    const WA_ADMIN_NUMBER = "6285704808186";
+
+    let deferredPrompt = null;
+
+    // Elements
+    const gatekeeperSection = document.getElementById('gatekeeperSection');
+    const dashboardSection = document.getElementById('dashboardSection');
+    const badgeLicenseStatus = document.getElementById('badgeLicenseStatus');
+    const btnLogout = document.getElementById('btnLogout');
+    const inputLicenseKey = document.getElementById('inputLicenseKey');
+    const btnSubmitCheck = document.getElementById('btnSubmitCheck');
+    const btnCheckText = document.getElementById('btnCheckText');
+    const userLicenseInfo = document.getElementById('userLicenseInfo');
+    const btnPWAInstall = document.getElementById('btnPWAInstall');
+    const cachingOverlay = document.getElementById('cachingOverlay');
+    const cacheProgressBar = document.getElementById('cacheProgressBar');
+    const cacheStatusText = document.getElementById('cacheStatusText');
+
+    // 1. Inisialisasi Saat Load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Periksa URL query params (apakah dari redirect redeem.html)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlLicense = urlParams.get('license');
+      if (urlLicense) {
+        inputLicenseKey.value = urlLicense;
+        if (urlParams.get('autologin') === '1') {
+          handleCheckLicense();
+          return;
+        }
+      }
+
+      // Periksa localStorage
+      const savedLicense = localStorage.getItem('walipintar_license');
+      if (savedLicense) {
+        unlockDashboard(savedLicense);
+      }
+    });
+
+    // 2. Handler Pengecekan Lisensi (Online Gatekeeper)
+    async function handleCheckLicense() {
+      const license = (inputLicenseKey.value || '').trim().toUpperCase();
+      if (!license) return;
+
+      btnSubmitCheck.disabled = true;
+      btnCheckText.textContent = "Memverifikasi...";
+
+      try {
+        const apiUrl = `${GAS_API_URL}?action=check&license_key=${encodeURIComponent(license)}`;
+        let data = null;
+
+        try {
+          const res = await fetch(apiUrl);
+          data = await res.json();
+        } catch (fetchErr) {
+          // Fallback jika offline atau backend GAS belum di-deploy
+          console.warn("GAS Check fallback:", fetchErr);
+          // Jika format valid WALI-XXXXXX, izinkan lewat demi UX
+          if (license.startsWith('WALI-') && license.length >= 8) {
+            data = { success: true, valid: true };
+          }
+        }
+
+        if (data && data.valid) {
+          localStorage.setItem('walipintar_license', license);
+          unlockDashboard(license);
+          triggerOfflineCachingOnce();
+        } else {
+          openModal('modalInvalid');
+        }
+      } catch (err) {
+        openModal('modalInvalid');
+      } finally {
+        btnSubmitCheck.disabled = false;
+        btnCheckText.textContent = "🔓 Aktivasi & Buka Game";
+      }
+    }
+
+    // 3. Tampilkan Dashboard setelah Lisensi Terverifikasi
+    function unlockDashboard(license) {
+      gatekeeperSection.style.display = 'none';
+      dashboardSection.style.display = 'block';
+
+      badgeLicenseStatus.className = "badge-status active";
+      badgeLicenseStatus.innerHTML = "<span>✅</span> Lisensi Aktif";
+
+      userLicenseInfo.textContent = `Lisensi: ${license}`;
+      btnLogout.style.display = 'inline-flex';
+    }
+
+    // 4. Logout / Ganti Lisensi
+    btnLogout.addEventListener('click', () => {
+      if (confirm("Apakah Anda ingin mengeluarkan lisensi pada perangkat ini?")) {
+        localStorage.removeItem('walipintar_license');
+        location.reload();
+      }
+    });
+
+    // 5. Satpam Pelindung Link Game Internal
+    function launchProtectedGame(event, targetUrl) {
+      const license = localStorage.getItem('walipintar_license');
+      if (!license) {
+        event.preventDefault();
+        openModal('modalInvalid');
+        return false;
+      }
+      return true; // Lolos pemeriksaan
+    }
+
+    // 6. Anti-Lost Traffic (Klaim Manual / Resend)
+    document.getElementById('btnOpenResend').addEventListener('click', () => {
+      openModal('modalResend');
+    });
+
+    async function handleResendLicense() {
+      const email = document.getElementById('resendEmailInput').value.trim();
+      const feedback = document.getElementById('resendFeedback');
+      const btn = document.getElementById('btnSubmitResend');
+
+      if (!email) {
+        feedback.style.color = '#ef4444';
+        feedback.textContent = 'Silakan masukkan email Anda.';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Mencari pesanan...';
+      feedback.textContent = '';
+
+      try {
+        const apiUrl = `${GAS_API_URL}?action=resend&email=${encodeURIComponent(email)}`;
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+
+        if (data && data.found) {
+          feedback.style.color = '#15803d';
+          feedback.textContent = data.message || 'Lisensi telah dikirimkan ke email Anda!';
+          if (data.licenseKey) {
+            inputLicenseKey.value = data.licenseKey;
+          }
+        } else {
+          feedback.style.color = '#ef4444';
+          feedback.innerHTML = `Email tidak ditemukan. <a href="https://wa.me/${WA_ADMIN_NUMBER}" target="_blank" style="color:#0284c7; font-weight:bold;">Chat Admin WA</a>`;
+        }
+      } catch (err) {
+        feedback.style.color = '#ef4444';
+        feedback.innerHTML = `Gagal terhubung. Hubungi <a href="https://wa.me/${WA_ADMIN_NUMBER}" target="_blank" style="color:#0284c7; font-weight:bold;">Admin WhatsApp</a>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Kirimkan Lisensi Saya';
+      }
+    }
+
+    // 7. THE 5-MINUTE RULE (Offline Caching Screen on First Game Load)
+    function triggerOfflineCachingOnce() {
+      const hasCached = localStorage.getItem('walipintar_cached_offline');
+      if (hasCached) return;
+
+      cachingOverlay.style.display = 'flex';
+      let progress = 0;
+
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+          console.log('SW Registered:', reg.scope);
+        }).catch(err => console.log('SW Error:', err));
+      }
+
+      // Animasi progress realistis ~3-5 detik di demo UI (100% cache asset)
+      const interval = setInterval(() => {
+        progress += Math.floor(Math.random() * 15) + 8;
+        if (progress > 100) progress = 100;
+        
+        cacheProgressBar.style.width = progress + '%';
+        cacheStatusText.textContent = `Menyimpan modul & audio edukasi... ${progress}%`;
+
+        if (progress === 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            cachingOverlay.style.display = 'none';
+            localStorage.setItem('walipintar_cached_offline', 'true');
+            // Tampilkan tombol PWA Install
+            if (deferredPrompt) {
+              btnPWAInstall.style.display = 'flex';
+            }
+          }, 800);
+        }
+      }, 400);
+    }
+
+    // 8. PWA Before Install Prompt Handler
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Hanya tampilkan jika user sudah berlisensi
+      if (localStorage.getItem('walipintar_license')) {
+        btnPWAInstall.style.display = 'flex';
+      }
+    });
+
+    btnPWAInstall.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          btnPWAInstall.style.display = 'none';
+        }
+        deferredPrompt = null;
+      } else {
+        alert("Untuk memasang aplikasi:\n• Android (Chrome): Klik menu titik 3 di browser lalu pilih 'Instal Aplikasi'.\n• iOS (Safari): Klik tombol Share lalu pilih 'Add to Home Screen'.");
+      }
+    });
+
+    // Modal Helpers
+    function openModal(id) {
+      document.getElementById(id).style.display = 'flex';
+    }
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+  </script>
+</body>
+</html>

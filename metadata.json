@@ -2,7 +2,5 @@
   "name": "Taman Belajar Ceria - Game Edukasi Anak",
   "description": "Game edukasi offline anak usia 3-8 tahun dengan pengenalan hewan, tumbuhan, buah & sayur, suara hewan, angka, dan logika.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

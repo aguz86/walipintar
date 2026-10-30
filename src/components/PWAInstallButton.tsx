@@ -27,7 +27,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   // Guide Modal (Works for iOS Safari, Android Chrome, and Desktop)
   const renderGuideModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-slate-800">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center relative border-4 border-indigo-200">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-5 sm:p-6 shadow-2xl text-center relative border-4 border-indigo-200 max-h-[92vh] overflow-y-auto">
         <button
           onClick={() => setShowGuide(false)}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
@@ -54,7 +54,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                 2. Gulir ke bawah lalu pilih <strong>Tambah ke Layar Utama (Add to Home Screen)</strong> ➕.
               </p>
               <p>
-                3. Buka ikon <strong>Taman Ceria</strong> di layar HP untuk bermain offline tanpa kuota!
+                3. Buka ikon <strong>Wali Pintar</strong> di layar HP untuk bermain offline tanpa kuota!
               </p>
             </>
           ) : (
@@ -106,8 +106,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
               </h4>
               <p className="text-xs md:text-sm text-slate-600 mt-1 max-w-xl">
                 {lang === 'id'
-                  ? 'Pasang aplikasi Taman Belajar Ceria di layar utama ponsel atau tablet anak. Cepat dibuka, hemat kuota internet, dan aman digunakan saat bepergian!'
-                  : 'Install Taman Belajar Ceria on your home screen. Fast to launch, zero internet needed, and 100% safe for travel!'}
+                  ? 'Pasang aplikasi Wali Pintar di layar utama ponsel atau tablet anak. Cepat dibuka, hemat kuota internet, dan aman digunakan saat bepergian!'
+                  : 'Install Wali Pintar on your home screen. Fast to launch, zero internet needed, and 100% safe for travel!'}
               </p>
             </div>
           </div>

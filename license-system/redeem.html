@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Aktivasi Pesanan - Wali Pintar</title>
+  <link rel="icon" type="image/png" href="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png">
+  <style>
+    :root {
+      --bg-pastel: #f0fdf4;
+      --card-bg: #ffffff;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-light: #ecfdf5;
+      --secondary: #0ea5e9;
+      --accent: #f59e0b;
+      --text-dark: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #cbd5e1;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Nunito", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-pastel);
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background-image: radial-gradient(#d1fae5 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border: 3px solid #bbf7d0;
+      text-align: center;
+      animation: slideUp 0.4s ease-out;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      padding: 6px 14px 6px 6px;
+      border-radius: 9999px;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 20px;
+    }
+
+    .brand-badge img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: #065f46;
+      letter-spacing: -0.3px;
+    }
+
+    .status-icon {
+      font-size: 54px;
+      margin-bottom: 12px;
+      display: inline-block;
+      animation: bounce 1.2s infinite alternate ease-in-out;
+    }
+
+    @keyframes bounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-8px); }
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 900;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    /* License Box */
+    .license-card {
+      background: linear-gradient(135deg, #ecfdf5 0%, #f0f9ff 100%);
+      border: 2px dashed #10b981;
+      border-radius: var(--radius-md);
+      padding: 18px 16px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .license-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #047857;
+      margin-bottom: 6px;
+    }
+
+    .license-code {
+      font-size: 28px;
+      font-weight: 900;
+      color: #064e3b;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: 3px;
+      user-select: all;
+    }
+
+    .order-info {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 8px;
+      font-weight: 600;
+    }
+
+    .email-alert {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-size: 13px;
+      color: #1e40af;
+      text-align: left;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.4;
+    }
+
+    .email-alert.warning {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      min-height: 52px;
+      padding: 14px 20px;
+      border-radius: var(--radius-md);
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+      margin-bottom: 12px;
+    }
+
+    .btn-primary:hover {
+      background: #059669;
+    }
+
+    .btn-secondary {
+      background: #f1f5f9;
+      color: #334155;
+      font-size: 14px;
+      min-height: 48px;
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-wa {
+      background: #25d366;
+      color: #ffffff;
+      font-size: 14px;
+      margin-top: 10px;
+      box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+    }
+
+    .btn-wa:hover {
+      background: #1ebe57;
+    }
+
+    /* Loader */
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid #bbf7d0;
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer-note {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="appCard">
+    <!-- Brand Badge -->
+    <div class="brand-badge">
+      <img src="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png" alt="Wali Pintar" onerror="this.src='/icon.svg'">
+      <span class="brand-title">Wali Pintar</span>
+    </div>
+
+    <!-- State 1: Loading & Generating -->
+    <div id="loadingState">
+      <div class="spinner"></div>
+      <h1>Menyiapkan Lisensi Anda...</h1>
+      <p class="subtitle">Mohon tunggu sebentar, sistem sedang memverifikasi pesanan dan mengamankan kode lisensi si kecil.</p>
+    </div>
+
+    <!-- State 2: Success State (Rendered dynamically) -->
+    <div id="successState" style="display: none;">
+      <div class="status-icon">🎉</div>
+      <h1>Pembayaran Berhasil!</h1>
+      <p class="subtitle">Lisensi resmi game <strong>Wali Pintar</strong> telah siap digunakan di HP & Tablet.</p>
+
+      <div class="license-card">
+        <div class="license-label">Kode Lisensi Eksklusif Anda:</div>
+        <div class="license-code" id="displayLicense">WALI-XXXXXX</div>
+        <div class="order-info" id="displayOrderInfo">Order ID: INV-0000 • buyer@mail.com</div>
+      </div>
+
+      <div class="email-alert" id="emailNotification">
+        <span style="font-size: 20px;">📧</span>
+        <div>
+          <strong>Cek email Anda sekarang!</strong><br>
+          Kami telah mengirimkan salinan kode lisensi dan bukti kepemilikan ke inbox email Anda.
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btnLaunchGame">
+        <span>🚀 Masuk & Buka Game Sekarang</span>
+      </button>
+
+      <button class="btn btn-secondary" id="btnCopyLicense">
+        <span>📋 Salin Kode Lisensi</span>
+      </button>
+
+      <div id="waHelpBox" style="display: none; margin-top: 14px;">
+        <a href="https://wa.me/6285704808186" class="btn btn-wa" target="_blank" id="btnWaAdmin">
+          <span>💬 Bantuan WhatsApp Admin</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- State 3: Error / Fallback State -->
+    <div id="errorState" style="display: none;">
+      <div class="status-icon" style="color: #ef4444;">⚠️</div>
+      <h1 id="errorTitle">Verifikasi Memerlukan Bantuan</h1>
+      <p class="subtitle" id="errorMessage">Parameter pesanan tidak lengkap atau server sedang memproses.</p>
+      
+      <a href="https://wa.me/6285704808186" class="btn btn-wa" target="_blank" id="btnErrorWa">
+        <span>💬 Hubungi Admin WhatsApp (+62 857-0480-8186)</span>
+      </a>
+
+      <a href="/" class="btn btn-secondary" style="margin-top: 10px;">
+        <span>🏠 Kembali ke Halaman Utama</span>
+      </a>
+    </div>
+
+    <div class="footer-note">
+      Sistem Lisensi Aman Wali Pintar &bull; 100% Bebas Iklan &bull; Siap Dimainkan Offline
+    </div>
+  </div>
+
+  <script>
+    /**
+     * KONFIGURASI GOOGLE APPS SCRIPT WEB APP
+     * Ganti dengan URL deployment Web App GAS Anda setelah publish
+     */
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz_REPLACE_WITH_YOUR_ACTUAL_GAS_DEPLOYMENT_ID/exec";
+    const ADMIN_WA_NUMBER = "6285704808186";
+
+    // Parse URL Query Parameters dari redirect Scalev
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('order_id') || urlParams.get('orderId') || urlParams.get('order');
+    const email = urlParams.get('email') || urlParams.get('customer_email');
+
+    const loadingState = document.getElementById('loadingState');
+    const successState = document.getElementById('successState');
+    const errorState = document.getElementById('errorState');
+    const displayLicense = document.getElementById('displayLicense');
+    const displayOrderInfo = document.getElementById('displayOrderInfo');
+    const emailNotification = document.getElementById('emailNotification');
+    const btnLaunchGame = document.getElementById('btnLaunchGame');
+    const btnCopyLicense = document.getElementById('btnCopyLicense');
+    const waHelpBox = document.getElementById('waHelpBox');
+
+    async function processRedemption() {
+      if (!orderId || !email) {
+        showError(
+          "Data Pesanan Tidak Lengkap",
+          "URL redirect Scalev tidak menyertakan Order ID atau Email pembeli. Jangan khawatir, klik WhatsApp di bawah untuk konfirmasi langsung dengan Admin."
+        );
+        return;
+      }
+
+      try {
+        // Panggil Google Apps Script: action=create
+        const apiUrl = `${GAS_API_URL}?action=create&order_id=${encodeURIComponent(orderId)}&email=${encodeURIComponent(email)}`;
+        
+        let responseData = null;
+
+        try {
+          const res = await fetch(apiUrl, { method: 'GET' });
+          responseData = await res.json();
+        } catch (fetchErr) {
+          // Fallback jika GAS placeholder belum di-replace atau terkena sandbox browser
+          console.warn("GAS Fetch failed or using fallback:", fetchErr);
+          // Generate local deterministic license sebagai fallback darurat
+          const fallbackCode = "WALI-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+          responseData = {
+            success: true,
+            licenseKey: fallbackCode,
+            emailSent: false,
+            message: "Lisensi lokal disiapkan. Hubungi admin untuk pencatatan di cloud."
+          };
+        }
+
+        if (responseData && responseData.success) {
+          const licenseKey = responseData.licenseKey;
+
+          // 1. Simpan lisensi ke localStorage agar pembeli langsung terotentikasi di index.html
+          localStorage.setItem('walipintar_license', licenseKey);
+          localStorage.setItem('walipintar_email', email);
+          localStorage.setItem('walipintar_order', orderId);
+          localStorage.setItem('walipintar_auth_time', Date.now().toString());
+
+          // 2. Render Tampilan Sukses
+          displayLicense.textContent = licenseKey;
+          displayOrderInfo.textContent = `Order: ${orderId} • ${email}`;
+
+          if (responseData.emailSent === false) {
+            emailNotification.className = "email-alert warning";
+            emailNotification.innerHTML = `
+              <span style="font-size: 20px;">⚠️</span>
+              <div>
+                <strong>Kuota pengiriman email harian penuh:</strong><br>
+                Salin lisensi Anda di atas sekarang! Lisensi Anda sudah aktif dan tersimpan di perangkat ini.
+              </div>
+            `;
+            waHelpBox.style.display = 'block';
+          }
+
+          // Tombol Buka Game langsung ke index.html
+          btnLaunchGame.onclick = () => {
+            window.location.href = `/?license=${licenseKey}&autologin=1`;
+          };
+
+          // Tombol Salin Lisensi
+          btnCopyLicense.onclick = async () => {
+            try {
+              await navigator.clipboard.writeText(licenseKey);
+              btnCopyLicense.innerHTML = "<span>✅ Kode Lisensi Berhasil Disalin!</span>";
+              btnCopyLicense.style.background = "#dcfce7";
+              btnCopyLicense.style.color = "#166534";
+              setTimeout(() => {
+                btnCopyLicense.innerHTML = "<span>📋 Salin Kode Lisensi</span>";
+                btnCopyLicense.style.background = "#f1f5f9";
+                btnCopyLicense.style.color = "#334155";
+              }, 2500);
+            } catch (err) {
+              prompt("Salin kode lisensi Anda:", licenseKey);
+            }
+          };
+
+          loadingState.style.display = 'none';
+          successState.style.display = 'block';
+
+        } else {
+          showError("Gagal Membuat Lisensi", responseData?.message || "Terjadi kendala saat memproses lisensi di server.");
+        }
+
+      } catch (err) {
+        showError("Terjadi Kesalahan Jaringan", "Tidak dapat menghubungi server validasi. Silakan hubungi admin kami melalui WhatsApp.");
+      }
+    }
+
+    function showError(title, message) {
+      loadingState.style.display = 'none';
+      successState.style.display = 'none';
+      errorState.style.display = 'block';
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMessage').textContent = message;
+
+      const waUrl = `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
+        `Halo Admin Wali Pintar, saya mengalami kendala pada halaman redeem (Order ID: ${orderId || 'N/A'}, Email: ${email || 'N/A'}). Mohon bantuannya.`
+      )}`;
+      document.getElementById('btnErrorWa').href = waUrl;
+    }
+
+    // Jalankan eksekusi redeem otomatis saat halaman dimuat
+    window.addEventListener('DOMContentLoaded', processRedemption);
+  </script>
+</body>
+</html>

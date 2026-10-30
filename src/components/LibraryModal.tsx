@@ -79,27 +79,27 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="w-full max-w-4xl rounded-3xl bg-white p-5 md:p-6 shadow-2xl relative border-4 border-emerald-300 my-auto text-slate-800 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-4xl rounded-3xl bg-white p-3.5 sm:p-5 md:p-6 shadow-2xl relative border-4 border-emerald-300 my-auto text-slate-800 max-h-[94vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 text-2xl font-bold shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 text-xl sm:text-2xl font-bold shadow-xs shrink-0">
               📚
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 leading-tight">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 leading-tight">
                   {lang === 'id' ? 'Pustaka Ceria' : 'Learning Library'}
                 </h3>
-                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                <span className="text-[10px] sm:text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   {ALL_ITEMS.length} {lang === 'id' ? 'Item' : 'Items'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium line-clamp-1">
                 {lang === 'id'
-                  ? 'Katalog lengkap 505 materi edukasi: hewan, buah, sayur, tumbuhan & kendaraan'
-                  : 'Complete 505 encyclopedia: animals, fruits, veggies, plants & vehicles'}
+                  ? 'Katalog lengkap 505 materi edukasi anak'
+                  : 'Complete 505 encyclopedia for kids'}
               </p>
             </div>
           </div>
@@ -108,7 +108,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
             className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
             aria-label="Tutup"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
@@ -123,7 +123,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
                 lang === 'id'
-                  ? `Cari di antara ${currentCategory.items.length} ${currentCategory.labelId.toLowerCase()} (misal: Durian, Bayam, Melati, Becak)...`
+                  ? `Cari di antara ${currentCategory.items.length} ${currentCategory.labelId.toLowerCase()}...`
                   : `Search ${currentCategory.items.length} ${currentCategory.labelEn.toLowerCase()}...`
               }
               className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-100 focus:bg-white border border-slate-200 focus:border-emerald-500 text-xs md:text-sm font-bold text-slate-800 focus:outline-none transition-colors"
@@ -139,7 +139,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
           </div>
 
           {/* Categories Tab Strip */}
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
             {CATEGORIES.map((cat, idx) => (
               <button
                 key={cat.id}

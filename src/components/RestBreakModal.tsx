@@ -33,7 +33,7 @@ export const RestBreakModal: React.FC<RestBreakModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-300">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-5 sm:p-6 shadow-2xl text-center border-4 border-emerald-300 max-h-[92vh] overflow-y-auto">
         <div className="text-6xl mb-3 animate-bounce">
           {type === 'break' ? '🌿' : '🌙'}
         </div>
