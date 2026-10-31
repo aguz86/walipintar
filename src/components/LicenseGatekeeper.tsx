@@ -39,86 +39,75 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
       return;
     }
 
-    setIsLoading(true);
-
-    // 1. Cek skenario simulasi / demo salah
-    if (trimmed.startsWith('SALAH-') || trimmed.startsWith('WALI-SALAH') || trimmed === 'INVALID' || trimmed === 'WRONG') {
-      setTimeout(() => {
-        setIsLoading(false);
-        setRejectMessage('Kode lisensi tidak valid atau belum terdaftar di sistem. Silakan periksa kembali email Anda atau hubungi Admin WhatsApp.');
-        setShowRejectModal(true);
-        SFX.no();
-      }, 500);
-      return;
-    }
-
-    // 2. Wajib berawalan prefix 'WALI-'
+    // 1. Wajib berawalan prefix 'WALI-'
     if (!trimmed.startsWith('WALI-')) {
-      setTimeout(() => {
-        setIsLoading(false);
-        setRejectMessage("Format lisensi ditolak! Seluruh kode lisensi resmi Wali Pintar WAJIB diawali dengan prefix 'WALI-' dan 4 karakter huruf & angka (Contoh: WALI-7K9P).");
-        setShowRejectModal(true);
-        SFX.no();
-      }, 400);
+      setRejectMessage("Format lisensi ditolak! Seluruh kode lisensi resmi Wali Pintar WAJIB diawali dengan prefix 'WALI-' diikuti kombinasi huruf dan angka (Contoh: WALI-XXXX).");
+      setShowRejectModal(true);
+      SFX.no();
       return;
     }
 
-    // 3. Validasi format WALI-XXXX (minimal 4 karakter alfanumerik bebas 0, O, 1, I)
+    // 2. Validasi format WALI-XXXX (minimal 4 karakter akhiran)
     const suffixPart = trimmed.replace('WALI-', '');
     if (suffixPart.length < 4) {
-      setTimeout(() => {
-        setIsLoading(false);
-        setRejectMessage("Kode lisensi tidak lengkap. Format resmi adalah 'WALI-XXXX' (4 karakter kombinasi huruf & angka tanpa huruf 0, O, 1, I, contoh: WALI-7K9P).");
-        setShowRejectModal(true);
-        SFX.no();
-      }, 400);
+      setRejectMessage("Kode lisensi tidak lengkap. Format resmi adalah 'WALI-XXXX' (4 karakter kombinasi huruf & angka tanpa typo).");
+      setShowRejectModal(true);
+      SFX.no();
       return;
     }
 
-    // 4. Verifikasi online ke Google Apps Script / Google Sheets jika ada koneksi
-    const isDemoKey = ['WALI-7K9P', 'WALI-3M8Q', 'WALI-9999', 'WALI-1234'].includes(trimmed);
-    if (!isDemoKey) {
-      try {
-        const checkUrl = `${GAS_API_URL}?action=check&license_key=${encodeURIComponent(trimmed)}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        
-        const response = await fetch(checkUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
+    setIsLoading(true);
 
-        if (response.ok) {
-          const resData = await response.json();
-          if (resData && resData.valid === false) {
-            setIsLoading(false);
-            setRejectMessage(resData.message || 'Kode lisensi tidak valid, sudah dihapus, atau belum terdaftar.');
-            setShowRejectModal(true);
-            SFX.no();
-            return;
-          }
-        }
-      } catch (networkErr) {
-        // Fallback jika offline
-        console.warn('Online GAS check fallback to offline:', networkErr);
-      }
-    }
-
+    // 3. Verifikasi Real-Time ke Google Apps Script / Google Sheets
     try {
-      // 1 Lisensi WALI-XXXX langsung membuka seluruh 3 kategori game
-      localStorage.setItem('walipintar_license', trimmed);
-      localStorage.setItem('walipintar_auth_time', Date.now().toString());
+      const checkUrl = `${GAS_API_URL}?action=check&license_key=${encodeURIComponent(trimmed)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 9000);
 
-      setTimeout(() => {
+      const response = await fetch(checkUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const resData = await response.json();
+        if (resData && (resData.valid === true || (resData.success === true && resData.valid !== false))) {
+          // Lisensi terdaftar dan aktif di Google Sheets!
+          localStorage.setItem('walipintar_license', trimmed);
+          localStorage.setItem('walipintar_auth_time', Date.now().toString());
+          if (resData.email) localStorage.setItem('walipintar_email', resData.email);
+          if (resData.orderId) localStorage.setItem('walipintar_order', resData.orderId);
+
+          setIsLoading(false);
+          SFX.fanfare();
+          onUnlock(trimmed);
+          return;
+        } else {
+          // Ditolak oleh server Google Sheet
+          setIsLoading(false);
+          setRejectMessage(
+            resData?.message ||
+              'Kode lisensi tidak ditemukan di database Google Sheet atau status belum aktif. Pastikan kode diketik persis sesuai email dari admin@walipintar.my.id.'
+          );
+          setShowRejectModal(true);
+          SFX.no();
+          return;
+        }
+      } else {
         setIsLoading(false);
-        SFX.fanfare();
-        onUnlock(trimmed);
-      }, 400);
-
-    } catch (err) {
-      // Fallback offline
-      localStorage.setItem('walipintar_license', trimmed);
+        setRejectMessage('Gagal menghubungi server validasi Google Sheets. Silakan periksa koneksi internet Anda atau hubungi Admin WhatsApp.');
+        setShowRejectModal(true);
+        SFX.no();
+        return;
+      }
+    } catch (networkErr: any) {
       setIsLoading(false);
-      SFX.fanfare();
-      onUnlock(trimmed);
+      const isTimeout = networkErr?.name === 'AbortError';
+      const msg = isTimeout
+        ? 'Koneksi ke server validasi Google Sheet memakan waktu terlalu lama. Silakan coba beberapa saat lagi.'
+        : 'Verifikasi lisensi pertama kali membutuhkan koneksi internet untuk memeriksa database Google Sheet. Pastikan perangkat terhubung ke internet, lalu coba lagi.';
+      setRejectMessage(msg);
+      setShowRejectModal(true);
+      SFX.no();
+      return;
     }
   };
 
@@ -217,27 +206,6 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               </p>
             </div>
           </div>
-
-          {/* Quick Demo Helper (Kecil & Rapi untuk Uji Coba Cepat) */}
-          <div className="pt-1 text-[10.5px] text-slate-500 flex items-center justify-between border-t border-amber-200/60 mt-1.5">
-            <span>💡 Mode Uji Coba Cepat:</span>
-            <div className="space-x-1.5">
-              <button
-                type="button"
-                onClick={() => setInputKey('WALI-7K9P')}
-                className="text-emerald-800 font-bold hover:underline bg-white px-1.5 py-0.5 rounded border border-amber-200"
-              >
-                Isi WALI-7K9P
-              </button>
-              <button
-                type="button"
-                onClick={() => setInputKey('SALAH-123')}
-                className="text-rose-700 font-bold hover:underline bg-white px-1.5 py-0.5 rounded border border-amber-200"
-              >
-                Tes Salah
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Form Input Lisensi (Format WALI-XXXX) */}
@@ -247,7 +215,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               type="text"
               value={inputKey}
               onChange={(e) => setInputKey(e.target.value.toUpperCase())}
-              placeholder="CONTOH:  WALI-7K9P"
+              placeholder="CONTOH:  WALI-XXXX"
               className="w-full h-14 sm:h-15 px-4 text-center font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 border-slate-200 focus:border-teal-500 focus:bg-teal-50/20 focus:outline-none transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:tracking-wider shadow-2xs font-mono"
               autoCapitalize="characters"
               autoComplete="off"

@@ -535,7 +535,7 @@ export default function App() {
                 className="bg-gradient-to-b from-amber-50 via-white to-emerald-50 rounded-3xl p-5 border-3 border-emerald-300 hover:border-emerald-500 shadow-md hover:shadow-xl transition-all hover:scale-103 active:scale-97 cursor-pointer flex flex-col justify-between relative group text-left"
               >
                 <div className="absolute top-4 right-4 bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xs">
-                  {data.lang === 'id' ? '14 Game' : '14 Games'}
+                  {data.lang === 'id' ? `${GAME_DEFINITIONS.length} Game` : `${GAME_DEFINITIONS.length} Games`}
                 </div>
 
                 <div>
@@ -737,7 +737,7 @@ export default function App() {
           />
         )}
 
-        {/* 4. CATEGORY: PERMAINAN EDUKASI (14 GAMES) */}
+        {/* 4. CATEGORY: PERMAINAN EDUKASI (17 GAMES) */}
         {mainCategory === 'educational' && (
           <>
             {activeGameId ? (
