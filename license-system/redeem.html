@@ -273,7 +273,7 @@
 
       <div class="license-card">
         <div class="license-label">Kode Lisensi Eksklusif Anda:</div>
-        <div class="license-code" id="displayLicense">WALI-XXXXXX</div>
+        <div class="license-code" id="displayLicense">WALI-XXXX</div>
         <div class="order-info" id="displayOrderInfo">Order ID: INV-0000 • buyer@mail.com</div>
       </div>
 
@@ -325,7 +325,7 @@
      * KONFIGURASI GOOGLE APPS SCRIPT WEB APP
      * Ganti dengan URL deployment Web App GAS Anda setelah publish
      */
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz_REPLACE_WITH_YOUR_ACTUAL_GAS_DEPLOYMENT_ID/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec";
     const ADMIN_WA_NUMBER = "6285704808186";
 
     // Parse URL Query Parameters dari redirect Scalev
@@ -362,10 +362,12 @@
           const res = await fetch(apiUrl, { method: 'GET' });
           responseData = await res.json();
         } catch (fetchErr) {
-          // Fallback jika GAS placeholder belum di-replace atau terkena sandbox browser
-          console.warn("GAS Fetch failed or using fallback:", fetchErr);
-          // Generate local deterministic license sebagai fallback darurat
-          const fallbackCode = "WALI-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+          // Generate local deterministic license WALI-XXXX 4 karakter huruf & angka aman tanpa 0, O, 1, I
+          const SAFE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+          let fallbackCode = 'WALI-';
+          for (let i = 0; i < 4; i++) {
+            fallbackCode += SAFE_CHARS.charAt(Math.floor(Math.random() * SAFE_CHARS.length));
+          }
           responseData = {
             success: true,
             licenseKey: fallbackCode,

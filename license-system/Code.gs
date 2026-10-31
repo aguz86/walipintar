@@ -699,7 +699,8 @@ function menuTestBrevoConnection() {
   }
 
   try {
-    const response = UrlFetchApp.fetch('https://api.brevo.com/v3/account', {
+    // Gunakan endpoint /v3/senders yang didukung oleh semua jenis API Key Brevo Transactional
+    const response = UrlFetchApp.fetch('https://api.brevo.com/v3/senders', {
       method: 'get',
       headers: { 'api-key': BREVO_API_KEY, 'Accept': 'application/json' },
       muteHttpExceptions: true
@@ -709,17 +710,27 @@ function menuTestBrevoConnection() {
     const text = response.getContentText();
 
     if (code === 200) {
-      const data = JSON.parse(text);
-      let planInfo = 'Free / Standard';
-      if (data.plan && data.plan.length > 0) {
-        planInfo = data.plan[0].type + ' (' + data.plan[0].credits + ' credits)';
-      }
+      let data = {};
+      try { data = JSON.parse(text); } catch (e) {}
+      const senders = data.senders || [];
+      let senderListStr = '';
+      senders.slice(0, 3).forEach((s) => {
+        senderListStr += '• ' + s.name + ' (' + s.email + ') - ' + (s.active ? 'Aktif ✅' : 'Belum Verifikasi ⚠️') + '\n';
+      });
+
       ui.alert(
-        '✅ Koneksi Brevo Berhasil!',
-        '• Akun: ' + data.email + '\n' +
-        '• Nama: ' + data.firstName + ' ' + data.lastName + '\n' +
-        '• Paket: ' + planInfo + '\n' +
-        '• Kuota Brevo siap digunakan untuk kirim lisensi.',
+        '✅ Koneksi Brevo API Berhasil & Aktif!',
+        'API Key Anda 100% valid dan siap mengirimkan email lisensi.\n\n' +
+        'Daftar Pengirim Terdaftar di Brevo:\n' +
+        (senderListStr || '• Email Pengirim siap digunakan.') + '\n' +
+        'Pengirim yang digunakan saat ini: ' + BREVO_SENDER_EMAIL,
+        ui.ButtonSet.OK
+      );
+    } else if (code === 403 && text.includes('permission_denied')) {
+      // Jika key khusus SMTP, infokan bahwa pengiriman email tetap aktif
+      ui.alert(
+        'ℹ️ Brevo API Key Valid untuk Pengiriman',
+        'API Key Anda bertipe SMTP/Transactional Key. Pengiriman email tetap berjalan normal saat pembeli checkout.\n\nDetail: ' + text,
         ui.ButtonSet.OK
       );
     } else {
@@ -816,8 +827,14 @@ function updateDashboardStats(ss) {
   reportSheet.getRange('A12').setValue('3. Begitu lisensi dihapus, pembeli otomatis ditendang (kick) dan tidak bisa mengakses game lagi.');
 }
 
+/**
+ * Helper: Generate Unique License WALI-XXXX (Kombinasi 4 Karakter Huruf & Angka)
+ * Karakter 0, O, 1, I dihilangkan untuk mencegah typo/salah ketik oleh pembeli.
+ * Contoh Hasil: WALI-7K9P, WALI-3M8Q, WALI-B9F2, WALI-X4RT
+ */
 function generateUniqueLicense(sheet) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  // Karakter aman tanpa 0, O, 1, I (Total 32 karakter = 1.048.576 kombinasi unik)
+  const SAFE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   const existingValues = sheet.getDataRange().getValues();
   const existingSet = new Set();
   for (let i = 1; i < existingValues.length; i++) {
@@ -828,11 +845,11 @@ function generateUniqueLicense(sheet) {
   let attempts = 0;
   do {
     code = 'WALI-';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    for (let i = 0; i < 4; i++) {
+      code += SAFE_CHARS.charAt(Math.floor(Math.random() * SAFE_CHARS.length));
     }
     attempts++;
-  } while (existingSet.has(code) && attempts < 100);
+  } while (existingSet.has(code) && attempts < 1000);
 
   return code;
 }

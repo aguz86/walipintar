@@ -10,7 +10,10 @@ import {
   Home,
   Shield,
   HelpCircle,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
+import { LicenseGatekeeper } from './components/LicenseGatekeeper';
 import {
   GAME_DEFINITIONS,
   AGE_LEVELS,
@@ -93,6 +96,15 @@ export default function App() {
       // Ignore
     }
     return null;
+  });
+
+  // Online License Gatekeeper State (Wajib login lisensi sebelum akses game)
+  const [activeLicense, setActiveLicense] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('walipintar_license') || null;
+    } catch {
+      return null;
+    }
   });
 
   // Active game view inside educational category
@@ -246,70 +258,120 @@ export default function App() {
     SFX.ding();
   };
 
+  const handleLogoutLicense = () => {
+    const confirmMsg =
+      data.lang === 'id'
+        ? `Keluar dari Lisensi (${activeLicense})?\nPerangkat ini akan meminta kode lisensi lagi untuk membuka game.`
+        : `Log out from License (${activeLicense})?\nThis device will require a license key again to access games.`;
+    if (window.confirm(confirmMsg)) {
+      localStorage.removeItem('walipintar_license');
+      setActiveLicense(null);
+      setMainCategory(null);
+      setActiveGameId(null);
+      SFX.bloop();
+    }
+  };
+
   const activeLevelConfig = AGE_LEVELS[data.level];
+
+  // JIKA LISENSI BELUM AKTIF / PERTAMA KALI: Wajib input lisensi terlebih dahulu
+  if (!activeLicense) {
+    return (
+      <LicenseGatekeeper
+        onUnlock={(licenseKey) => {
+          setActiveLicense(licenseKey);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen min-h-dvh flex flex-col antialiased">
       {/* Confetti Animation when Victory */}
       <ConfettiCanvas active={!!victoryData} />
 
-      {/* 3-ZONE TOP BAR (Clean Top Bar Contract & Mobile Friendly) */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-2.5 sm:px-4 py-2 shadow-xs">
+      {/* TOP BAR: Clean, Balanced, and Mobile-Friendly Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-2 sm:px-4 py-1.5 sm:py-2 shadow-xs">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
-          {/* Zone 1: Brand Title */}
+          {/* Brand Identity & Quick License Indicator */}
           <button
             onClick={handleBackToCategories}
-            className="flex items-center gap-2 sm:gap-2.5 text-left cursor-pointer group shrink-0"
+            className="flex items-center gap-1.5 sm:gap-2.5 text-left cursor-pointer group shrink-0 min-w-0"
             title={data.lang === 'id' ? 'Kembali ke Pilihan Kategori' : 'Back to Categories'}
           >
             <img
               src="/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png"
               alt="Logo Wali Pintar"
-              className="w-9 h-9 sm:w-11 sm:h-11 rounded-full object-cover shadow-2xs border-2 border-emerald-300 transition-transform group-hover:scale-105"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover shadow-2xs border-2 border-emerald-300 transition-transform group-hover:scale-105 shrink-0"
             />
-            <div>
-              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-lg font-black text-slate-900 tracking-tight leading-tight truncate">
                 Wali Pintar
               </h1>
-              <span className="text-[10px] font-bold text-emerald-700 hidden sm:inline">
+              {/* Desktop Subtitle */}
+              <span className="text-[10px] font-bold text-emerald-700 hidden sm:inline leading-none">
                 {data.lang === 'id' ? 'Bermain & Belajar 3–8 Th' : 'Kids Learning 3–8 yo'}
               </span>
+              {/* Mobile License Pill Indicator */}
+              <div className="flex sm:hidden items-center gap-1 text-[9px] font-bold text-emerald-700 leading-none mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span className="font-mono text-[9px] text-emerald-800 font-black truncate max-w-[90px]">
+                  {activeLicense || '100% Offline'}
+                </span>
+              </div>
             </div>
           </button>
 
-          {/* Zone 2: Navigation & Action Controls */}
+          {/* Action Controls & Kid Reward Stats */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* Header Compact PWA Install Button */}
-            <PWAInstallButton lang={data.lang} variant="compact" />
+            {/* Active License Badge with Switch/Logout Option (Tablet & Desktop) */}
+            <button
+              onClick={handleLogoutLicense}
+              className="hidden sm:flex h-8 sm:h-9 px-2.5 rounded-xl bg-emerald-50 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 border border-emerald-200 text-emerald-900 font-black text-xs items-center gap-1.5 cursor-pointer transition-colors shrink-0 group shadow-2xs"
+              title={
+                data.lang === 'id'
+                  ? `Lisensi Aktif: ${activeLicense} (Klik untuk ganti / keluar lisensi)`
+                  : `Active License: ${activeLicense} (Click to switch / log out)`
+              }
+            >
+              <KeyRound className="w-3.5 h-3.5 text-emerald-600 group-hover:text-rose-600 shrink-0" />
+              <span className="font-mono text-xs">{activeLicense}</span>
+              <span className="text-[10px] bg-emerald-200/70 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
+                {data.lang === 'id' ? 'Aktif' : 'Active'}
+              </span>
+            </button>
 
-            {/* Language Toggle */}
+            {/* Language Toggle Button */}
             <button
               onClick={() => {
                 setData((p) => ({ ...p, lang: p.lang === 'id' ? 'en' : 'id' }));
                 SFX.bloop();
               }}
-              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 font-black text-[11px] sm:text-xs text-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200/80 font-black text-[11px] sm:text-xs text-slate-700 flex items-center gap-1 cursor-pointer transition-colors shrink-0 shadow-2xs"
               aria-label="Ganti Bahasa"
               title="Ganti Bahasa / Switch Language"
             >
-              <Globe className="w-3.5 h-3.5 text-slate-500" />
+              <Globe className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>{data.lang.toUpperCase()}</span>
             </button>
 
             {/* Parental Gate Modal Button */}
             <button
               onClick={() => setShowParent(true)}
-              className="h-8 sm:h-9 w-8 sm:w-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer transition-colors shrink-0"
-              title={data.lang === 'id' ? 'Pengaturan Orang Tua' : 'Parent Controls'}
+              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 flex items-center gap-1 cursor-pointer transition-colors shrink-0 shadow-2xs"
+              title={data.lang === 'id' ? 'Pengaturan Orang Tua & Lisensi' : 'Parent Controls & License'}
               aria-label="Area Orang Tua"
             >
-              <Shield className="w-4 h-4 text-amber-600" />
+              <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="hidden md:inline font-black text-xs">
+                {data.lang === 'id' ? 'Orang Tua' : 'Parents'}
+              </span>
             </button>
 
-            {/* Profile & Age Button (Umur di samping profil) */}
+            {/* Profile & Age Button */}
             <button
               onClick={() => setShowProfile(true)}
-              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 font-black text-[11px] sm:text-xs flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
+              className="h-8 sm:h-9 px-1.5 sm:px-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 font-black text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-colors shrink-0 shadow-2xs"
               aria-label="Profil Anak"
               title={
                 data.lang === 'id'
@@ -317,34 +379,37 @@ export default function App() {
                   : `Profile ${data.name || 'Kid'} (${data.age} yo)`
               }
             >
-              <span className="text-base sm:text-lg">{data.avatar}</span>
-              <span className="max-w-[65px] truncate hidden md:inline">
+              <span className="text-sm sm:text-base leading-none">{data.avatar}</span>
+              <span className="max-w-[65px] truncate hidden lg:inline">
                 {data.name || (data.lang === 'id' ? 'Profil' : 'Profile')}
               </span>
               <span className="bg-indigo-600 text-white text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded-md shrink-0">
                 {data.age} {data.lang === 'id' ? 'th' : 'yo'}
               </span>
             </button>
-          </div>
 
-          {/* Zone 3: Star Counter */}
-          <div className="flex items-center gap-1 text-amber-500 bg-amber-50 border border-amber-200 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs md:text-sm font-black shrink-0">
-            <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-400" />
-            <span className="tabular-nums text-amber-900">{totalStars}</span>
+            {/* Star Reward Counter */}
+            <div
+              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-black text-xs sm:text-sm flex items-center gap-1 shrink-0 shadow-2xs"
+              title={data.lang === 'id' ? `Total ${totalStars} Bintang` : `${totalStars} Total Stars`}
+            >
+              <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-400 text-amber-500 shrink-0" />
+              <span className="tabular-nums font-black">{totalStars}</span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* SUB-HEADER TAGLINE BANNER */}
+      {/* SUB-HEADER TAGLINE BANNER (Mobile Optimized) */}
       <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white shadow-xs border-b border-emerald-700/30">
-        <div className="max-w-5xl mx-auto px-3 py-2 flex items-center justify-center gap-2 text-center">
-          <span className="text-xs sm:text-sm animate-pulse">✨</span>
-          <p className="text-[11px] sm:text-xs md:text-sm font-black tracking-wide leading-snug">
+        <div className="max-w-5xl mx-auto px-2.5 sm:px-3 py-1.5 flex items-center justify-center gap-1.5 sm:gap-2 text-center">
+          <span className="text-xs sm:text-sm animate-pulse shrink-0">✨</span>
+          <p className="text-[10px] sm:text-xs md:text-sm font-black tracking-wide leading-tight sm:leading-snug truncate sm:whitespace-normal">
             {data.lang === 'id'
               ? 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'
               : 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'}
           </p>
-          <span className="text-xs sm:text-sm">🌱</span>
+          <span className="text-xs sm:text-sm shrink-0">🌱</span>
         </div>
       </div>
 
@@ -352,21 +417,21 @@ export default function App() {
       <main className="flex-1 flex flex-col">
         {/* If a category is selected and no mini-game is open, show Category Quick-Switcher Header Bar */}
         {mainCategory && !activeGameId && (
-          <div className="bg-slate-100/90 border-b border-slate-200/80 px-2.5 sm:px-4 py-1.5 shadow-2xs">
+          <div className="bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 px-2 sm:px-4 py-1.5 shadow-2xs sticky top-[49px] sm:top-[57px] z-30">
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
               <button
                 onClick={handleBackToCategories}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-black text-xs shrink-0 cursor-pointer shadow-2xs transition-colors"
+                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-black text-xs shrink-0 cursor-pointer shadow-2xs transition-colors"
                 title={data.lang === 'id' ? 'Kembali ke Pilihan Kategori' : 'Back to Categories Hub'}
               >
                 <span>🏠</span>
-                <span>{data.lang === 'id' ? 'Pilih Kategori' : 'All Categories'}</span>
+                <span className="text-[11px] sm:text-xs">{data.lang === 'id' ? 'Kategori' : 'Categories'}</span>
               </button>
 
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => handleSelectCategory('educational')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
                     mainCategory === 'educational'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-white/80 hover:bg-white text-slate-700'
@@ -378,7 +443,7 @@ export default function App() {
 
                 <button
                   onClick={() => handleSelectCategory('coloring')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
                     mainCategory === 'coloring'
                       ? 'bg-rose-500 text-white shadow-xs'
                       : 'bg-white/80 hover:bg-white text-slate-700'
@@ -390,14 +455,14 @@ export default function App() {
 
                 <button
                   onClick={() => handleSelectCategory('alphabet')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
                     mainCategory === 'alphabet'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-white/80 hover:bg-white text-slate-700'
                   }`}
                 >
                   <span>🔤</span>
-                  <span>{data.lang === 'id' ? 'Abjad A-Z' : 'Alphabet'}</span>
+                  <span>{data.lang === 'id' ? 'Abjad' : 'Alphabet'}</span>
                 </button>
               </div>
             </div>
@@ -996,6 +1061,8 @@ export default function App() {
         onSetDailyLimit={(dailyLimit) => setData((p) => ({ ...p, dailyLimit }))}
         playedMinutes={Math.floor(data.playedSeconds / 60)}
         onResetProgress={handleResetProgress}
+        activeLicense={activeLicense}
+        onLogoutLicense={handleLogoutLicense}
       />
 
       <LibraryModal

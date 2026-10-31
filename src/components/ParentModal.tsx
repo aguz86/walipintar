@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw } from 'lucide-react';
+import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut } from 'lucide-react';
 import { SFX, playAnimalSound, speakText } from '../utils/audio';
 
 interface ParentModalProps {
@@ -10,6 +10,8 @@ interface ParentModalProps {
   onSetDailyLimit: (minutes: number) => void;
   playedMinutes: number;
   onResetProgress: () => void;
+  activeLicense?: string | null;
+  onLogoutLicense?: () => void;
 }
 
 export const ParentModal: React.FC<ParentModalProps> = ({
@@ -20,6 +22,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   onSetDailyLimit,
   playedMinutes,
   onResetProgress,
+  activeLicense,
+  onLogoutLicense,
 }) => {
   // Math gate: random multiplication between 6 and 9
   const [num1] = useState(() => Math.floor(Math.random() * 4) + 6);
@@ -116,6 +120,41 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 {lang === 'id' ? 'Pengaturan Pendamping Anak' : 'Parental Controls'}
               </h3>
             </div>
+
+            {/* License Management Card */}
+            {activeLicense && (
+              <div className="bg-emerald-50/80 p-3.5 sm:p-4 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="text-[11px] font-black uppercase text-emerald-800 flex items-center gap-1.5 tracking-wider">
+                    <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{lang === 'id' ? 'Lisensi Aplikasi Aktif' : 'Active App License'}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-black text-xs sm:text-sm text-emerald-950 bg-white px-2 py-0.5 rounded-lg border border-emerald-300 shadow-2xs">
+                      {activeLicense}
+                    </span>
+                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>{lang === 'id' ? 'Akses Penuh • 100% Offline' : 'Full Access • 100% Offline'}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {onLogoutLicense && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onLogoutLicense();
+                    }}
+                    className="self-start sm:self-center px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 font-bold text-xs shadow-2xs transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    title={lang === 'id' ? 'Ganti atau keluar dari lisensi ini' : 'Change or switch license'}
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>{lang === 'id' ? 'Ganti Lisensi' : 'Switch Key'}</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Screen time tracking & limits */}
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200">
