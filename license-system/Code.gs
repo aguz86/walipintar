@@ -855,47 +855,117 @@ function generateUniqueLicense(sheet) {
 }
 
 function generateLicenseHtmlEmail(licenseKey, orderId) {
+  // URL logo web terkompresi (ukuran ~6.2 KB ultra ringan & cepat dimuat di Gmail / HP)
+  const LOGO_URL = `${APP_URL}/assets/logo-email.png`;
+
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 580px; margin: 0 auto; background-color: #f8fafc; padding: 24px; border-radius: 20px; color: #1e293b;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background-color: #f8fafc; padding: 24px; border-radius: 24px; color: #1e293b; border: 1px solid #e2e8f0;">
+      
+      <!-- LOGO WEB TERKOMPRESI (6.2 KB) & BRANDING -->
       <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #059669; margin: 0; font-size: 26px; font-weight: 900; letter-spacing: -0.5px;">🌱 ${BRAND_NAME}</h1>
-        <p style="color: #64748b; font-size: 13px; margin-top: 4px;">Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas</p>
+        <img src="${LOGO_URL}" width="80" height="80" alt="${BRAND_NAME}" style="display: block; margin: 0 auto 12px auto; width: 80px; height: 80px; border-radius: 20px; border: 3px solid #bbf7d0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18); object-fit: cover;" />
+        <h1 style="color: #065f46; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">🌱 ${BRAND_NAME}</h1>
+        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Zona Bermain & Belajar Edukatif Si Kecil &bull; 100% Bebas Iklan &bull; Siap Offline</p>
       </div>
 
-      <div style="background-color: #ffffff; padding: 28px; border-radius: 18px; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-        <h2 style="color: #0f172a; margin-top: 0; font-size: 19px;">Halo Ayah & Bunda Hebat! 👋</h2>
-        <p style="color: #475569; font-size: 14px; line-height: 1.6;">
-          Terima kasih telah mempercayakan media belajar si kecil kepada <strong>${BRAND_NAME}</strong>. Berikut adalah Kode Lisensi resmi Anda:
+      <!-- KARTU UTAMA LISENSI -->
+      <div style="background-color: #ffffff; padding: 26px 22px; border-radius: 20px; border: 2px solid #e2e8f0; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 800;">Halo Ayah & Bunda Hebat! 👋</h2>
+        <p style="color: #475569; font-size: 13.5px; line-height: 1.6; margin-bottom: 18px;">
+          Terima kasih telah mempercayakan media belajar si kecil kepada <strong>${BRAND_NAME}</strong>. Pembayaran Anda telah kami terima dengan sukses. Berikut adalah kode lisensi resmi Anda:
         </p>
 
-        <div style="background: linear-gradient(135deg, #ecfdf5 0%, #e0f2fe 100%); border: 2px dashed #10b981; border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0;">
-          <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #047857; letter-spacing: 1px;">KODE LISENSI RESMI ANDA:</span>
-          <div style="font-size: 32px; font-weight: 900; color: #065f46; letter-spacing: 3px; margin: 8px 0; font-family: ui-monospace, monospace;">
+        <!-- KOTAK KODE LISENSI RESMI (TEPAT 9 KARAKTER: WALI-XXXX) -->
+        <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px dashed #10b981; border-radius: 16px; padding: 20px 14px; text-align: center; margin: 18px 0;">
+          <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #047857; letter-spacing: 1.5px; display: block; margin-bottom: 6px;">
+            KODE LISENSI RESMI ANDA (TEPAT 9 KARAKTER):
+          </span>
+          
+          <div style="font-size: 30px; font-weight: 900; color: #064e3b; letter-spacing: 3px; margin: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; user-select: all; -webkit-user-select: all; background: #ffffff; padding: 10px 16px; border-radius: 12px; display: inline-block; border: 1px solid #a7f3d0; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
             ${licenseKey}
           </div>
-          <span style="font-size: 12px; color: #64748b;">Nomor Pesanan: <strong>${orderId}</strong></span>
+          
+          <div style="font-size: 11.5px; color: #64748b; margin-top: 8px; font-weight: 600;">
+            Nomor Pesanan: <strong style="color: #0f172a;">${orderId}</strong> &bull; Format: WALI-XXXX (Tanpa angka 0, 1 & huruf O, I)
+          </div>
+
+          <!-- TOMBOL COPY PASTE LISENSI DI EMAIL -->
+          <div style="margin-top: 14px;">
+            <a href="${APP_URL}/redeem.html?key=${licenseKey}&action=copy" target="_blank" style="display: inline-block; background-color: #f1f5f9; hover: background-color: #e2e8f0; color: #1e293b; border: 1.5px solid #cbd5e1; padding: 9px 18px; border-radius: 10px; font-size: 12.5px; font-weight: 800; text-decoration: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+              📋 Klik untuk Salin Lisensi Otomatis
+            </a>
+          </div>
         </div>
 
-        <h3 style="color: #0f172a; font-size: 15px; margin-bottom: 10px;">Cara Membuka Game di HP & Tablet:</h3>
-        <ol style="color: #475569; font-size: 13px; line-height: 1.7; padding-left: 20px; margin-bottom: 24px;">
-          <li>Kunjungi alamat: <a href="${APP_URL}" style="color: #059669; font-weight: bold; text-decoration: underline;">${APP_URL}</a></li>
-          <li>Masukkan Kode Lisensi: <strong>${licenseKey}</strong></li>
-          <li>Tekan tombol <strong>"Aktivasi Game"</strong>.</li>
-          <li>Setelah persiapan offline selesai, klik tombol <strong>"Pasang Aplikasi (Bisa Offline)"</strong> agar si kecil bisa langsung bermain tanpa kuota internet!</li>
+        <!-- TOMBOL UTAMA BUKA GAME (1-KLIK LANGSUNG AKTIF) -->
+        <div style="text-align: center; margin: 22px 0 16px 0;">
+          <a href="${APP_URL}/?key=${licenseKey}" target="_blank" style="display: block; background-color: #10b981; color: #ffffff; padding: 15px 24px; border-radius: 14px; font-size: 15.5px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);">
+            🚀 Buka Dashboard Game (1-Klik Otomatis)
+          </a>
+          <span style="font-size: 11px; color: #64748b; margin-top: 6px; display: block;">
+            *Klik tombol di atas untuk langsung membuka dan mengaktifkan 17 game edukatif tanpa perlu ketik manual.
+          </span>
+        </div>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 20px 0;" />
+
+        <h3 style="color: #0f172a; font-size: 14px; font-weight: 800; margin-bottom: 8px;">Cara Memasang Aplikasi di HP / Tablet (Bisa Offline):</h3>
+        <ol style="color: #475569; font-size: 12.5px; line-height: 1.7; padding-left: 20px; margin-bottom: 0;">
+          <li>Buka game lewat tautan di atas menggunakan browser <strong>Google Chrome</strong> (Android) atau <strong>Safari</strong> (iPhone/iPad).</li>
+          <li>Klik menu titik tiga di pojok kanan atas browser, lalu pilih <strong>"Instal Aplikasi"</strong> atau <strong>"Tambahkan ke Layar Utama"</strong>.</li>
+          <li>Aplikasi Wali Pintar akan terpasang di HP Anda dan 100% siap dimainkan si kecil kapan saja tanpa kuota internet!</li>
         </ol>
 
-        <div style="text-align: center; margin-top: 24px;">
-          <a href="${APP_URL}?license=${licenseKey}&autologin=1" style="display: inline-block; background-color: #10b981; color: #ffffff; padding: 14px 28px; border-radius: 14px; font-size: 15px; font-weight: bold; text-decoration: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
-            🚀 Buka Game Langsung
-          </a>
+        <!-- SEKSI MEDIA SOSIAL RESMI (YOUTUBE, FACEBOOK, INSTAGRAM, TIKTOK) -->
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="font-size: 11.5px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 12px 0;">
+            Ikuti Media Sosial Resmi Wali Pintar
+          </p>
+
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 auto; max-width: 480px;">
+            <tr>
+              <!-- YouTube -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://youtube.com/@walipintar" target="_blank" style="display: block; background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #e11d48; text-align: center;">
+                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">▶️</span>
+                  <span>YouTube</span>
+                </a>
+              </td>
+              <!-- Facebook -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://facebook.com/walipintar" target="_blank" style="display: block; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #1d4ed8; text-align: center;">
+                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">👥</span>
+                  <span>Facebook</span>
+                </a>
+              </td>
+              <!-- Instagram -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://instagram.com/walipintar" target="_blank" style="display: block; background-color: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #be185d; text-align: center;">
+                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">📸</span>
+                  <span>Instagram</span>
+                </a>
+              </td>
+              <!-- TikTok -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://tiktok.com/@walipintar" target="_blank" style="display: block; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #0f172a; text-align: center;">
+                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">🎵</span>
+                  <span>TikTok</span>
+                </a>
+              </td>
+            </tr>
+          </table>
+          <p style="font-size: 11px; color: #94a3b8; margin: 10px 0 0 0; line-height: 1.5;">
+            Dapatkan inspirasi stimulasi anak, tips parenting, dan update game edukatif di <strong>@walipintar</strong>.
+          </p>
         </div>
       </div>
 
-      <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-        Pengiriman resmi didukung oleh Brevo Transactional Email.<br>
-        Butuh bantuan aktivasi? Hubungi WhatsApp Layanan Pelanggan:<br>
-        <a href="https://wa.me/${ADMIN_WA}" style="color: #059669; font-weight: bold; text-decoration: none;">+62 857-0480-8186 (Admin WhatsApp)</a><br>
-        &copy; ${BRAND_NAME} - Seluruh hak cipta dilindungi undang-undang.
+      <!-- FOOTER EMAIL -->
+      <div style="text-align: center; margin-top: 20px; font-size: 11.5px; color: #94a3b8; line-height: 1.6;">
+        Email resmi dikirim otomatis melalui sistem lisensi <strong>${BRAND_NAME}</strong>.<br>
+        Butuh bantuan teknis / pertanyaan? Hubungi Customer Service kami:<br>
+        <a href="https://wa.me/${ADMIN_WA}" style="color: #059669; font-weight: bold; text-decoration: none;">💬 WhatsApp Admin (+62 857-0480-8186)</a><br>
+        &copy; ${BRAND_NAME} &bull; Seluruh hak cipta dilindungi undang-undang.
       </div>
     </div>
   `;
