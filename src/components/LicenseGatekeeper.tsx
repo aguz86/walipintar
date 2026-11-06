@@ -6,7 +6,7 @@ interface LicenseGatekeeperProps {
   onUnlock: (licenseKey: string) => void;
 }
 
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
+const GAS_API_URL = (import.meta as any).env?.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
 
 export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }) => {
   const [inputKey, setInputKey] = useState('');

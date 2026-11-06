@@ -747,28 +747,18 @@
         // Panggil Google Apps Script: action=create
         const apiUrl = `${GAS_API_URL}?action=create&order_id=${encodeURIComponent(targetOrder)}&email=${encodeURIComponent(targetEmail)}&name=${encodeURIComponent(targetName || '')}`;
         
-        let responseData = null;
-
         try {
           const res = await fetch(apiUrl, { method: 'GET' });
           responseData = await res.json();
         } catch (fetchErr) {
-          // Generate local deterministic license WALI-XXXX 4 karakter huruf & angka aman tanpa 0, O, 1, I
-          const SAFE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-          let fallbackCode = 'WALI-';
-          for (let i = 0; i < 4; i++) {
-            fallbackCode += SAFE_CHARS.charAt(Math.floor(Math.random() * SAFE_CHARS.length));
-          }
-          responseData = {
-            success: true,
-            licenseKey: fallbackCode,
-            emailSent: false,
-            message: "Lisensi disiapkan. Data Anda tersimpan aman di perangkat ini."
-          };
+          showError("Gagal Menghubungi Server", "Koneksi ke server terputus. Pastikan internet Anda aktif atau hubungi Admin WhatsApp kami.");
+          return;
         }
 
         if (responseData && responseData.success) {
           const licenseKey = responseData.licenseKey;
+          const verifiedEmail = responseData.email || targetEmail;
+          const verifiedName = responseData.name || targetName;
 
           if (responseData.emailSent === false) {
             emailNotification.className = "email-alert warning";
@@ -782,7 +772,7 @@
             waHelpBox.style.display = 'block';
           }
 
-          wireSuccessActions(licenseKey, targetOrder, targetEmail, targetName);
+          wireSuccessActions(licenseKey, targetOrder, verifiedEmail, verifiedName);
 
         } else {
           showError("Gagal Membuat Lisensi", responseData?.message || "Terjadi kendala saat memproses lisensi di server.");

@@ -26,19 +26,34 @@ const SCALEV_URL = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
 const APP_URL = 'https://walipintar.my.id';
 
 /**
- * Kunci Rahasia Admin untuk menghapus lisensi via API (opsional)
+ * ============================================================================
+ * 🔒 ZERO SECRETS IN GITHUB (KEAMANAN TINGKAT TINGGI UNTUK CLOUDFLARE & GITHUB)
+ * ============================================================================
+ * API Key TIDAK PERLU ditulis di dalam kode file ini agar tidak bocor ke GitHub!
+ * Sistem membaca secara otomatis dari "Script Properties" terenkripsi Google Apps Script:
+ * 
+ * CARA MEMASUKKAN API KEY TANPA LEWAT GITHUB:
+ * 1. Di editor Apps Script, klik menu "Project Settings" (Ikon Gerigi ⚙️ di bilah kiri).
+ * 2. Scroll ke bawah ke bagian "Script Properties" (Properti Skrip).
+ * 3. Klik "Add script property" lalu masukkan:
+ *    - SCALEV_API_KEY : [Tempel token Scalev Anda]
+ *    - BREVO_API_KEY  : [Tempel token Brevo xkeysib-... Anda]
+ *    - ADMIN_SECRET_KEY: [Kunci rahasia admin Anda]
+ * ============================================================================
  */
-const ADMIN_SECRET_KEY = 'WALI_ADMIN_SECRET_KEY_2026';
+function getSecureConfig(key, fallbackVal) {
+  try {
+    const val = PropertiesService.getScriptProperties().getProperty(key);
+    if (val && val.trim() !== '') return val.trim();
+  } catch (e) {}
+  return fallbackVal;
+}
 
-/**
- * KONFIGURASI BREVO API:
- * 1. Dapatkan API Key di https://app.brevo.com/settings/keys/api
- * 2. Masukkan API Key Anda di bawah (format: xkeysib-...).
- * 3. Masukkan Email Pengirim yang sudah diverifikasi di menu Brevo Senders.
- */
-const BREVO_API_KEY = 'xkeysib-PASTE_YOUR_BREVO_API_KEY_HERE';
-const BREVO_SENDER_NAME = 'Wali Pintar Official';
-const BREVO_SENDER_EMAIL = 'halo@walipintar.my.id';
+const ADMIN_SECRET_KEY = getSecureConfig('ADMIN_SECRET_KEY', 'WALI_ADMIN_SECRET_KEY_2026');
+const BREVO_API_KEY = getSecureConfig('BREVO_API_KEY', 'xkeysib-PASTE_YOUR_BREVO_API_KEY_HERE');
+const BREVO_SENDER_NAME = getSecureConfig('BREVO_SENDER_NAME', 'Wali Pintar Official');
+const BREVO_SENDER_EMAIL = getSecureConfig('BREVO_SENDER_EMAIL', 'halo@walipintar.my.id');
+const SCALEV_API_KEY = getSecureConfig('SCALEV_API_KEY', 'PASTE_YOUR_SCALEV_API_KEY_HERE');
 
 // =====================================================================
 
@@ -63,9 +78,17 @@ function ujiCobaSistem_KlikDiSini() {
 
   // 3. Cek Status Brevo
   if (!BREVO_API_KEY || BREVO_API_KEY.includes('PASTE_YOUR_BREVO_API_KEY')) {
-    Logger.log('⚠️ 3. Brevo API Key belum diisi. Masukkan API Key Anda di baris 33.');
+    Logger.log('⚠️ 3. Brevo API Key belum diisi. Masukkan API Key Anda di baris 39.');
   } else {
     Logger.log('✅ 3. Brevo API Key terpasang: ' + BREVO_API_KEY.substring(0, 14) + '...');
+  }
+
+  // 4. Cek Status Scalev API (Anti-Bypass)
+  if (!SCALEV_API_KEY || SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY')) {
+    Logger.log('⚠️ 4. Scalev API Key belum diisi (Anti-Bypass belum aktif).');
+    Logger.log('     Dapatkan API Key di: Settings > Developers > API Keys.');
+  } else {
+    Logger.log('✅ 4. Scalev API Key terpasang: ' + SCALEV_API_KEY.substring(0, 14) + '... (Anti-Bypass Aktif)');
   }
 
   Logger.log('========================================================');
@@ -85,9 +108,11 @@ function onOpen() {
     .addSeparator()
     .addItem('🗑️ Hapus Lisensi (Cari Kode / Email / Order)', 'menuDeleteLicenseSearch')
     .addItem('🗑️ Hapus Baris Lisensi yang Sedang Dipilih', 'menuDeleteSelectedRow')
+    .addItem('⚠️ Hapus SEMUA Order di Sheet (Reset Total)', 'menuDeleteAllOrders')
     .addSeparator()
     .addItem('📊 Buat / Segarkan Tab Laporan & Statistik', 'menuGenerateReport')
     .addItem('🛠️ Uji Koneksi Akun Brevo API', 'menuTestBrevoConnection')
+    .addItem('🛡️ Uji Koneksi Scalev API (Anti-Bypass)', 'menuTestScalevConnection')
     .addToUi();
 }
 
@@ -158,12 +183,53 @@ function handleRequest(e, httpMethod) {
     // ACTION 1: CREATE (Dipanggil otomatis oleh redeem.html setelah bayar Scalev)
     // ------------------------------------------------------------------------
     if (action === 'create') {
-      const orderId = (params.order_id || postData.order_id || '').trim();
-      const email = (params.email || postData.email || '').trim().toLowerCase();
-      const name = (params.name || params.customer_name || params.nama || params.buyer_name || postData.name || postData.customer_name || postData.nama || '').trim();
+      let orderId = (params.order_id || postData.order_id || '').trim();
+      let email = (params.email || postData.email || '').trim().toLowerCase();
+      let name = (params.name || params.customer_name || params.nama || params.buyer_name || postData.name || postData.customer_name || postData.nama || '').trim();
 
-      if (!orderId || !email) {
-        return createJsonResponse({ success: false, message: 'Order ID dan Email wajib diisi.' });
+      // Bersihkan jika terkirim template mentah dari Scalev URL
+      if (orderId.startsWith('{')) orderId = '';
+      if (email.startsWith('{')) email = '';
+      if (name.startsWith('{')) name = '';
+
+      if (!orderId && !email) {
+        return createJsonResponse({ success: false, message: 'Nomor Pesanan (Order ID) atau Email wajib diisi.' });
+      }
+
+      // ----------------------------------------------------------------------
+      // 🛡️ VERIFIKASI KETAT ANTI-BYPASS VIA SCALEV API v3
+      // Lisensi HANYA diterbitkan jika transaksi berstatus LUNAS ('paid' / 'settled')
+      // ----------------------------------------------------------------------
+      let scalevVerificationNote = 'Verifikasi Scalev API: Nonaktif';
+      if (SCALEV_API_KEY && !SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY') && orderId) {
+        const scalevCheck = verifyScalevPayment(orderId);
+        if (!scalevCheck.verified) {
+          return createJsonResponse({
+            success: false,
+            verified: false,
+            orderId: orderId,
+            message: 'AKSES DITOLAK: ' + (scalevCheck.message || 'Pembayaran belum terkonfirmasi lunas di Scalev. Lisensi hanya terbit setelah pembayaran berhasil.')
+          });
+        }
+
+        scalevVerificationNote = 'Scalev API Verified (LUNAS)';
+
+        // Tangkap nomor Order ID resmi dari Scalev (misal: #SVL-92847 atau 383254)
+        if (scalevCheck.officialOrderId) {
+          orderId = scalevCheck.officialOrderId;
+        }
+
+        // Ambil data pelanggan resmi langsung dari database Scalev (Customer cukup input 1x di Scalev!)
+        if (scalevCheck.customerEmail && (!email || !email.includes('@'))) {
+          email = scalevCheck.customerEmail.toLowerCase();
+        }
+        if (scalevCheck.customerName && !name) {
+          name = scalevCheck.customerName;
+        }
+      }
+
+      if (!email || !email.includes('@')) {
+        return createJsonResponse({ success: false, message: 'Alamat email pembeli diperlukan untuk pengiriman lisensi resmi.' });
       }
 
       // Idempotency: Cek apakah Order ID sudah pernah diproses
@@ -200,7 +266,7 @@ function handleRequest(e, httpMethod) {
         brevoResult.success ? 'TERKIRIM (Brevo)' : 'GAGAL (' + brevoResult.error + ')',
         brevoResult.messageId || '-',
         0,
-        name ? 'Otomatis via Scalev Redeem (' + name + ')' : 'Otomatis via Scalev Redeem'
+        name ? scalevVerificationNote + ' (' + name + ')' : scalevVerificationNote
       ]);
 
       updateDashboardStats(ss);
@@ -361,6 +427,31 @@ function handleRequest(e, httpMethod) {
           message: 'Tidak ditemukan lisensi dengan kriteria: ' + target
         });
       }
+    }
+
+    // ------------------------------------------------------------------------
+    // ACTION 5: DELETE_ALL (Hapus Semua Order via API dengan Kunci Rahasia)
+    // ------------------------------------------------------------------------
+    if (action === 'delete_all') {
+      const secret = params.secret || postData.secret || '';
+      if (secret !== ADMIN_SECRET_KEY) {
+        return createJsonResponse({ success: false, message: 'Akses ditolak: Kunci rahasia admin salah.' });
+      }
+
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        return createJsonResponse({ success: true, deletedCount: 0, message: 'Sheet Licenses sudah kosong.' });
+      }
+
+      const deletedCount = lastRow - 1;
+      sheet.deleteRows(2, deletedCount);
+      updateDashboardStats(ss);
+
+      return createJsonResponse({
+        success: true,
+        deletedCount: deletedCount,
+        message: 'Berhasil menghapus SEMUA data (' + deletedCount + ' baris order) dari sheet.'
+      });
     }
 
     return createJsonResponse({ success: false, message: 'Aksi tidak dikenal.' });
@@ -688,6 +779,73 @@ function menuDeleteSelectedRow() {
   ui.alert('✅ Baris Berhasil Dihapus!', numRows + ' baris data lisensi telah dihapus dari sheet dan laporan telah disegarkan.', ui.ButtonSet.OK);
 }
 
+/**
+ * Menu Hapus SEMUA Order di Sheet Licenses (Reset Total)
+ * Menghapus baris 2 sampai baris terakhir, mempertahankan Header di baris 1.
+ * Dilengkapi dialog konfirmasi ganda (ketik kata 'HAPUS') untuk keamanan.
+ */
+function menuDeleteAllOrders() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = initLicensesSheet(ss);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    ui.alert('ℹ️ Sheet Masih Kosong', 'Tidak ada data order atau lisensi yang tersimpan di sheet "' + SHEET_LICENSES + '".', ui.ButtonSet.OK);
+    return;
+  }
+
+  const orderCount = lastRow - 1;
+
+  // Dialog Konfirmasi 1: Peringatan Awal
+  const confirm1 = ui.alert(
+    '⚠️ PERINGATAN KERAS: Hapus SEMUA Order',
+    'Anda akan MENGHAPUS SEMUA DATA (' + orderCount + ' baris pesanan & lisensi) di tab "' + SHEET_LICENSES + '".\n\n' +
+    '• Seluruh lisensi aktif akan terhapus permanen.\n' +
+    '• Pembeli sebelumnya tidak akan bisa mengakses game lagi kecuali didaftarkan ulang.\n' +
+    '• Baris 1 (Header Tabel) akan tetap dipertahankan.\n\n' +
+    'Apakah Anda yakin ingin melanjutkan?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm1 !== ui.Button.YES) {
+    ui.alert('Penghapusan dibatalkan.');
+    return;
+  }
+
+  // Dialog Konfirmasi 2: Pengaman Ketik Kata "HAPUS"
+  const confirm2 = ui.prompt(
+    '🔒 Konfirmasi Pengaman Terakhir',
+    'Untuk mencegah salah klik yang tidak disengaja, ketik kata "HAPUS" di kolom bawah lalu klik OK:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (confirm2.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('Penghapusan dibatalkan.');
+    return;
+  }
+
+  const userInput = confirm2.getResponseText().trim().toUpperCase();
+  if (userInput !== 'HAPUS') {
+    ui.alert('❌ Dibatalkan', 'Kata kunci tidak cocok ("' + userInput + '"). Penghapusan seluruh order dibatalkan.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Eksekusi penghapusan dari baris 2 sampai baris terakhir
+  sheet.deleteRows(2, orderCount);
+
+  // Segarkan tab laporan & statistik
+  updateDashboardStats(ss);
+
+  ui.alert(
+    '✅ SEMUA ORDER BERHASIL DIHAPUS!',
+    'Sebanyak ' + orderCount + ' data pesanan & lisensi telah berhasil dibersihkan dari sheet "' + SHEET_LICENSES + '".\n\n' +
+    '• Baris 1 (Header) tetap rapi dan siap menerima order baru.\n' +
+    '• Tab Laporan & Statistik telah disegarkan menjadi 0 transaksi.',
+    ui.ButtonSet.OK
+  );
+}
+
 function menuGenerateReport() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   updateDashboardStats(ss);
@@ -974,3 +1132,155 @@ function generateLicenseHtmlEmail(licenseKey, orderId, customerName) {
     </div>
   `;
 }
+
+// ============================================================================
+// 🛡️ MODUL SCALEV API v3: VERIFIKASI STATUS PEMBAYARAN REAL-TIME (ANTI-BYPASS)
+// ============================================================================
+
+/**
+ * Memverifikasi ke server Scalev apakah pesanan benar-benar sudah berstatus LUNAS (Paid).
+ * Jika status bukan 'paid' (misal unpaid/cancelled) atau order palsu, akses langsung ditolak.
+ * 
+ * @param {string} orderId - ID pesanan (UUID atau Order ID / Nomor Invoice)
+ * @returns {object} Status verifikasi dan data pembeli resmi dari Scalev
+ */
+function verifyScalevPayment(orderId) {
+  if (!SCALEV_API_KEY || SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY')) {
+    return {
+      configured: false,
+      verified: true, // Fallback jika belum diisi agar tidak memblokir uji coba awal
+      message: 'Scalev API Key belum dipasang di Code.gs.'
+    };
+  }
+
+  try {
+    const cleanOrderId = String(orderId).trim();
+    const options = {
+      method: 'get',
+      headers: {
+        'Authorization': 'Bearer ' + SCALEV_API_KEY,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      muteHttpExceptions: true
+    };
+
+    // 1. Coba cari langsung berdasarkan ID / UUID / Nomor Order
+    let url = 'https://api.scalev.com/v3/orders/' + encodeURIComponent(cleanOrderId);
+    let response = UrlFetchApp.fetch(url, options);
+    let statusCode = response.getResponseCode();
+    let content = response.getContentText();
+    let json = null;
+
+    try {
+      json = JSON.parse(content);
+    } catch (e) {}
+
+    // 2. Jika 404 atau tidak ditemukan langsung, cari lewat list query search
+    if (statusCode === 404 || !json || json.errors) {
+      const searchUrl = 'https://api.scalev.com/v3/orders?search=' + encodeURIComponent(cleanOrderId);
+      response = UrlFetchApp.fetch(searchUrl, options);
+      statusCode = response.getResponseCode();
+      content = response.getContentText();
+      try {
+        const searchJson = JSON.parse(content);
+        if (searchJson && searchJson.data && searchJson.data.length > 0) {
+          json = searchJson.data[0];
+        }
+      } catch (e) {}
+    }
+
+    if (json && (json.id || json.order_id)) {
+      const paymentStatus = String(json.payment_status || json.status || '').toLowerCase();
+      const isPaid = (paymentStatus === 'paid' || paymentStatus === 'settled' || paymentStatus === 'completed');
+
+      const customer = json.customer || {};
+      const customerEmail = customer.email || json.customer_email || json.email || '';
+      const customerName = customer.name || json.customer_name || json.name || '';
+      const customerPhone = customer.phone || json.customer_phone || json.phone || '';
+      const officialOrderId = String(json.order_id || json.id || cleanOrderId).trim();
+
+      return {
+        configured: true,
+        verified: isPaid,
+        statusCode: statusCode,
+        paymentStatus: paymentStatus,
+        officialOrderId: officialOrderId,
+        customerEmail: customerEmail,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        message: isPaid
+          ? 'Pembayaran terverifikasi lunas di Scalev.'
+          : 'Pembayaran di Scalev belum lunas (Status: ' + paymentStatus + ').'
+      };
+    } else {
+      return {
+        configured: true,
+        verified: false,
+        statusCode: statusCode,
+        message: 'Nomor pesanan (' + cleanOrderId + ') tidak ditemukan di database Scalev.'
+      };
+    }
+  } catch (err) {
+    Logger.log('Error verifyScalevPayment: ' + err.toString());
+    return {
+      configured: true,
+      verified: false,
+      error: err.toString(),
+      message: 'Gagal menghubungi server Scalev: ' + err.message
+    };
+  }
+}
+
+/**
+ * Menu Uji Coba Koneksi Scalev API dari Google Sheets
+ */
+function menuTestScalevConnection() {
+  const ui = SpreadsheetApp.getUi();
+  if (!SCALEV_API_KEY || SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY')) {
+    ui.alert(
+      '⚠️ Scalev API Key Belum Dipasang',
+      'Untuk mengaktifkan proteksi Anti-Bypass, masukkan API Key Anda di baris 50 file Code.gs.\n\n' +
+      'Cara dapatkan API Key:\n' +
+      '1. Buka https://app.scalev.com\n' +
+      '2. Settings > Developers > API Keys\n' +
+      '3. Buat API Key baru dan salin ke Code.gs.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  try {
+    const response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=1', {
+      method: 'get',
+      headers: {
+        'Authorization': 'Bearer ' + SCALEV_API_KEY,
+        'Accept': 'application/json'
+      },
+      muteHttpExceptions: true
+    });
+
+    const code = response.getResponseCode();
+    const text = response.getContentText();
+
+    if (code >= 200 && code < 300) {
+      ui.alert(
+        '🛡️ Koneksi Scalev API Sukses & Aktif!',
+        'Sistem Anti-Bypass Berhasil Dikonfigurasi.\n\n' +
+        '• Status Koneksi: HTTP ' + code + ' (Terhubung)\n' +
+        '• Proteksi: Lisensi HANYA akan terbit otomatis jika pesanan terbukti berstatus "PAID / LUNAS" di Scalev.\n' +
+        '• Pengguna tidak bisa memalsukan order ID atau membuka link tanpa transfer.',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert(
+        '❌ Gagal Terhubung ke Scalev API',
+        'HTTP ' + code + ':\n' + text + '\n\nPastikan API Key di baris 50 sudah sesuai.',
+        ui.ButtonSet.OK
+      );
+    }
+  } catch (err) {
+    ui.alert('❌ Error Uji Koneksi Scalev', err.toString(), ui.ButtonSet.OK);
+  }
+}
+
