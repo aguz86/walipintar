@@ -101,6 +101,14 @@ export default function App() {
   // Online License Gatekeeper State (Wajib login lisensi sebelum akses game)
   const [activeLicense, setActiveLicense] = useState<string | null>(() => {
     try {
+      // 1. Cek dari URL query parameter jika dibuka langsung dari tombol redeem / email (1-klik langsung masuk tanpa copy-paste)
+      const params = new URLSearchParams(window.location.search);
+      const urlKey = params.get('key') || params.get('license') || params.get('lisensi');
+      if (urlKey && urlKey.trim().length === 9 && urlKey.trim().toUpperCase().startsWith('WALI-')) {
+        const clean = urlKey.trim().toUpperCase();
+        localStorage.setItem('walipintar_license', clean);
+        return clean;
+      }
       return localStorage.getItem('walipintar_license') || null;
     } catch {
       return null;

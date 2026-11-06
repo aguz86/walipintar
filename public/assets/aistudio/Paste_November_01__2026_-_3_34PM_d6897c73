@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Taman Belajar Ceria - 12 Game Edukasi Anak Offline (PAUD - SD)</title>
+  <meta name="description" content="Paket 12 Game Edukasi Anak Usia 3-8 Tahun 100% Offline Tanpa Iklan. Screen time sehat bikin anak cerdas berhitung, mengeja kata, dan melatih logika tanpa kuota!" />
+  <meta property="og:title" content="Taman Belajar Ceria - 12 Game Edukasi Anak Offline (PAUD - SD)" />
+  <meta property="og:description" content="Paket 12 Game Edukasi Anak Usia 3-8 Tahun 100% Offline Tanpa Iklan. Screen time sehat bikin anak cerdas berhitung, mengeja kata, dan melatih logika tanpa kuota!" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#ec4899" />
+  <style>
+    /* RESET & CORE TYPOGRAPHY (PURE SYSTEM FONTS - ZERO CSP DEPENDENCIES) */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html {
+      scroll-behavior: smooth;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+      background-color: #fdf4f8;
+      color: #1e293b;
+    }
+    body {
+      overflow-x: hidden;
+      line-height: 1.5;
+      padding-bottom: 78px;
+    }
+
+    /* UTILITY LAYOUT */
+    .container {
+      width: 100%;
+      max-width: 580px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    .text-center { text-align: center; }
+    .font-black { font-weight: 900; }
+    .font-bold { font-weight: 700; }
+
+    /* URGENCY TICKER */
+    .top-bar {
+      background: linear-gradient(90deg, #ec4899, #f43f5e);
+      color: #ffffff;
+      text-align: center;
+      padding: 9px 12px;
+      font-size: 11.5px;
+      font-weight: 800;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(236, 72, 153, 0.25);
+    }
+    .timer-badge {
+      background: #ffe4e6;
+      color: #9f1239;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      display: inline-block;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* HERO SECTION */
+    .hero {
+      background: linear-gradient(180deg, #ecfdf5 0%, #fdf2f8 60%, #fffbeb 100%);
+      padding: 24px 0 32px;
+      border-bottom: 2px dashed #fbcfe8;
+      text-align: center;
+    }
+    .badge-hero {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fce7f3;
+      border: 1.5px solid #f472b6;
+      color: #be185d;
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 6px rgba(244, 114, 182, 0.2);
+    }
+    .hero-title {
+      font-size: 24px;
+      line-height: 1.25;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, #059669, #0284c7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-desc {
+      font-size: 13.5px;
+      color: #475569;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+
+    /* VISUAL SHOWCASE MOCKUP */
+    .mockup-card {
+      background: #ffffff;
+      border: 3px solid #6ee7b7;
+      border-radius: 26px;
+      padding: 20px 16px;
+      box-shadow: 0 16px 36px rgba(16, 185, 129, 0.15);
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .mockup-pill {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #10b981;
+      color: #ffffff;
+      padding: 3px 14px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 900;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+      white-space: nowrap;
+    }
+    .game-grid-mini {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .game-item-mini {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 10px 4px 8px;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .game-item-mini:hover {
+      transform: translateY(-2px);
+    }
+    .game-item-mini .ico {
+      font-size: 26px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .game-item-mini .lbl {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: #334155;
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* CTA BUTTONS */
+    .btn-cta {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 16px 20px;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: 900;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-cta:active {
+      transform: scale(0.98);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    .btn-cta small {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #d1fae5;
+      margin-top: 3px;
+    }
+    .btn-cta-pink {
+      background: linear-gradient(135deg, #ec4899, #db2777);
+      box-shadow: 0 8px 24px rgba(236, 72, 153, 0.35);
+    }
+    .btn-cta-pink small {
+      color: #fce7f3;
+    }
+
+    /* SECTIONS */
+    .section {
+      padding: 34px 0;
+    }
+    .sec-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 900;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #fdf2f8;
+      color: #db2777;
+      border: 1px solid #fbcfe8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .sec-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.3;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .sec-subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    /* PAIN POINT CARDS */
+    .pain-card {
+      background: #ffffff;
+      border: 1.5px solid #fecdd3;
+      border-radius: 18px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      box-shadow: 0 2px 8px rgba(244, 63, 94, 0.05);
+    }
+    .pain-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+      background: #ffe4e6;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+    }
+    .pain-content h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #9f1239;
+      margin-bottom: 2px;
+    }
+    .pain-content p {
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    /* BENEFIT PILLARS */
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .benefit-item {
+      background: #ffffff;
+      border: 2px solid #a7f3d0;
+      border-radius: 20px;
+      padding: 16px 14px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.06);
+    }
+    .benefit-item .ico {
+      font-size: 32px;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .benefit-item h4 {
+      font-size: 12.5px;
+      font-weight: 900;
+      color: #065f46;
+      margin-bottom: 4px;
+    }
+    .benefit-item p {
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    /* GAME CATALOG CARDS */
+    .game-catalog {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .catalog-card {
+      background: #ffffff;
+      border-radius: 20px;
+      border: 2px solid #e2e8f0;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+    .catalog-icon {
+      font-size: 36px;
+      width: 52px;
+      height: 52px;
+      background: #f1f5f9;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .catalog-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .catalog-tag {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 900;
+      padding: 1px 7px;
+      border-radius: 6px;
+      background: #e0f2fe;
+      color: #0369a1;
+      margin-bottom: 2px;
+    }
+    .catalog-title {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+    .catalog-desc {
+      font-size: 11.5px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+
+    /* TESTIMONIALS */
+    .testi-card {
+      background: #ffffff;
+      border: 2px solid #fed7aa;
+      border-radius: 20px;
+      padding: 18px 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.08);
+    }
+    .testi-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .testi-avatar {
+      font-size: 30px;
+      background: #fff7ed;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .testi-meta h5 {
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .testi-meta span {
+      font-size: 11px;
+      color: #ea580c;
+      font-weight: 700;
+    }
+    .stars {
+      color: #f59e0b;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .testi-text {
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.55;
+      font-style: italic;
+    }
+
+    /* BONUS CARDS */
+    .bonus-card {
+      background: #fffbeb;
+      border: 2px dashed #f59e0b;
+      border-radius: 20px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .bonus-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 900;
+      background: #f59e0b;
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+    }
+
+    /* PRICING & LEAD-CAPTURE FORM CONTAINER */
+    .pricing-box {
+      background: #ffffff;
+      border: 3.5px solid #f472b6;
+      border-radius: 28px;
+      padding: 24px 18px;
+      text-align: center;
+      box-shadow: 0 20px 45px rgba(244, 114, 182, 0.22);
+      position: relative;
+    }
+    .pricing-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #ec4899, #f43f5e);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 4px 16px;
+      border-radius: 999px;
+      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+      white-space: nowrap;
+    }
+    .price-was {
+      font-size: 14px;
+      color: #94a3b8;
+      text-decoration: line-through;
+      margin-top: 14px;
+      font-weight: 700;
+    }
+    .price-now {
+      font-size: 38px;
+      font-weight: 900;
+      color: #047857;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .price-sub {
+      font-size: 11.5px;
+      color: #64748b;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    .feature-list {
+      text-align: left;
+      list-style: none;
+      margin-bottom: 20px;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 14px;
+    }
+    .feature-list li {
+      font-size: 12.5px;
+      color: #334155;
+      margin-bottom: 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .feature-list li span {
+      color: #10b981;
+      font-weight: 900;
+      font-size: 15px;
+    }
+
+    /* SCALEV HTML MODE LEAD CAPTURE FORM */
+    .lead-form-card {
+      background: #fdf2f8;
+      border: 2px solid #fbcfe8;
+      border-radius: 22px;
+      padding: 18px 14px;
+      margin-top: 18px;
+      text-align: left;
+    }
+    .form-heading {
+      font-size: 13px;
+      font-weight: 900;
+      color: #9d174d;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      color: #475569;
+      margin-bottom: 4px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 12px;
+      font-size: 13px;
+      outline: none;
+      background: #ffffff;
+      color: #0f172a;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus {
+      border-color: #ec4899;
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+    }
+    .form-note {
+      font-size: 10.5px;
+      color: #64748b;
+      margin-top: 8px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* FAQ ACCORDION */
+    .faq-item {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 16px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .faq-q {
+      padding: 14px 16px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .faq-a {
+      padding: 0 16px 14px;
+      font-size: 12px;
+      color: #475569;
+      line-height: 1.55;
+      display: none;
+    }
+    .faq-item.active {
+      border-color: #f472b6;
+    }
+    .faq-item.active .faq-a {
+      display: block;
+    }
+    .faq-item.active .faq-arrow {
+      transform: rotate(180deg);
+    }
+    .faq-arrow {
+      font-size: 10px;
+      color: #94a3b8;
+      transition: transform 0.2s;
+    }
+
+    /* STICKY BOTTOM BAR */
+    .sticky-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border-top: 1.5px solid #fbcfe8;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 40;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+      max-width: 580px;
+      margin: 0 auto;
+    }
+    .sticky-price-label {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 700;
+    }
+    .sticky-price {
+      font-size: 17px;
+      font-weight: 900;
+      color: #047857;
+      line-height: 1.1;
+    }
+    .btn-sticky {
+      background: linear-gradient(135deg, #ec4899, #f43f5e);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 10px 16px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.35);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      padding: 24px 0 16px;
+      font-size: 11px;
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP URGENCY TICKER -->
+  <div class="top-bar">
+    🔥 <span>Diskon Spesial Bunda Hari Ini: Sisa 7 Slot Akses</span>
+    <span class="timer-badge" id="timerBadge">02:44:59</span>
+  </div>
+
+  <!-- HERO SECTION -->
+  <header class="hero">
+    <div class="container">
+      <div class="badge-hero">
+        <span>🎒</span>
+        <span>KHUSUS ANAK USIA 3 - 8 TAHUN (PAUD, TK & SD)</span>
+      </div>
+
+      <h1 class="hero-title">
+        Ubah Gadget Jadi Guru Cerdas Si Kecil:<br />
+        <span>100% Offline, Bebas Iklan & Tanpa Kuota!</span>
+      </h1>
+
+      <p class="hero-desc">
+        Bunda merasa bersalah saat anak main HP terus? Berikan <b>Taman Belajar Ceria: 12 Game Edukasi Interaktif</b>. Anak anteng bermain sambil mengasah logika berhitung, mengeja kata, dan ketangkasan otak!
+      </p>
+
+      <!-- VISUAL SHOWCASE PREVIEW -->
+      <div class="mockup-card">
+        <div class="mockup-pill">⭐ PAKET 12 GAME LENGKAP SEKALI BAYAR ⭐</div>
+
+        <div class="game-grid-mini">
+          <div class="game-item-mini">
+            <span class="ico">🦁</span>
+            <span class="lbl">Kuis Hewan</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🃏</span>
+            <span class="lbl">Memory Card</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🧩</span>
+            <span class="lbl">Puzzle 3x3</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">⚡</span>
+            <span class="lbl">Speed Math</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🐰</span>
+            <span class="lbl">Coding Logika</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🌻</span>
+            <span class="lbl">Taman Bunga</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">📖</span>
+            <span class="lbl">Cerita Ajaib</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🇸🇬</span>
+            <span class="lbl">Singa Math</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🔤</span>
+            <span class="lbl">Spelling Kata</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🍎</span>
+            <span class="lbl">Sortir Benda</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">🦸</span>
+            <span class="lbl">Petualang</span>
+          </div>
+          <div class="game-item-mini">
+            <span class="ico">⭐</span>
+            <span class="lbl">Tangkap Bintang</span>
+          </div>
+        </div>
+      </div>
+
+      <a href="#orderSection" class="btn-cta" id="btnHeroCta">
+        AMBIL AKSES 12 GAME SEKARANG (Rp 49.000) ➔
+        <small>⚡ Promo Diskon 75% • Garansi Akses Seumur Hidup</small>
+      </a>
+    </div>
+  </header>
+
+  <!-- PAIN POINTS / CURHAT BUNDA SECTION -->
+  <section class="section" style="background:#ffffff;">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge">PERNAHKAH BUNDA MERASAKAN INI?</span>
+        <h2 class="sec-title">Dilema Gadget untuk Anak Zaman Now</h2>
+        <p class="sec-subtitle">Niat hati meminjamkan HP agar anak anteng saat Bunda beraktivitas, tapi ujung-ujungnya malah bikin cemas...</p>
+      </div>
+
+      <div class="pain-card">
+        <div class="pain-icon">😭</div>
+        <div class="pain-content">
+          <h4>Tantrum Hebat Saat HP Diambil</h4>
+          <p>Anak kecanduan scrolling video pendek tanpa henti, jadi mudah marah dan sulit diajak komunikasi.</p>
+        </div>
+      </div>
+
+      <div class="pain-card">
+        <div class="pain-icon">🔞</div>
+        <div class="pain-content">
+          <h4>Takut Iklan Dewasa & Judi Online Muncul</h4>
+          <p>Game gratisan di Play Store sering menyisipkan iklan video yang tidak pantas ditonton anak-anak.</p>
+        </div>
+      </div>
+
+      <div class="pain-card">
+        <div class="pain-icon">💸</div>
+        <div class="pain-content">
+          <h4>Kuota Data Cepat Habis & Boros Uang</h4>
+          <p>Harus streaming berjam-jam saat di mobil, restoran, atau saat liburan ke kampung halaman tanpa Wi-Fi.</p>
+        </div>
+      </div>
+
+      <div class="pain-card">
+        <div class="pain-icon">😵‍💫</div>
+        <div class="pain-content">
+          <h4>Warna Neon Terlalu Terang & Merusak Mata</h4>
+          <p>Grafis game dewasa sering menggunakan warna mencolok yang membuat mata balita cepat lelah dan perih.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOLUTION / 4 PILAR EMAS -->
+  <section class="section" style="background: linear-gradient(180deg, #f0fdf4, #ffffff);">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge" style="background:#dcfce7; color:#15803d; border-color:#86efac;">SOLUSI TERBAIK</span>
+        <h2 class="sec-title">Kini Hadir: Taman Belajar Ceria</h2>
+        <p class="sec-subtitle">Screen time edukatif yang aman, menenangkan, dan membantu tumbuh kembang buah hati.</p>
+      </div>
+
+      <div class="benefit-grid">
+        <div class="benefit-item">
+          <span class="ico">✈️</span>
+          <h4>100% Offline</h4>
+          <p>Matikan kuota HP atau aktifkan mode pesawat. Game tetap jalan lancar tanpa buffering!</p>
+        </div>
+
+        <div class="benefit-item">
+          <span class="ico">🛡️</span>
+          <h4>0% Iklan (Bebas Iklan)</h4>
+          <p>Bebas dari segala jenis pop-up, banner, atau iklan tersembunyi. 100% ramah anak.</p>
+        </div>
+
+        <div class="benefit-item">
+          <span class="ico">🧠</span>
+          <h4>Latihan Otak Komplit</h4>
+          <p>Mencakup matematika Singapura, logika coding, mengeja Inggris, dan daya ingat visual.</p>
+        </div>
+
+        <div class="benefit-item">
+          <span class="ico">🎨</span>
+          <h4>Warna Pastel Lembut</h4>
+          <p>Palet warna pastel yang menenangkan pikiran anak dan nyaman di mata si kecil.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SHOWCASE 12 MINI GAMES -->
+  <section class="section" style="background:#ffffff;">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge">KATALOG LENGKAP</span>
+        <h2 class="sec-title">Apa Saja yang Didapatkan Si Kecil?</h2>
+        <p class="sec-subtitle">12 modul game edukasi yang dirancang khusus sesuai tahapan usia emas anak.</p>
+      </div>
+
+      <div class="game-catalog">
+        <div class="catalog-card">
+          <div class="catalog-icon">🦁</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 5 - 8 TAHUN</span>
+            <div class="catalog-title">1. Kuis Cerdas Hewan & Warna</div>
+            <div class="catalog-desc">Mengenalkan nama satwa, warna, dan habitat dengan efek animasi ceria saat jawaban benar.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🃏</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 4 - 7 TAHUN</span>
+            <div class="catalog-title">2. Memory Card Match Flip</div>
+            <div class="catalog-desc">Grid kartu 4x4 untuk melatih daya ingat jangka pendek dan konsentrasi buah hati.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🧩</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 6 - 10 TAHUN</span>
+            <div class="catalog-title">3. Puzzle Angka & Balok 3x3</div>
+            <div class="catalog-desc">Melatih pemecahan masalah spasial dengan menggeser blok ubin ke posisi yang tepat.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">⚡</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 6 - 12 TAHUN</span>
+            <div class="catalog-title">4. Speed Math Berhitung Cepat</div>
+            <div class="catalog-desc">Tantangan tambah & kurang dengan timer 30 detik untuk mengasah refleks matematika.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🐰</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 7 - 12 TAHUN</span>
+            <div class="catalog-title">5. Coding Kelinci & Logika Algoritma</div>
+            <div class="catalog-desc">Menyusun barisan perintah (Atas, Bawah, Kiri, Kanan) memandu kelinci menuju wortel.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🌻</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 5 - 9 TAHUN</span>
+            <div class="catalog-title">6. Kebun Bunga Ajaib (Garden Builder)</div>
+            <div class="catalog-desc">Simulasi menanam benih, menyiram air, dan panen bunga warna-warni secara sabar.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">📖</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 6 - 10 TAHUN</span>
+            <div class="catalog-title">7. Cerita Interaktif Hutan Ajaib</div>
+            <div class="catalog-desc">Petualangan teks bercabang yang mengasah minat literasi dan kemampuan mengambil keputusan.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🇸🇬</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 6 - 9 TAHUN</span>
+            <div class="catalog-title">8. Singapore Math (Konsep Part-Whole)</div>
+            <div class="catalog-desc">Metode balok visual 10 kotak untuk memahami matematika pecahan dan komplemen secara nyata.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🔤</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 4 - 8 TAHUN</span>
+            <div class="catalog-title">9. English Spelling Kata Bergambar</div>
+            <div class="catalog-desc">Menebak dan menyusun huruf kosakata bahasa Inggris dasar dengan petunjuk emoji lucu.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🍎</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 3 - 6 TAHUN (PAUD)</span>
+            <div class="catalog-title">10. Sorting Buah & Kendaraan</div>
+            <div class="catalog-desc">Mengelompokkan benda ke zona kategori yang benar untuk melatih klasifikasi motorik.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">🦸</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">USIA 8 - 12 TAHUN</span>
+            <div class="catalog-title">11. RPG Turn-Based Pahlawan Cilik</div>
+            <div class="catalog-desc">Pertarungan strategi giliran (Serang, Pulihkan, Lari) melatih perhitungan taktik dan HP.</div>
+          </div>
+        </div>
+
+        <div class="catalog-card">
+          <div class="catalog-icon">⭐</div>
+          <div class="catalog-info">
+            <span class="catalog-tag">SEMUA USIA (3+)</span>
+            <div class="catalog-title">12. Bintang Ceria & Hub 5-in-1</div>
+            <div class="catalog-desc">Menu hub warna-warni ramah anak dan mode arcade rileks penenang saat bosan.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS / REAL SOCIAL PROOF -->
+  <section class="section" style="background:#fff7ed;">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge" style="background:#ffedd5; color:#c2410c; border-color:#fed7aa;">KATA BUNDA</span>
+        <h2 class="sec-title">Apa Kata Mereka yang Sudah Mencobanya?</h2>
+        <p class="sec-subtitle">Ratusan ibu muda telah membuktikan anak lebih anteng dan cerdas di rumah.</p>
+      </div>
+
+      <div class="testi-card">
+        <div class="testi-header">
+          <div class="testi-avatar">👩🏻</div>
+          <div class="testi-meta">
+            <h5>Bunda Sarah (28 th)</h5>
+            <span>Ibu dari Kenzo (5 th) • Jakarta Selatan</span>
+          </div>
+        </div>
+        <div class="stars">⭐⭐⭐⭐⭐</div>
+        <p class="testi-text">
+          "Biasanya Kenzo tiap megang HP pasti nonton video unboxing berjam-jam sampai nangis kalau diminta. Semenjak saya pasang Taman Belajar Ceria, dia malah ketagihan main tebak kata dan nyiram kebun bunga. Yang paling bikin tenang, kuota HP dimatiin tetap lancar jaya!"
+        </p>
+      </div>
+
+      <div class="testi-card">
+        <div class="testi-header">
+          <div class="testi-avatar">🧕🏼</div>
+          <div class="testi-meta">
+            <h5>Bunda Dian (29 th)</h5>
+            <span>Ibu dari Naura (4 th) • Surabaya</span>
+          </div>
+        </div>
+        <div class="stars">⭐⭐⭐⭐⭐</div>
+        <p class="testi-text">
+          "Game-nya bersih banget dari iklan aneh-aneh! Sebelumnya saya was-was anak ngeklik iklan judi atau pop-up belanja di YouTube. Ini sekali bayar murah banget Rp 49rb dapat 12 game sekaligus. Suaranya juga manis nggak berisik bikin sakit kepala. Recommended buat ibu-ibu muda!"
+        </p>
+      </div>
+
+      <div class="testi-card">
+        <div class="testi-header">
+          <div class="testi-avatar">👩🏼</div>
+          <div class="testi-meta">
+            <h5>Mama Cheryl (34 th)</h5>
+            <span>Ibu dari Elora (7 th) • Bandung</span>
+          </div>
+        </div>
+        <div class="stars">⭐⭐⭐⭐⭐</div>
+        <p class="testi-text">
+          "Game coding kelinci sama Singapore Math-nya jenius sih. Anak saya jadi ngerti konsep urutan langkah logika dan pengurangan tanpa merasa dipaksa belajar. Worth it banget dibanding beli mainan plastik yang seminggu rusak."
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- BONUS SPESIAL BUNDA -->
+  <section class="section" style="background:#ffffff;">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge">GRATIS HARI INI</span>
+        <h2 class="sec-title">3 Bonus Eksklusif Pendamping Belajar</h2>
+        <p class="sec-subtitle">Diberikan cuma-cuma khusus untuk pemesanan diskon hari ini!</p>
+      </div>
+
+      <div class="bonus-card">
+        <div style="font-size:36px;">🖨️</div>
+        <div>
+          <span class="bonus-badge">BONUS #1 (Senilai Rp 50.000)</span>
+          <div style="font-size:13px; font-weight:900; color:#0f172a;">Printable Worksheet Lembar Kerja Anak</div>
+          <div style="font-size:11.5px; color:#475569; margin-top:2px;">50+ lembar mewarnai & latihan menulis PDF siap print di rumah untuk motorik halus.</div>
+        </div>
+      </div>
+
+      <div class="bonus-card">
+        <div style="font-size:36px;">📜</div>
+        <div>
+          <span class="bonus-badge">BONUS #2 (Senilai Rp 35.000)</span>
+          <div style="font-size:13px; font-weight:900; color:#0f172a;">Template Piagam Anak Juara & Mandiri</div>
+          <div style="font-size:11.5px; color:#475569; margin-top:2px;">Piagam apresiasi digital yang bisa dicetak untuk membangun rasa percaya diri si kecil.</div>
+        </div>
+      </div>
+
+      <div class="bonus-card">
+        <div style="font-size:36px;">🔄</div>
+        <div>
+          <span class="bonus-badge">BONUS #3 (Senilai Rp 75.000)</span>
+          <div style="font-size:13px; font-weight:900; color:#0f172a;">Update & Penambahan Game Baru Seumur Hidup</div>
+          <div style="font-size:11.5px; color:#475569; margin-top:2px;">Bukan sistem langganan bulanan. Sekali bayar, Bunda berhak menikmati seluruh versi baru tanpa bayar lagi!</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCALEV PRICING & LEAD CAPTURE CHECKOUT SECTION -->
+  <section class="section" id="orderSection" style="background: linear-gradient(180deg, #ecfdf5, #fff);">
+    <div class="container">
+      <div class="pricing-box">
+        <div class="pricing-badge">🔥 PROMO DISKON 75% HARI INI</div>
+
+        <div style="font-size:18px; font-weight:900; color:#0f172a; margin-top:8px;">Paket Lengkap Taman Belajar Ceria</div>
+        <p style="font-size:12px; color:#64748b;">Akses Penuh 12 Game Edukasi Offline + 3 Bonus Eksklusif</p>
+
+        <div class="price-was">Harga Normal: Rp 199.000</div>
+        <div class="price-now">Rp 49.000</div>
+        <div class="price-sub">Sekali bayar untuk selamanya • Tanpa biaya bulanan</div>
+
+        <ul class="feature-list">
+          <li><span>✓</span> Akses Penuh 12 Game Edukasi (PAUD - SD)</li>
+          <li><span>✓</span> 100% Bisa Dimainkan Offline Tanpa Kuota Data</li>
+          <li><span>✓</span> Nol Iklan & Tanpa Konten Berbahaya</li>
+          <li><span>✓</span> Kompatibel di HP Android, iPhone, iPad & Tablet</li>
+          <li><span>✓</span> Bonus 50+ Printable Worksheet PDF Siap Cetak</li>
+          <li><span>✓</span> Panduan Instalasi Mudah 1 Menit & Bantuan CS WhatsApp</li>
+        </ul>
+
+        <!-- LEAD CAPTURE FORM (OPTIMAL UNTUK SCALEV SALES PAGE) -->
+        <div class="lead-form-card">
+          <div class="form-heading">📋 Formulir Pemesanan Cepat Bunda</div>
+
+          <form id="orderForm">
+            <div class="form-group">
+              <label class="form-label" for="momName">Nama Lengkap Bunda *</label>
+              <input type="text" id="momName" class="form-input" placeholder="Contoh: Bunda Sarah" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="childInfo">Nama & Usia Si Kecil *</label>
+              <input type="text" id="childInfo" class="form-input" placeholder="Contoh: Kenzo, 5 tahun (TK-B)" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="momPhone">Nomor WhatsApp Bunda *</label>
+              <input type="tel" id="momPhone" class="form-input" placeholder="Contoh: 081234567890" required />
+            </div>
+
+            <button type="submit" class="btn-cta btn-cta-pink" id="btnSubmitOrder" style="margin-top:12px;">
+              KIRIM PESANAN VIA WHATSAPP (Rp 49.000) ➔
+              <small>⚡ Klik untuk konfirmasi ke admin & terima link akses instan</small>
+            </button>
+          </form>
+
+          <p class="form-note">
+            🔒 Data privasi Bunda aman. Setelah tombol ditekan, Anda akan langsung dialihkan ke obrolan WhatsApp admin resmi.
+          </p>
+        </div>
+
+        <!-- ALTERNATIVE DIRECT 1-CLICK WHATSAPP BUTTON -->
+        <div style="margin-top:16px;">
+          <a id="btnDirectWa" href="https://wa.me/6281234567890?text=Halo%20Admin%20Taman%20Belajar%20Ceria!%20Saya%20mau%20pesan%20Paket%2012%20Game%20Edukasi%20Anak%20(Promo%20Rp%2049.000).%20Mohon%20info%20rekening/QRIS%20pembayaran%20ya." target="_blank" class="btn-cta" style="background:#25d366; box-shadow:0 6px 18px rgba(37,211,102,0.35);">
+            💬 Pesan Langsung Tanpa Isi Form ➔
+            <small>Langsung chat via WhatsApp dengan format standar</small>
+          </a>
+        </div>
+
+        <div style="margin-top:16px; font-size:11px; color:#64748b; line-height:1.5;">
+          🛡️ <b>Garansi Uang Kembali 100%:</b> Jika game tidak dapat berjalan di perangkat HP atau tablet Bunda, tim kami siap memandu sampai lancar atau uang Bunda kami kembalikan 100% tanpa potongan.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ (TANYA JAWAB BUNDA) -->
+  <section class="section">
+    <div class="container">
+      <div class="text-center">
+        <span class="sec-badge">TANYA JAWAB</span>
+        <h2 class="sec-title">Pertanyaan yang Sering Diajukan Bunda</h2>
+        <p class="sec-subtitle">Segala hal yang perlu Bunda ketahui tentang paket game ini.</p>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">
+          <span>Apakah game ini benar-benar bisa dimainkan tanpa internet?</span>
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-a">
+          <b>Ya, 100% benar!</b> Semua gambar menggunakan emoji sistem bawaan HP dan efek suaranya disintesis langsung oleh browser. Begitu halaman disimpan ke Layar Utama (Add to Home Screen), Bunda bisa mematikan kuota data atau mengaktifkan Airplane Mode dan game tetap berfungsi mulus tanpa putus.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">
+          <span>Apakah bisa di semua tipe HP Android, iPhone, dan Tablet?</span>
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-a">
+          <b>Bisa di semua HP!</b> Game ini berformat web app modern berbobot sangat ringan (kurang dari 1 MB). Mendukung Google Chrome, Safari iOS, Samsung Internet, Xiaomi Browser, hingga tablet anak sekolah tanpa membebani memori penyimpanan.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">
+          <span>Bagaimana cara pasangnya? Apakah butuh skill komputer?</span>
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-a">
+          <b>Sangat gampang, Bunda!</b> Cukup buka link resmi yang kami kirimkan ke WhatsApp Bunda, tekan menu titik tiga di browser dan klik <i>"Tambahkan ke Layar Utama" (Add to Home Screen)</i>. Ikon game akan langsung muncul di menu HP seperti aplikasi biasa. Kami juga sertakan panduan video 1 menitnya.
+        </div>
+      </div>
+
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q">
+          <span>Apakah ada biaya langganan bulanan di kemudian hari?</span>
+          <span class="faq-arrow">▼</span>
+        </div>
+        <div class="faq-a">
+          <b>Tidak ada biaya bulanan sama sekali!</b> Bunda hanya membayar 1 kali (Rp 49.000 saat promo) dan paket game dapat dinikmati seumur hidup oleh si kecil maupun adik-adiknya kelak.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <p style="font-weight:bold; color:#64748b;">Taman Belajar Ceria Indonesia</p>
+      <p style="margin-top:4px;">Inovasi Screen Time Anak 3-8 Tahun: Bebas Kuota, Bebas Iklan & Mengasah Otak.</p>
+      <p style="margin-top:10px;">© 2026 Taman Belajar Ceria. Hak Cipta Dilindungi.</p>
+    </div>
+  </footer>
+
+  <!-- STICKY BOTTOM CONVERSION BAR FOR MOBILE -->
+  <div class="sticky-bar">
+    <div>
+      <div class="sticky-price-label">Promo Hari Ini:</div>
+      <div class="sticky-price">Rp 49.000</div>
+    </div>
+    <a href="#orderSection" class="btn-sticky" id="btnStickyCta">
+      PESAN SEKARANG ➔
+    </a>
+  </div>
+
+  <!-- SCALEV HTML MODE RUNTIME INTEGRATION SCRIPT -->
+  <!-- Script ini dieksekusi secara aman setelah DOMContentLoaded sesuai standar runtime Scalev -->
+  <script>
+    // FAQ Toggle Helper
+    function toggleFaq(el) {
+      if (el) el.classList.toggle('active');
+    }
+
+    // Defensive Scalev Analytics Tracker
+    function scalevTrackEvent(eventName, payload) {
+      var providers = ['facebook', 'tiktok', 'kwai'];
+      if (window.Scalev && window.Scalev.analytics && typeof window.Scalev.analytics.track === 'function') {
+        providers.forEach(function (provider) {
+          try {
+            window.Scalev.analytics.track(provider, Object.assign({
+              event: eventName,
+              timestamp: new Date().toISOString()
+            }, payload || {}));
+          } catch (e) {
+            // Defensive fail-safe: don't break page execution if tracker encounters error
+          }
+        });
+      }
+    }
+
+    // Initialize on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', function () {
+      // 1. Safe Scalev Data Retrieval
+      var scalevData = (window.Scalev && window.Scalev.data && typeof window.Scalev.data.get === 'function')
+        ? window.Scalev.data.get()
+        : { page: {}, store: null };
+
+      // 2. Track initial ViewContent event
+      scalevTrackEvent('ViewContent', {
+        content_name: 'Taman Belajar Ceria - 12 Game Edukasi Anak',
+        content_category: 'Edukasi Anak',
+        value: 49000,
+        currency: 'IDR'
+      });
+
+      // 3. Countdown Timer (2 Jam 44 Menit)
+      var totalSecs = 2 * 3600 + 44 * 60 + 59;
+      var timerBadge = document.getElementById('timerBadge');
+      setInterval(function () {
+        if (totalSecs > 0) totalSecs--;
+        var h = Math.floor(totalSecs / 3600).toString().padStart(2, '0');
+        var m = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, '0');
+        var s = (totalSecs % 60).toString().padStart(2, '0');
+        if (timerBadge) timerBadge.textContent = h + ':' + m + ':' + s;
+      }, 1000);
+
+      // 4. Hero & Sticky CTA Click Tracking
+      var btnHero = document.getElementById('btnHeroCta');
+      if (btnHero) {
+        btnHero.addEventListener('click', function () {
+          scalevTrackEvent('InitiateCheckout', {
+            placement: 'Hero Section',
+            value: 49000,
+            currency: 'IDR'
+          });
+        });
+      }
+
+      var btnSticky = document.getElementById('btnStickyCta');
+      if (btnSticky) {
+        btnSticky.addEventListener('click', function () {
+          scalevTrackEvent('InitiateCheckout', {
+            placement: 'Sticky Bottom Bar',
+            value: 49000,
+            currency: 'IDR'
+          });
+        });
+      }
+
+      var btnDirectWa = document.getElementById('btnDirectWa');
+      if (btnDirectWa) {
+        btnDirectWa.addEventListener('click', function () {
+          scalevTrackEvent('Lead', {
+            channel: 'WhatsApp Direct',
+            value: 49000,
+            currency: 'IDR'
+          });
+        });
+      }
+
+      // 5. Order Form Submission Handling (WhatsApp Lead Redirection)
+      var orderForm = document.getElementById('orderForm');
+      if (orderForm) {
+        orderForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          var momName = (document.getElementById('momName') && document.getElementById('momName').value) || '';
+          var childInfo = (document.getElementById('childInfo') && document.getElementById('childInfo').value) || '';
+          var momPhone = (document.getElementById('momPhone') && document.getElementById('momPhone').value) || '';
+
+          // Track Lead & InitiateCheckout Events to Scalev
+          scalevTrackEvent('Lead', {
+            name: momName,
+            child: childInfo,
+            phone: momPhone,
+            value: 49000,
+            currency: 'IDR'
+          });
+
+          scalevTrackEvent('InitiateCheckout', {
+            content_name: 'Paket 12 Game Edukasi Anak',
+            value: 49000,
+            currency: 'IDR'
+          });
+
+          // Compose WhatsApp Message
+          var message = 'Halo Admin Taman Belajar Ceria!\n' +
+            'Saya mau konfirmasi pemesanan Paket 12 Game Edukasi Anak (Promo Rp 49.000).\n\n' +
+            '*Data Pemesanan:*\n' +
+            '• Nama Bunda: ' + momName + '\n' +
+            '• Anak: ' + childInfo + '\n' +
+            '• No. WhatsApp: ' + momPhone + '\n\n' +
+            'Mohon kirimkan nomor rekening / QRIS untuk pembayaran dan link akses game instannya ya. Terima kasih!';
+
+          // Admin WhatsApp Number (Ganti 6281234567890 dengan nomor admin jualan Scalev Anda)
+          var adminPhone = '6281234567890';
+          var waUrl = 'https://wa.me/' + adminPhone + '?text=' + encodeURIComponent(message);
+
+          // Redirect to WhatsApp
+          window.location.href = waUrl;
+        });
+      }
+    });
+  </script>
+</body>
+</html>

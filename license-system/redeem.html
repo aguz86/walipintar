@@ -118,11 +118,11 @@
 
     /* License Box */
     .license-card {
-      background: linear-gradient(135deg, #ecfdf5 0%, #f0f9ff 100%);
+      background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
       border: 2px dashed #10b981;
       border-radius: var(--radius-md);
-      padding: 18px 16px;
-      margin-bottom: 20px;
+      padding: 20px 16px;
+      margin-bottom: 18px;
       position: relative;
     }
 
@@ -132,7 +132,16 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       color: #047857;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+    }
+
+    .license-code-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 6px 0 10px;
+      flex-wrap: wrap;
     }
 
     .license-code {
@@ -142,13 +151,144 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       letter-spacing: 3px;
       user-select: all;
+      background: #ffffff;
+      padding: 8px 16px;
+      border-radius: 14px;
+      border: 1.5px solid #a7f3d0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .btn-copy-inline {
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    }
+    .btn-copy-inline:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+    .btn-copy-inline.copied {
+      background: #dcfce7;
+      color: #166534;
+      border-color: #86efac;
     }
 
     .order-info {
       font-size: 12px;
       color: #64748b;
-      margin-top: 8px;
+      margin-top: 6px;
       font-weight: 600;
+    }
+
+    /* DIRECT ACCESS BUTTON (TANPA COPY PASTE) */
+    .btn-direct-access {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      padding: 16px 18px;
+      border-radius: 18px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.15s, box-shadow 0.15s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-direct-access:active {
+      transform: scale(0.98);
+      box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
+    }
+    .btn-direct-access .btn-icon-circle {
+      width: 44px;
+      height: 44px;
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .btn-direct-access .btn-main-title {
+      font-size: 15.5px;
+      font-weight: 900;
+      line-height: 1.25;
+      display: block;
+    }
+    .btn-direct-access .btn-sub-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #d1fae5;
+      display: block;
+      margin-top: 3px;
+    }
+    .btn-direct-access .btn-arrow {
+      font-size: 18px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    /* PROMINENT COPY BUTTON */
+    .btn-copy-prominent {
+      background: #ffffff;
+      color: #1e293b;
+      border: 2px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 14px 18px;
+      font-size: 14.5px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      transition: all 0.2s;
+      width: 100%;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .btn-copy-prominent:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+    .btn-copy-prominent.copied {
+      background: #dcfce7;
+      border-color: #86efac;
+      color: #166534;
+    }
+
+    .direct-access-badge {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 14px;
+      padding: 11px 14px;
+      font-size: 12px;
+      color: #1e40af;
+      text-align: left;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.5;
+      margin-bottom: 16px;
     }
 
     .email-alert {
@@ -352,26 +492,48 @@
       <p class="subtitle">Lisensi resmi game <strong>Wali Pintar</strong> telah siap digunakan di HP & Tablet.</p>
 
       <div class="license-card">
-        <div class="license-label">Kode Lisensi Eksklusif Anda:</div>
-        <div class="license-code" id="displayLicense">WALI-XXXX</div>
+        <div class="license-label">Kode Lisensi Resmi Anda:</div>
+        <div class="license-code-wrap">
+          <div class="license-code" id="displayLicense">WALI-XXXX</div>
+          <button type="button" class="btn-copy-inline" id="btnQuickCopy" title="Salin Kode Lisensi">
+            <span id="quickCopyIcon">📋</span>
+            <span id="quickCopyText">Salin</span>
+          </button>
+        </div>
         <div class="order-info" id="displayOrderInfo">Order ID: INV-0000 • buyer@mail.com</div>
+      </div>
+
+      <!-- TOMBOL UTAMA: LANGSUNG AKSES DOMAIN UTAMA TANPA HARUS COPY PASTE -->
+      <a href="/" class="btn-direct-access" id="btnLaunchGame" title="Langsung Buka Game di Domain Utama">
+        <div class="btn-icon-circle">🚀</div>
+        <div style="flex: 1; min-width: 0;">
+          <span class="btn-main-title">Langsung Buka & Mainkan Game</span>
+          <span class="btn-sub-title">⚡ 1-Klik Otomatis Masuk • Tanpa Perlu Copy-Paste Lisensi</span>
+        </div>
+        <span class="btn-arrow">➔</span>
+      </a>
+
+      <!-- TOMBOL COPY LISENSI BESAR & PROMINENT -->
+      <button type="button" class="btn-copy-prominent" id="btnCopyLicense">
+        <span id="copyBtnIcon">📋</span>
+        <span id="copyBtnLabel">Salin Kode Lisensi (WALI-XXXX)</span>
+      </button>
+
+      <!-- NOTIFIKASI AKSES INSTAN -->
+      <div class="direct-access-badge">
+        <span style="font-size: 16px; line-height: 1;">✨</span>
+        <div>
+          <strong>Akses Instan:</strong> Lisensi Anda sudah otomatis tertanam di perangkat ini. Cukup klik tombol hijau di atas untuk langsung membuka game tanpa harus repot menyalin kode!
+        </div>
       </div>
 
       <div class="email-alert" id="emailNotification">
         <span style="font-size: 20px;">📧</span>
         <div>
           <strong>Cek email Anda sekarang!</strong><br>
-          Kami telah mengirimkan salinan kode lisensi dan bukti kepemilikan ke inbox email Anda.
+          Salinan kode lisensi resmi juga telah dikirimkan ke email Anda via Brevo.
         </div>
       </div>
-
-      <button class="btn btn-primary" id="btnLaunchGame">
-        <span>🚀 Masuk & Buka Game Sekarang</span>
-      </button>
-
-      <button class="btn btn-secondary" id="btnCopyLicense">
-        <span>📋 Salin Kode Lisensi</span>
-      </button>
 
       <div id="waHelpBox" style="display: none; margin-top: 14px;">
         <a href="https://wa.me/6285704808186" class="btn btn-wa" target="_blank" id="btnWaAdmin">
@@ -382,16 +544,28 @@
 
     <!-- State 3: Error / Fallback State -->
     <div id="errorState" style="display: none;">
-      <div class="status-icon" style="color: #ef4444;">⚠️</div>
-      <h1 id="errorTitle">Verifikasi Memerlukan Bantuan</h1>
-      <p class="subtitle" id="errorMessage">Parameter pesanan tidak lengkap atau server sedang memproses.</p>
+      <div class="status-icon" style="color: #10b981;">✨</div>
+      <h1 id="errorTitle">Aktivasi Lisensi Instan</h1>
+      <p class="subtitle" id="errorMessage">Masukkan email atau nomor pesanan Anda saat checkout di Scalev untuk memunculkan kode lisensi seketika:</p>
       
+      <div id="manualLookupBox" style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:16px; padding:16px; margin-bottom:16px; text-align:left;">
+        <label style="display:block; font-size:12px; font-weight:800; color:#334155; margin-bottom:6px;">Email Pembelian di Scalev:</label>
+        <input type="email" id="manualEmailInput" placeholder="contoh: nama@email.com" style="width:100%; padding:12px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; margin-bottom:10px; outline:none; box-sizing:border-box;" />
+        <label style="display:block; font-size:12px; font-weight:800; color:#334155; margin-bottom:6px;">Nama Anda (Opsional):</label>
+        <input type="text" id="manualNameInput" placeholder="Contoh: Bunda Rina" style="width:100%; padding:12px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; margin-bottom:10px; outline:none; box-sizing:border-box;" />
+        <label style="display:block; font-size:12px; font-weight:800; color:#334155; margin-bottom:6px;">Nomor Pesanan / Order ID (Opsional):</label>
+        <input type="text" id="manualOrderInput" placeholder="Contoh: 383254 atau nomor invoice" style="width:100%; padding:12px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; margin-bottom:14px; outline:none; box-sizing:border-box;" />
+        <button type="button" class="btn btn-primary" id="btnManualSubmit" style="margin-bottom:0; width:100%;">
+          <span>⚡ Munculkan Lisensi Saya Sekarang</span>
+        </button>
+      </div>
+
       <a href="https://wa.me/6285704808186" class="btn btn-wa" target="_blank" id="btnErrorWa">
-        <span>💬 Hubungi Admin WhatsApp (+62 857-0480-8186)</span>
+        <span>💬 Butuh Bantuan? Hubungi WhatsApp Admin (0857-0480-8186)</span>
       </a>
 
       <a href="/" class="btn btn-secondary" style="margin-top: 10px;">
-        <span>🏠 Kembali ke Halaman Utama</span>
+        <span>🏠 Sudah Punya Lisensi? Masuk ke Game</span>
       </a>
     </div>
 
@@ -434,7 +608,8 @@
     // Parse URL Query Parameters dari redirect Scalev
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('order_id') || urlParams.get('orderId') || urlParams.get('order') || urlParams.get('order_number') || urlParams.get('orderNumber') || urlParams.get('id') || urlParams.get('invoice');
-    const email = urlParams.get('email') || urlParams.get('customer_email') || urlParams.get('buyer_email') || urlParams.get('mail');
+    const email = urlParams.get('email') || urlParams.get('customer_email') || urlParams.get('buyer_email') || urlParams.get('mail') || urlParams.get('gmail');
+    const name = urlParams.get('name') || urlParams.get('customer_name') || urlParams.get('buyer_name') || urlParams.get('nama') || urlParams.get('customer_first_name') || '';
     const directLicense = urlParams.get('license') || urlParams.get('license_key') || urlParams.get('key') || urlParams.get('lisensi');
 
     const loadingState = document.getElementById('loadingState');
@@ -447,58 +622,130 @@
     const btnCopyLicense = document.getElementById('btnCopyLicense');
     const waHelpBox = document.getElementById('waHelpBox');
 
+    function wireSuccessActions(licenseKey, orderIdText, emailText, nameText) {
+      const cleanLic = (licenseKey || '').trim().toUpperCase();
+      localStorage.setItem('walipintar_license', cleanLic);
+      if (emailText) localStorage.setItem('walipintar_email', emailText);
+      if (orderIdText) localStorage.setItem('walipintar_order', orderIdText);
+      localStorage.setItem('walipintar_auth_time', Date.now().toString());
+
+      displayLicense.textContent = cleanLic;
+      displayOrderInfo.textContent = nameText
+        ? `Order: ${orderIdText || '-'} • ${emailText || ''} (${nameText})`
+        : `Order: ${orderIdText || '-'} • ${emailText || ''}`;
+
+      // Update teks tombol salin utama
+      const copyBtnLabel = document.getElementById('copyBtnLabel');
+      if (copyBtnLabel) {
+        copyBtnLabel.textContent = `Salin Kode Lisensi (${cleanLic})`;
+      }
+
+      // 1. TOMBOL LANGSUNG AKSES DOMAIN UTAMA TANPA COPY PASTE
+      btnLaunchGame.onclick = (e) => {
+        if (e) e.preventDefault();
+        window.location.href = `/?key=${encodeURIComponent(cleanLic)}&autologin=1`;
+      };
+      btnLaunchGame.setAttribute('href', `/?key=${encodeURIComponent(cleanLic)}&autologin=1`);
+
+      // 2. FUNGSI COPY LISENSI
+      const executeCopy = async (targetBtn, originalText, successText) => {
+        try {
+          await navigator.clipboard.writeText(cleanLic);
+          targetBtn.classList.add('copied');
+          targetBtn.innerHTML = `<span>${successText}</span>`;
+          setTimeout(() => {
+            targetBtn.classList.remove('copied');
+            targetBtn.innerHTML = `<span>${originalText}</span>`;
+          }, 2500);
+        } catch (err) {
+          prompt("Salin kode lisensi resmi Anda:", cleanLic);
+        }
+      };
+
+      // Handler untuk Tombol Prominent Copy
+      btnCopyLicense.onclick = () => {
+        executeCopy(btnCopyLicense, `📋 Salin Kode Lisensi (${cleanLic})`, `✅ Kode Lisensi Berhasil Disalin!`);
+      };
+
+      // Handler untuk Tombol Quick Inline Copy
+      const btnQuickCopy = document.getElementById('btnQuickCopy');
+      if (btnQuickCopy) {
+        btnQuickCopy.onclick = () => {
+          executeCopy(btnQuickCopy, `📋 Salin`, `✅ Tersalin!`);
+        };
+      }
+
+      // Auto-copy bila diarahkan dari tombol email (action=copy)
+      if (urlParams.get('action') === 'copy') {
+        try {
+          navigator.clipboard.writeText(cleanLic).then(() => {
+            btnCopyLicense.classList.add('copied');
+            btnCopyLicense.innerHTML = "<span>✅ Kode Lisensi Berhasil Disalin!</span>";
+          }).catch(() => {});
+        } catch (e) {}
+      }
+
+      loadingState.style.display = 'none';
+      successState.style.display = 'block';
+    }
+
     async function processRedemption() {
       // Jika directLicense sudah ada di URL
       if (directLicense) {
-        const cleanLic = directLicense.trim().toUpperCase();
-        localStorage.setItem('walipintar_license', cleanLic);
-        displayLicense.textContent = cleanLic;
-        displayOrderInfo.textContent = orderId ? `Order: ${orderId} • ${email || ''}` : `Lisensi Resmi Aktif`;
-        btnLaunchGame.onclick = () => {
-          window.location.href = `/?key=${cleanLic}`;
-        };
-        btnCopyLicense.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(cleanLic);
-            btnCopyLicense.innerHTML = "<span>✅ Kode Lisensi Berhasil Disalin!</span>";
-            btnCopyLicense.style.background = "#dcfce7";
-            btnCopyLicense.style.color = "#166534";
-            setTimeout(() => {
-              btnCopyLicense.innerHTML = "<span>📋 Salin Kode Lisensi</span>";
-              btnCopyLicense.style.background = "#f1f5f9";
-              btnCopyLicense.style.color = "#334155";
-            }, 2500);
-          } catch (err) {
-            prompt("Salin kode lisensi Anda:", cleanLic);
-          }
-        };
-        // Auto-copy bila diarahkan dari tombol email (action=copy)
-        if (urlParams.get('action') === 'copy') {
-          try {
-            navigator.clipboard.writeText(cleanLic).then(() => {
-              btnCopyLicense.innerHTML = "<span>✅ Kode Lisensi Berhasil Disalin!</span>";
-              btnCopyLicense.style.background = "#dcfce7";
-              btnCopyLicense.style.color = "#166534";
-            }).catch(() => {});
-          } catch (e) {}
-        }
-
-        loadingState.style.display = 'none';
-        successState.style.display = 'block';
+        wireSuccessActions(directLicense, orderId, email, name);
         return;
       }
 
-      if (!orderId || !email) {
+      // Cek apakah parameter ada dan bukan token mentah seperti {order_id} atau {email}
+      const isOrderIdValid = orderId && !orderId.startsWith('{');
+      const isEmailValid = email && !email.startsWith('{') && email.includes('@');
+      const cleanName = (name && !name.startsWith('{')) ? name : '';
+
+      if (!isOrderIdValid || !isEmailValid) {
+        // Tampilkan formulir mandiri jika parameter dari redirect kosong atau belum diganti oleh Scalev
+        initManualForm();
         showError(
-          "Data Pesanan Tidak Lengkap",
-          "URL redirect Scalev tidak menyertakan Order ID atau Email pembeli. Jangan khawatir, klik WhatsApp di bawah untuk konfirmasi langsung dengan Admin."
+          "Aktivasi Lisensi Instan",
+          "Masukkan email atau nomor pesanan Anda saat checkout di Scalev untuk memunculkan kode lisensi seketika:"
         );
         return;
       }
 
+      await fetchAndActivateLicense(orderId, email, cleanName);
+    }
+
+    function initManualForm() {
+      const btnManual = document.getElementById('btnManualSubmit');
+      const emailInput = document.getElementById('manualEmailInput');
+      const nameInput = document.getElementById('manualNameInput');
+      const orderInput = document.getElementById('manualOrderInput');
+      if (!btnManual) return;
+
+      btnManual.onclick = async () => {
+        const inputEmail = emailInput ? emailInput.value.trim() : '';
+        const inputName = nameInput ? nameInput.value.trim() : '';
+        const inputOrder = orderInput && orderInput.value.trim() ? orderInput.value.trim() : 'ORD-' + Date.now().toString().slice(-6);
+
+        if (!inputEmail || !inputEmail.includes('@')) {
+          alert('Silakan masukkan format email yang valid saat Anda checkout di Scalev.');
+          if (emailInput) emailInput.focus();
+          return;
+        }
+
+        btnManual.disabled = true;
+        btnManual.innerHTML = '<span>⏳ Memproses Lisensi Anda...</span>';
+
+        loadingState.style.display = 'block';
+        errorState.style.display = 'none';
+
+        await fetchAndActivateLicense(inputOrder, inputEmail, inputName);
+      };
+    }
+
+    async function fetchAndActivateLicense(targetOrder, targetEmail, targetName) {
       try {
         // Panggil Google Apps Script: action=create
-        const apiUrl = `${GAS_API_URL}?action=create&order_id=${encodeURIComponent(orderId)}&email=${encodeURIComponent(email)}`;
+        const apiUrl = `${GAS_API_URL}?action=create&order_id=${encodeURIComponent(targetOrder)}&email=${encodeURIComponent(targetEmail)}&name=${encodeURIComponent(targetName || '')}`;
         
         let responseData = null;
 
@@ -516,22 +763,12 @@
             success: true,
             licenseKey: fallbackCode,
             emailSent: false,
-            message: "Lisensi lokal disiapkan. Hubungi admin untuk pencatatan di cloud."
+            message: "Lisensi disiapkan. Data Anda tersimpan aman di perangkat ini."
           };
         }
 
         if (responseData && responseData.success) {
           const licenseKey = responseData.licenseKey;
-
-          // 1. Simpan lisensi ke localStorage agar pembeli langsung terotentikasi di index.html
-          localStorage.setItem('walipintar_license', licenseKey);
-          localStorage.setItem('walipintar_email', email);
-          localStorage.setItem('walipintar_order', orderId);
-          localStorage.setItem('walipintar_auth_time', Date.now().toString());
-
-          // 2. Render Tampilan Sukses
-          displayLicense.textContent = licenseKey;
-          displayOrderInfo.textContent = `Order: ${orderId} • ${email}`;
 
           if (responseData.emailSent === false) {
             emailNotification.className = "email-alert warning";
@@ -545,30 +782,7 @@
             waHelpBox.style.display = 'block';
           }
 
-          // Tombol Buka Game langsung ke index.html
-          btnLaunchGame.onclick = () => {
-            window.location.href = `/?license=${licenseKey}&autologin=1`;
-          };
-
-          // Tombol Salin Lisensi
-          btnCopyLicense.onclick = async () => {
-            try {
-              await navigator.clipboard.writeText(licenseKey);
-              btnCopyLicense.innerHTML = "<span>✅ Kode Lisensi Berhasil Disalin!</span>";
-              btnCopyLicense.style.background = "#dcfce7";
-              btnCopyLicense.style.color = "#166534";
-              setTimeout(() => {
-                btnCopyLicense.innerHTML = "<span>📋 Salin Kode Lisensi</span>";
-                btnCopyLicense.style.background = "#f1f5f9";
-                btnCopyLicense.style.color = "#334155";
-              }, 2500);
-            } catch (err) {
-              prompt("Salin kode lisensi Anda:", licenseKey);
-            }
-          };
-
-          loadingState.style.display = 'none';
-          successState.style.display = 'block';
+          wireSuccessActions(licenseKey, targetOrder, targetEmail, targetName);
 
         } else {
           showError("Gagal Membuat Lisensi", responseData?.message || "Terjadi kendala saat memproses lisensi di server.");

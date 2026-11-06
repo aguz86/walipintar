@@ -22,7 +22,7 @@ const SHEET_LICENSES = 'Licenses';
 const SHEET_REPORTS = 'Laporan_Statistik';
 const ADMIN_WA = '6285704808186';
 const BRAND_NAME = 'Wali Pintar';
-const SCALEV_URL = 'https://walipintar.myscalev.com';
+const SCALEV_URL = 'https://walipintar.myscalev.com/p/game-edukatif-anak-pintar-17-game-505-materi-100-offline';
 const APP_URL = 'https://walipintar.my.id';
 
 /**
@@ -160,6 +160,7 @@ function handleRequest(e, httpMethod) {
     if (action === 'create') {
       const orderId = (params.order_id || postData.order_id || '').trim();
       const email = (params.email || postData.email || '').trim().toLowerCase();
+      const name = (params.name || params.customer_name || params.nama || params.buyer_name || postData.name || postData.customer_name || postData.nama || '').trim();
 
       if (!orderId || !email) {
         return createJsonResponse({ success: false, message: 'Order ID dan Email wajib diisi.' });
@@ -177,6 +178,7 @@ function handleRequest(e, httpMethod) {
             licenseKey: existingLicense,
             email: data[i][2],
             orderId: orderId,
+            name: name,
             message: 'Lisensi untuk pesanan ini sudah pernah dibuat sebelumnya.'
           });
         }
@@ -186,7 +188,7 @@ function handleRequest(e, httpMethod) {
       const now = new Date();
 
       // Kirim Email Murni Brevo REST API v3
-      const brevoResult = sendBrevoEmail(email, licenseKey, orderId, false);
+      const brevoResult = sendBrevoEmail(email, licenseKey, orderId, false, name);
 
       sheet.appendRow([
         now,
@@ -198,7 +200,7 @@ function handleRequest(e, httpMethod) {
         brevoResult.success ? 'TERKIRIM (Brevo)' : 'GAGAL (' + brevoResult.error + ')',
         brevoResult.messageId || '-',
         0,
-        'Otomatis via Scalev Redeem'
+        name ? 'Otomatis via Scalev Redeem (' + name + ')' : 'Otomatis via Scalev Redeem'
       ]);
 
       updateDashboardStats(ss);
@@ -422,17 +424,18 @@ function renderServerStatusPage() {
 /**
  * Pengiriman Email Murni Brevo REST API v3
  */
-function sendBrevoEmail(toEmail, licenseKey, orderId, isResend) {
+function sendBrevoEmail(toEmail, licenseKey, orderId, isResend, customerName) {
   if (!BREVO_API_KEY || BREVO_API_KEY.includes('PASTE_YOUR_BREVO_API_KEY')) {
     return { success: false, messageId: null, error: 'Brevo API Key belum diisi di Code.gs.' };
   }
 
   const subject = (isResend ? '[Kirim Ulang] ' : '🎉 ') + 'Lisensi Game Edukasi ' + BRAND_NAME + ': ' + licenseKey;
-  const htmlContent = generateLicenseHtmlEmail(licenseKey, orderId);
+  const htmlContent = generateLicenseHtmlEmail(licenseKey, orderId, customerName);
+  const recipientName = customerName && customerName.trim() ? customerName.trim() : 'Ayah & Bunda Hebat';
 
   const payload = {
     sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
-    to: [{ email: toEmail, name: 'Ayah & Bunda Hebat' }],
+    to: [{ email: toEmail, name: recipientName }],
     subject: subject,
     htmlContent: htmlContent
   };
@@ -854,9 +857,10 @@ function generateUniqueLicense(sheet) {
   return code;
 }
 
-function generateLicenseHtmlEmail(licenseKey, orderId) {
+function generateLicenseHtmlEmail(licenseKey, orderId, customerName) {
   // URL logo web terkompresi (ukuran ~6.2 KB ultra ringan & cepat dimuat di Gmail / HP)
   const LOGO_URL = `${APP_URL}/assets/logo-email.png`;
+  const greeting = customerName && customerName.trim() ? `Halo Bunda / Ayah ${customerName.trim()}! 👋` : 'Halo Ayah & Bunda Hebat! 👋';
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background-color: #f8fafc; padding: 24px; border-radius: 24px; color: #1e293b; border: 1px solid #e2e8f0;">
@@ -870,7 +874,7 @@ function generateLicenseHtmlEmail(licenseKey, orderId) {
 
       <!-- KARTU UTAMA LISENSI -->
       <div style="background-color: #ffffff; padding: 26px 22px; border-radius: 20px; border: 2px solid #e2e8f0; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);">
-        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 800;">Halo Ayah & Bunda Hebat! 👋</h2>
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 800;">${greeting}</h2>
         <p style="color: #475569; font-size: 13.5px; line-height: 1.6; margin-bottom: 18px;">
           Terima kasih telah mempercayakan media belajar si kecil kepada <strong>${BRAND_NAME}</strong>. Pembayaran Anda telah kami terima dengan sukses. Berikut adalah kode lisensi resmi Anda:
         </p>
