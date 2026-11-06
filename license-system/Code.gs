@@ -22,7 +22,7 @@ const SHEET_LICENSES = 'Licenses';
 const SHEET_REPORTS = 'Laporan_Statistik';
 const ADMIN_WA = '6285704808186';
 const BRAND_NAME = 'Wali Pintar';
-const SCALEV_URL = 'https://walipintar.myscalev.com/p/game-edukatif-anak-pintar-17-game-505-materi-100-offline';
+const SCALEV_URL = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
 const APP_URL = 'https://walipintar.my.id';
 
 /**

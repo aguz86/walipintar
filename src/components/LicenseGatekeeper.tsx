@@ -340,7 +340,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         <div className="mt-5 space-y-2 text-xs font-bold text-slate-600">
           <div>
             <a
-              href="https://walipintar.myscalev.com/p/game-edukatif-anak-pintar-17-game-505-materi-100-offline"
+              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
@@ -470,7 +470,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
               {/* Beli di Scalev */}
               <a
-                href="https://walipintar.myscalev.com/p/game-edukatif-anak-pintar-17-game-505-materi-100-offline"
+                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
