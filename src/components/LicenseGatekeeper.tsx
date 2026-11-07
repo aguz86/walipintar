@@ -45,7 +45,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
     if (e && e.preventDefault) e.preventDefault();
     const cleanEmail = inputEmail.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      setRejectMessage('Harap masukkan format email yang valid saat Anda checkout di Scalev.');
+      setRejectMessage('Harap masukkan format email yang valid saat Anda checkout.');
       setShowRejectModal(true);
       SFX.no();
       return;
@@ -301,7 +301,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
           </div>
         </div>
 
-        {/* Toggle Mode: Aktivasi via Email Scalev vs Masukkan Kode Lisensi */}
+        {/* Toggle Mode: Aktivasi via Email vs Masukkan Kode Lisensi */}
         <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl mb-4 border border-slate-200/80">
           <button
             type="button"
@@ -330,7 +330,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         </div>
 
         {activeTab === 'email' ? (
-          /* Mode 1: Aktivasi Instan via Email Pembelian di Scalev */
+          /* Mode 1: Aktivasi Instan via Email Pembelian */
           <form onSubmit={handleEmailActivation} className="space-y-3">
             <div className="space-y-1.5 text-left">
               <label className="block text-xs font-bold text-slate-800">
@@ -352,7 +352,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                 required
               />
               <p className="text-[11px] text-slate-500 font-medium">
-                ⚡ Sistem Scalev API akan langsung memverifikasi status pembayaran Anda. Jika sudah lunas, game seketika terbuka selamanya!
+                ⚡ Sistem otomatis memverifikasi status pembayaran Anda. Jika sudah lunas, game seketika terbuka selamanya!
               </p>
             </div>
 
@@ -364,7 +364,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Memverifikasi Pesanan Scalev...</span>
+                  <span>Memverifikasi Status Pembayaran...</span>
                 </>
               ) : (
                 <>
@@ -475,13 +475,13 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         <div className="mt-5 space-y-2 text-xs font-bold text-slate-600">
           <div>
             <a
-              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+              href="/beli"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
               <span>🛒</span>
-              <span>Belum Punya Lisensi? Beli di Scalev (Rp 110.000)</span>
+              <span>Belum Punya Lisensi? Beli Lisensi Resmi (Rp 110.000)</span>
             </a>
           </div>
 
@@ -581,7 +581,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
             </h3>
             
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              Pembayaran Anda terverifikasi lunas di Scalev. Lisensi resmi si kecil siap digunakan dan telah otomatis terpasang di perangkat ini.
+              Pembayaran Anda terverifikasi lunas. Lisensi resmi si kecil siap digunakan dan telah otomatis terpasang di perangkat ini.
             </p>
 
             <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-4">
@@ -628,7 +628,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
             </h3>
             
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              {unpaidModalData.message ? unpaidModalData.message.replace(/^AKSES DITOLAK:\s*/i, '') : 'Sistem belum mendeteksi pembayaran lunas untuk email ini di Scalev. Jika Anda baru saja transfer atau scan QRIS, silakan tunggu 1-2 menit lalu klik periksa kembali.'}
+              {unpaidModalData.message ? unpaidModalData.message.replace(/^AKSES DITOLAK:\s*/i, '') : 'Sistem belum mendeteksi pembayaran lunas untuk email ini. Jika Anda baru saja transfer atau scan QRIS, silakan tunggu 1-2 menit lalu klik periksa kembali.'}
             </p>
 
             <div className="space-y-2">
@@ -644,12 +644,12 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               </button>
 
               <a
-                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+                href="/beli"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
               >
-                <span>💳 Selesaikan Pembayaran di Scalev</span>
+                <span>💳 Selesaikan Pembayaran</span>
               </a>
 
               <a
@@ -707,14 +707,14 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                 <span>💬 Hubungi Admin WhatsApp (085704808186)</span>
               </a>
 
-              {/* Beli di Scalev */}
+              {/* Beli Lisensi Resmi */}
               <a
-                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+                href="/beli"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
               >
-                <span>🛒 Beli Lisensi Resmi di Scalev</span>
+                <span>🛒 Beli Lisensi Resmi</span>
               </a>
 
               {/* Coba Lagi */}

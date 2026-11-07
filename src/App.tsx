@@ -135,11 +135,16 @@ export default function App() {
   // Screen-time session counter (in seconds)
   const sessionSecondsRef = useRef(0);
 
-  // Jika URL dibuka pada /redeem (misal dari redirect Scalev), teruskan ke redeem.html
+  // Jika URL dibuka pada /redeem atau /beli atau /checkout
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/redeem') && !window.location.pathname.endsWith('.html')) {
-        window.location.replace('/redeem.html' + window.location.search);
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (path.startsWith('/redeem') && !path.endsWith('.html')) {
+          window.location.replace('/redeem.html' + window.location.search);
+        } else if (path === '/beli' || path === '/beli/' || path === '/checkout' || path === '/checkout/') {
+          window.location.href = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
+        }
       }
     } catch {}
   }, []);
