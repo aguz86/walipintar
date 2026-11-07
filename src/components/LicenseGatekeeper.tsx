@@ -9,17 +9,28 @@ interface LicenseGatekeeperProps {
 const GAS_API_URL = (import.meta as any).env?.VITE_GAS_API_URL || 'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
 
 export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }) => {
+  const [activeTab, setActiveTab] = useState<'email' | 'license'>('email');
   const [inputKey, setInputKey] = useState('');
+  const [inputEmail, setInputEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState('');
+  const [paidModalData, setPaidModalData] = useState<{ email: string; license: string; orderId?: string } | null>(null);
+  const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string } | null>(null);
 
-  // Auto-detect URL parameter ?license=WALI-XXXX or ?key= or ?lisensi= (misal dari redirect checkout atau link redeem)
+  // Auto-detect URL parameter ?license=WALI-XXXX or ?key= or ?email=
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlLicense = params.get('license') || params.get('key') || params.get('lisensi');
+      const urlEmail = params.get('email') || params.get('customer_email') || localStorage.getItem('walipintar_email');
+
+      if (urlEmail) {
+        setInputEmail(urlEmail);
+      }
+
       if (urlLicense) {
+        setActiveTab('license');
         const cleanKey = urlLicense.trim().toUpperCase();
         setInputKey(cleanKey);
         // Otomatis validasi ke Google Apps Script / Sheet saat dibuka via link
@@ -29,6 +40,55 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
       // Ignore URL parsing errors
     }
   }, []);
+
+  const handleEmailActivation = async (e?: React.FormEvent) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const cleanEmail = inputEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setRejectMessage('Harap masukkan format email yang valid saat Anda checkout di Scalev.');
+      setShowRejectModal(true);
+      SFX.no();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const url = `${GAS_API_URL}?action=create&email=${encodeURIComponent(cleanEmail)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setIsLoading(false);
+
+      if (data && data.success && data.licenseKey) {
+        localStorage.setItem('walipintar_license', data.licenseKey);
+        localStorage.setItem('walipintar_email', cleanEmail);
+        if (data.orderId) localStorage.setItem('walipintar_order', data.orderId);
+        localStorage.setItem('walipintar_auth_time', Date.now().toString());
+
+        SFX.fanfare();
+        setUnpaidModalData(null);
+        setPaidModalData({
+          email: cleanEmail,
+          license: data.licenseKey,
+          orderId: data.orderId,
+        });
+      } else {
+        SFX.no();
+        setPaidModalData(null);
+        setUnpaidModalData({
+          email: cleanEmail,
+          message: data?.message,
+        });
+      }
+    } catch (err) {
+      setIsLoading(false);
+      SFX.no();
+      setPaidModalData(null);
+      setUnpaidModalData({
+        email: cleanEmail,
+        message: 'Koneksi internet bermasalah atau server sibuk. Pastikan internet Anda aktif lalu coba lagi.',
+      });
+    }
+  };
 
   const validateAndUnlock = async (keyToValidate: string) => {
     let trimmed = keyToValidate.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
@@ -241,100 +301,175 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
           </div>
         </div>
 
-        {/* Form Input Lisensi (Format WALI-XXXX) */}
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1.5 text-left">
-            <div className="relative">
+        {/* Toggle Mode: Aktivasi via Email Scalev vs Masukkan Kode Lisensi */}
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl mb-4 border border-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab('email')}
+            className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'email'
+                ? 'bg-white text-emerald-800 shadow-sm font-extrabold border border-emerald-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>✉️</span>
+            <span>Aktivasi via Email</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('license')}
+            className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'license'
+                ? 'bg-white text-teal-800 shadow-sm font-extrabold border border-teal-200'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🔑</span>
+            <span>Punya Kode Lisensi</span>
+          </button>
+        </div>
+
+        {activeTab === 'email' ? (
+          /* Mode 1: Aktivasi Instan via Email Pembelian di Scalev */
+          <form onSubmit={handleEmailActivation} className="space-y-3">
+            <div className="space-y-1.5 text-left">
+              <label className="block text-xs font-bold text-slate-800">
+                Email Pembelian
+              </label>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[11.5px] font-bold text-emerald-800">
+                <span>💡</span>
+                <span>email saat checkout</span>
+              </div>
               <input
-                type="text"
-                value={inputKey}
-                onChange={(e) => {
-                  let cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9);
-                  if (!cleaned.startsWith('WALI-') && cleaned.length === 4 && !cleaned.includes('-')) {
-                    cleaned = `WALI-${cleaned}`;
-                  }
-                  setInputKey(cleaned);
-                }}
-                maxLength={9}
-                minLength={9}
-                placeholder="CONTOH:  WALI-7K9P"
-                className={`w-full h-14 sm:h-15 px-4 text-center font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
-                  /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
-                    ? 'border-emerald-500 bg-emerald-50/30 text-emerald-950'
-                    : inputKey.length === 9 && /[0O1I]/.test(inputKey.slice(5))
-                    ? 'border-rose-400 bg-rose-50/30 text-rose-950'
-                    : 'border-slate-200 focus:border-teal-500 focus:bg-teal-50/20'
-                }`}
-                autoCapitalize="characters"
-                autoComplete="off"
+                type="email"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                placeholder="nama@email.com"
+                className="w-full h-14 sm:h-15 px-4 font-bold text-slate-800 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-emerald-500 focus:bg-emerald-50/20 shadow-2xs focus:outline-none transition-all"
+                autoCapitalize="none"
+                autoComplete="email"
                 spellCheck="false"
                 required
               />
+              <p className="text-[11px] text-slate-500 font-medium">
+                ⚡ Sistem Scalev API akan langsung memverifikasi status pembayaran Anda. Jika sudah lunas, game seketika terbuka selamanya!
+              </p>
             </div>
 
-            {/* Indikator Rule & Karakter Counter */}
-            <div className="flex items-center justify-between px-1.5 text-[11px] font-semibold text-slate-500">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-slate-400">Aturan:</span>
-                <span className="font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                  WALI-XXXX
-                </span>
-                <span className="text-[10.5px] text-slate-500 font-medium">
-                  (Wajib 9 Karakter &bull; Tanpa 0, O, 1, I)
-                </span>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-13 sm:h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 transition-all cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Memverifikasi Pesanan Scalev...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg">🚀</span>
+                  <span>Verifikasi Lunas & Buka Game</span>
+                </>
+              )}
+            </button>
+          </form>
+        ) : (
+          /* Mode 2: Form Input Lisensi (Format WALI-XXXX) */
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1.5 text-left">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={inputKey}
+                  onChange={(e) => {
+                    let cleaned = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9);
+                    if (!cleaned.startsWith('WALI-') && cleaned.length === 4 && !cleaned.includes('-')) {
+                      cleaned = `WALI-${cleaned}`;
+                    }
+                    setInputKey(cleaned);
+                  }}
+                  maxLength={9}
+                  minLength={9}
+                  placeholder="CONTOH:  WALI-7K9P"
+                  className={`w-full h-14 sm:h-15 px-4 text-center font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
+                    /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
+                      ? 'border-emerald-500 bg-emerald-50/30 text-emerald-950'
+                      : inputKey.length === 9 && /[0O1I]/.test(inputKey.slice(5))
+                      ? 'border-rose-400 bg-rose-50/30 text-rose-950'
+                      : 'border-slate-200 focus:border-teal-500 focus:bg-teal-50/20'
+                  }`}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck="false"
+                  required
+                />
               </div>
-              <div className="flex items-center gap-1.5 font-mono">
-                {inputKey.length > 0 && (
+
+              {/* Indikator Rule & Karakter Counter */}
+              <div className="flex items-center justify-between px-1.5 text-[11px] font-semibold text-slate-500">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-slate-400">Aturan:</span>
+                  <span className="font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                    WALI-XXXX
+                  </span>
+                  <span className="text-[10.5px] text-slate-500 font-medium">
+                    (Wajib 9 Karakter &bull; Tanpa 0, O, 1, I)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono">
+                  {inputKey.length > 0 && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                        /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : /[0O1I]/.test(inputKey.slice(5))
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {/[0O1I]/.test(inputKey.slice(5))
+                        ? '❌ Ada 0, O, 1, I'
+                        : /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
+                        ? '✓ Format Sesuai'
+                        : `${9 - inputKey.length} Karakter Lagi`}
+                    </span>
+                  )}
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                      /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : /[0O1I]/.test(inputKey.slice(5))
-                        ? 'bg-rose-100 text-rose-800'
-                        : 'bg-slate-100 text-slate-600'
+                    className={`text-[11px] font-black ${
+                      inputKey.length === 9 && /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
+                        ? 'text-emerald-600'
+                        : inputKey.length === 9
+                        ? 'text-rose-600'
+                        : 'text-slate-400'
                     }`}
                   >
-                    {/[0O1I]/.test(inputKey.slice(5))
-                      ? '❌ Ada 0, O, 1, I'
-                      : /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
-                      ? '✓ Format Sesuai'
-                      : `${9 - inputKey.length} Karakter Lagi`}
+                    {inputKey.length}/9
                   </span>
-                )}
-                <span
-                  className={`text-[11px] font-black ${
-                    inputKey.length === 9 && /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
-                      ? 'text-emerald-600'
-                      : inputKey.length === 9
-                      ? 'text-rose-600'
-                      : 'text-slate-400'
-                  }`}
-                >
-                  {inputKey.length}/9
-                </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Tombol Utama: Buka Dashboard Game (Hijau Tosca Min 50px) */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full h-13 sm:h-14 rounded-2xl bg-[#14b8a6] hover:bg-[#0d9488] active:scale-[0.98] text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-teal-500/25 transition-all cursor-pointer disabled:opacity-60"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Memverifikasi Lisensi...</span>
-              </>
-            ) : (
-              <>
-                <span className="text-lg">🔓</span>
-                <span>Buka Dashboard Game</span>
-              </>
-            )}
-          </button>
-        </form>
+            {/* Tombol Utama: Buka Dashboard Game (Hijau Tosca Min 50px) */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-13 sm:h-14 rounded-2xl bg-[#14b8a6] hover:bg-[#0d9488] active:scale-[0.98] text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-teal-500/25 transition-all cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Memverifikasi Lisensi...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg">🔓</span>
+                  <span>Buka Dashboard Game</span>
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         {/* Links di bawah tombol (Sesuai Screenshot) */}
         <div className="mt-5 space-y-2 text-xs font-bold text-slate-600">
@@ -435,6 +570,110 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
       <div className="mt-4 text-center text-[11px] font-semibold text-slate-400">
         Wali Pintar &bull; Platform Edukasi Berlisensi Anak Usia 3–8 Tahun
       </div>
+
+      {/* POPUP JIKA LUNAS: "invoice email : (email) sudah lunas" + "mulai main game sekarang" */}
+      {paidModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
+            <div className="text-5xl mb-3 animate-bounce">🎉</div>
+            <h3 className="text-lg sm:text-xl font-black text-emerald-950 mb-2 leading-snug break-words">
+              invoice email : <span className="text-emerald-700 underline">{paidModalData.email}</span> sudah lunas
+            </h3>
+            
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Pembayaran Anda terverifikasi lunas di Scalev. Lisensi resmi si kecil siap digunakan dan telah otomatis terpasang di perangkat ini.
+            </p>
+
+            <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-4">
+              <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Kode Lisensi Resmi Anda:</div>
+              <div className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1">
+                {paidModalData.license}
+              </div>
+              {paidModalData.orderId && (
+                <div className="text-[11px] text-slate-500 font-semibold">
+                  Order ID: {paidModalData.orderId}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                onUnlock(paidModalData.license);
+              }}
+              className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 cursor-pointer transition-all active:scale-98"
+            >
+              <span>🚀 Mulai Main Game Sekarang</span>
+              <span>➔</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP JIKA BELUM LUNAS: "invoice email : (email) masih belum terbayar" */}
+      {unpaidModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-amber-300 relative animate-scale-in">
+            <button
+              onClick={() => setUnpaidModalData(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Tutup"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-5xl mb-3 animate-bounce">⏳</div>
+            <h3 className="text-lg sm:text-xl font-black text-amber-950 mb-2 leading-snug break-words">
+              invoice email : <span className="text-amber-800 underline">{unpaidModalData.email}</span> masih belum terbayar
+            </h3>
+            
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              {unpaidModalData.message ? unpaidModalData.message.replace(/^AKSES DITOLAK:\s*/i, '') : 'Sistem belum mendeteksi pembayaran lunas untuk email ini di Scalev. Jika Anda baru saja transfer atau scan QRIS, silakan tunggu 1-2 menit lalu klik periksa kembali.'}
+            </p>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setUnpaidModalData(null);
+                  handleEmailActivation();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+              >
+                <span>🔄 Periksa Ulang Pembayaran</span>
+              </button>
+
+              <a
+                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+              >
+                <span>💳 Selesaikan Pembayaran di Scalev</span>
+              </a>
+
+              <a
+                href={`https://wa.me/6285704808186?text=${encodeURIComponent(
+                  `Halo Admin Wali Pintar, saya sudah transfer untuk email ${unpaidModalData.email}, mohon bantuannya untuk verifikasi.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+              >
+                <span>💬 WhatsApp Admin (0857-0480-8186)</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setUnpaidModalData(null)}
+                className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Ganti Email Lain
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* POPUP REJECTION MODAL (Jika Lisensi Salah / Gagal) */}
       {showRejectModal && (

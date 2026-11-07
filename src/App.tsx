@@ -135,6 +135,15 @@ export default function App() {
   // Screen-time session counter (in seconds)
   const sessionSecondsRef = useRef(0);
 
+  // Jika URL dibuka pada /redeem (misal dari redirect Scalev), teruskan ke redeem.html
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/redeem') && !window.location.pathname.endsWith('.html')) {
+        window.location.replace('/redeem.html' + window.location.search);
+      }
+    } catch {}
+  }, []);
+
   // Save changes to localStorage
   useEffect(() => {
     try {
