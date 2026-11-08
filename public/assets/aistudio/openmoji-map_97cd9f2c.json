@@ -1,0 +1,2104 @@
+{
+ "_meta": {
+  "_readme": "Isi 'hex' dengan kode OpenMoji (nama file di color/svg tanpa .svg). quality: exact|variety|approx|none. fallback: 'card' (kartu bacaan 📖) atau 'emoji:<karakter>'. Setel 'verified': true setelah Anda memeriksa gambarnya. Gunakan 'skip': true untuk memaksa kartu bacaan.",
+  "openmojiLicense": "CC BY-SA 4.0 - wajib mencantumkan: All emojis designed by OpenMoji – the open-source emoji and icon project. License: CC BY-SA 4.0",
+  "quality": {
+   "exact": "objek yang sama persis",
+   "variety": "jenis/varietas sama, gambar generik (Pisang Ambon -> pisang)",
+   "approx": "mirip tetapi bukan objek yang sama; tampil dengan tanda ≈",
+   "none": "tidak ada kecocokan -> kartu bacaan"
+  }
+ },
+ "items": {
+  "Pepaya": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rambutan": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Durian": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false,
+   "note": "Tidak ada emoji/OpenMoji durian yang saya ketahui. 1F35B (usulan awal) adalah nasi kari, jangan dipakai."
+  },
+  "Salak": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jambu Biji": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Nangka": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Manggis": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Belimbing": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jambu Air": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sawo": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Duku": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sirsak": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Markisa": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Buah Naga": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Langsat": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kedondong": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kelengkeng": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Leci": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Srikaya": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jeruk Nipis": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jeruk Bali": {
+   "cat": "buah",
+   "hex": "1F34A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "jeruk lain, bentuk mirip"
+  },
+  "Cempedak": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kesemek": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bengkuang": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jeruk Keprok": {
+   "cat": "buah",
+   "hex": "1F34A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "jeruk lain, bentuk mirip"
+  },
+  "Jeruk Siam": {
+   "cat": "buah",
+   "hex": "1F34A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "jeruk lain, bentuk mirip"
+  },
+  "Pisang Raja": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Ambon": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Kepok": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Mas": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Tanduk": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Susu": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Barangan": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Pisang Lilin": {
+   "cat": "buah",
+   "hex": "1F34C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "varietas pisang -> emoji pisang"
+  },
+  "Mangga Arumanis": {
+   "cat": "buah",
+   "hex": "1F96D",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mangga Gedong Gincu": {
+   "cat": "buah",
+   "hex": "1F96D",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mangga Harum Manis": {
+   "cat": "buah",
+   "hex": "1F96D",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Semangka Kuning": {
+   "cat": "buah",
+   "hex": "1F349",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Melon Madu": {
+   "cat": "buah",
+   "hex": "1F348",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Anggur Hijau": {
+   "cat": "buah",
+   "hex": "1F347",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pir Hijau": {
+   "cat": "buah",
+   "hex": "1F350",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Alpukat Mentega": {
+   "cat": "buah",
+   "hex": "1F951",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kelapa Muda": {
+   "cat": "buah",
+   "hex": "1F965",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kelapa Hijau": {
+   "cat": "buah",
+   "hex": "1F965",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jeruk Mandarin": {
+   "cat": "buah",
+   "hex": "1F34A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "jeruk lain, bentuk mirip"
+  },
+  "Jambu Kristal": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kemang": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kecapi": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Menteng": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Matoa": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Buah Merah": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bisbul": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lobi-lobi": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Keledang": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lai": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rukam": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Asam Jawa": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mengkudu": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kawista": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Gandaria": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapulasan": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kepel": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sukun": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kersen": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Murbei": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ciplukan": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bacang": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kuini": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Delima": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Aprikot": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Plum": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kurma": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ara": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jambu Mete": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rambai": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Terap": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Buni": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kokosan": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Gowok": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mundu": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kepundung": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cermai": {
+   "cat": "buah",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bayam": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Kangkung": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Kol": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Terong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Buncis": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kacang Panjang": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Labu Siam": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Singkong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Tauge": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Bawang": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Seledri": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pare": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kembang Kol": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Labu Kuning": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lobak": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cabai Rawit": {
+   "cat": "sayur",
+   "hex": "1F336-FE0F",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Selada": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Oyong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jengkol": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Petai": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Singkong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jahe": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kunyit": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lengkuas": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Serai": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bit": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kacang Merah": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kacang Hijau": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kedelai": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Katuk": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Pepaya": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Genjer": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rebung": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jamur Tiram": {
+   "cat": "sayur",
+   "hex": "1F344",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jamur Kuping": {
+   "cat": "sayur",
+   "hex": "1F344",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jagung Manis": {
+   "cat": "sayur",
+   "hex": "1F33D",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jagung Muda": {
+   "cat": "sayur",
+   "hex": "1F33D",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kecipir": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapri": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Okra": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kailan": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Pakcoy": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Sawi Putih": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Sawi Hijau": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Caisim": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Selada Air": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Talas": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ubi Ungu": {
+   "cat": "sayur",
+   "hex": "1F360",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ubi Cilembu": {
+   "cat": "sayur",
+   "hex": "1F360",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Garut": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Gembili": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ganyong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kentang Hitam": {
+   "cat": "sayur",
+   "hex": "1F954",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kemangi": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Pandan": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Salam": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kecombrang": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kenikir": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pucuk Labu": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Melinjo": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Melinjo": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kluwih": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Nangka Muda": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pepaya Muda": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bunga Pepaya": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bunga Turi": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Timun Suri": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Waluh": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Leunca": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rimbang": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Terong Ungu": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Terong Belanda": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Paprika Merah": {
+   "cat": "sayur",
+   "hex": "1FAD1",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Paprika Kuning": {
+   "cat": "sayur",
+   "hex": "1FAD1",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bawang Bombai": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Kelor": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bayam Merah": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Kacang Polong": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jahe Merah": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Temulawak": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cabai Merah": {
+   "cat": "sayur",
+   "hex": "1F336-FE0F",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cabai Hijau": {
+   "cat": "sayur",
+   "hex": "1F336-FE0F",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kucai": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Daun Kari": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Selada Merah": {
+   "cat": "sayur",
+   "hex": "1F96C",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "sayur daun hijau"
+  },
+  "Daun Mint": {
+   "cat": "sayur",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Melati": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Anggrek": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pohon Mangga": {
+   "cat": "tumbuhan",
+   "hex": "1F333",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "pohon umum, bukan spesies"
+  },
+  "Pohon Pisang": {
+   "cat": "tumbuhan",
+   "hex": "1F333",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "pohon umum, bukan spesies"
+  },
+  "Kamboja": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pohon Jambu": {
+   "cat": "tumbuhan",
+   "hex": "1F333",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "pohon umum, bukan spesies"
+  },
+  "Pohon Rambutan": {
+   "cat": "tumbuhan",
+   "hex": "1F333",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "pohon umum, bukan spesies"
+  },
+  "Lidah Buaya": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bougenville": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kenanga": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cempaka": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kemuning": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Alamanda": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Soka": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kana": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Dahlia": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Krisan": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Aster": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sedap Malam": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lili": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Gladiol": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rafflesia": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bunga Bangkai": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Edelweis": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Teratai Biru": {
+   "cat": "tumbuhan",
+   "hex": "1FAB7",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Eceng Gondok": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Jati": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mahoni": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Beringin": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Asam": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Trembesi": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Flamboyan": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Angsana": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pinus": {
+   "cat": "tumbuhan",
+   "hex": "1F332",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cemara Udang": {
+   "cat": "tumbuhan",
+   "hex": "1F332",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bakau": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mangrove": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Nipah": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sagu": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Aren": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kelapa Sawit": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Karet": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kopi": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Teh": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kakao": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cengkih": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pala": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lada": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kayu Manis": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Vanili": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Tebu": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Tembakau": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapas": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sorgum": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pandan": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sirih": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Serai Wangi": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kumis Kucing": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sambiloto": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Meniran": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Putri Malu": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lidah Mertua": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pakis": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Suplir": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Lumut": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Paku Tiang": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Palem": {
+   "cat": "tumbuhan",
+   "hex": "1F334",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rotan": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bambu Kuning": {
+   "cat": "tumbuhan",
+   "hex": "1F38B",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bambu Petung": {
+   "cat": "tumbuhan",
+   "hex": "1F38B",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rumput Gajah": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Alang-alang": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rumput Teki": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kiambang": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Anyelir": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sri Rejeki": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bunga Kertas": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kembang Telang": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bunga Telekan": {
+   "cat": "tumbuhan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Becak": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false,
+   "note": "🛺 (1F6FA) adalah bajaj bermotor, bukan becak. Gunakan kartu bacaan."
+  },
+  "Ojek": {
+   "cat": "kendaraan",
+   "hex": "1F6F5",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Delman": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Odong-odong": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Andong": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Gerobak": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sepeda Ontel": {
+   "cat": "kendaraan",
+   "hex": "1F6B2",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Dokar": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bendi": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bemo": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kereta Kelinci": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sepeda Listrik": {
+   "cat": "kendaraan",
+   "hex": "1F6B2",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Motor Listrik": {
+   "cat": "kendaraan",
+   "hex": "1F6F5",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mobil Listrik": {
+   "cat": "kendaraan",
+   "hex": "1F697",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapal Phinisi": {
+   "cat": "kendaraan",
+   "hex": "26F5",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false,
+   "note": "perahu layar"
+  },
+  "Perahu Jukung": {
+   "cat": "kendaraan",
+   "hex": "1F6F6",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Perahu Bidar": {
+   "cat": "kendaraan",
+   "hex": "1F6F6",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Getek": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Rakit": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Tongkang": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapal Selam": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapal Perang": {
+   "cat": "kendaraan",
+   "hex": "1F6A2",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapal Pesiar": {
+   "cat": "kendaraan",
+   "hex": "1F6A2",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kapal Tanker": {
+   "cat": "kendaraan",
+   "hex": "1F6A2",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pesawat Tempur": {
+   "cat": "kendaraan",
+   "hex": "2708-FE0F",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pesawat Kargo": {
+   "cat": "kendaraan",
+   "hex": "2708-FE0F",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Balon Udara": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "KRL Commuter": {
+   "cat": "kendaraan",
+   "hex": "1F686",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "TransJakarta": {
+   "cat": "kendaraan",
+   "hex": "1F68C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bus Sekolah": {
+   "cat": "kendaraan",
+   "hex": "1F68C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Bus Tingkat": {
+   "cat": "kendaraan",
+   "hex": "1F68C",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Truk Sampah": {
+   "cat": "kendaraan",
+   "hex": "1F69A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Truk Molen": {
+   "cat": "kendaraan",
+   "hex": "1F69A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Truk Tangki": {
+   "cat": "kendaraan",
+   "hex": "1F69A",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Buldoser": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Ekskavator": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Derek": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Crane": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Pedati": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Cikar": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Sado": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Helikopter SAR": {
+   "cat": "kendaraan",
+   "hex": "1F681",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Kereta Bandara": {
+   "cat": "kendaraan",
+   "hex": "1F686",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false
+  },
+  "Whoosh": {
+   "cat": "kendaraan",
+   "hex": "1F684",
+   "quality": "variety",
+   "fallback": "card",
+   "verified": false,
+   "note": "kereta cepat"
+  },
+  "Mobil Derek": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  },
+  "Truk Kontainer": {
+   "cat": "kendaraan",
+   "hex": "1F69B",
+   "quality": "approx",
+   "fallback": "card",
+   "verified": false
+  },
+  "Mobil Boks": {
+   "cat": "kendaraan",
+   "hex": null,
+   "quality": "none",
+   "fallback": "card",
+   "verified": false
+  }
+ }
+}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Wali Pintar - Zona Bermain & Belajar Si Kecil</title>
+    <meta name="description" content="Wali Pintar - Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas. Game edukasi offline anak usia 3-8 tahun." />
+    <meta property="og:title" content="Wali Pintar - Zona Bermain & Belajar Si Kecil" />
+    <meta property="og:description" content="Wali Pintar - Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas. Game edukasi offline anak usia 3-8 tahun." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#10b981" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      // Early capture of PWA beforeinstallprompt event before any framework script runs
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-available'));
+      });
+      window.addEventListener('appinstalled', function() {
+        window.__pwaInstallPrompt = null;
+        window.dispatchEvent(new CustomEvent('pwa-app-installed'));
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
