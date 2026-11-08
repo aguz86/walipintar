@@ -55,9 +55,10 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
       const data = await res.json();
       setIsLoading(false);
 
-      if (data && data.success && data.licenseKey) {
+      const foundKey = data?.licenseKey || data?.license;
+      if (data && data.success && foundKey) {
         // LUNAS
-        localStorage.setItem('walipintar_license', data.licenseKey);
+        localStorage.setItem('walipintar_license', foundKey);
         localStorage.setItem('walipintar_email', cleanEmail);
         if (data.orderId) localStorage.setItem('walipintar_order', data.orderId);
         localStorage.setItem('walipintar_auth_time', Date.now().toString());
@@ -66,7 +67,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         setUnpaidModalData(null);
         setPaidModalData({
           email: cleanEmail,
-          license: data.licenseKey,
+          license: foundKey,
           orderId: data.orderId,
         });
       } else {

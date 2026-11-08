@@ -190,9 +190,10 @@ function handleRequest(e, httpMethod) {
     }
 
     // ------------------------------------------------------------------------
-    // ACTION 1: CREATE (Dipanggil otomatis oleh halaman claim setelah bayar)
     // ------------------------------------------------------------------------
-    if (action === 'create') {
+    // ACTION 1: CREATE / CLAIM (Validasi Pembayaran & Klaim Lisensi Otomatis)
+    // ------------------------------------------------------------------------
+    if (action === 'create' || action === 'claim') {
       let orderId = (params.order_id || postData.order_id || '').trim();
       let email = (params.email || postData.email || '').trim().toLowerCase();
       let name = (params.name || params.customer_name || params.nama || params.buyer_name || postData.name || postData.customer_name || postData.nama || '').trim();
@@ -203,16 +204,151 @@ function handleRequest(e, httpMethod) {
       if (name.startsWith('{')) name = '';
 
       if (!orderId && !email) {
-        return createJsonResponse({ success: false, message: 'Nomor Pesanan (Order ID) atau Email wajib diisi.' });
+        return createJsonResponse({ success: false, message: 'Alamat Email Pembelian atau Nomor Pesanan (Order ID) wajib diisi.' });
       }
 
-      const lookupTarget = orderId || email;
+      // ====================================================================
+      // TAHAP 1: CARI LANGSUNG DI GOOGLE SHEET TERLEBIH DAHULU (PRIORITAS UTAMA)
+      // ====================================================================
+      const data = sheet.getDataRange().getValues();
+      let foundRowIndex = -1;
+      let existingLicense = '';
+      let existingOrderId = '';
+      let existingEmail = '';
+      let existingLicenseStatus = '';
+      let existingPaymentStatus = '';
+      let existingGross = 0;
+      let existingName = '';
+      let existingBrevoStatus = '';
+
+      for (let i = 1; i < data.length; i++) {
+        const rowOrderId = String(data[i][1] || '').trim();
+        const rowEmail = String(data[i][2] || '').trim().toLowerCase();
+        const rowKey = String(data[i][3] || '').trim();
+        const rowStatus = String(data[i][4] || '').trim().toUpperCase();
+        const rowPay = String(data[i][5] || '').trim().toUpperCase();
+
+        const emailMatches = email && rowEmail === email;
+        const orderMatches = orderId && rowOrderId === orderId;
+
+        if (emailMatches || orderMatches) {
+          foundRowIndex = i + 1; // 1-based index di Google Sheet
+          existingOrderId = rowOrderId;
+          existingEmail = rowEmail;
+          existingLicense = rowKey;
+          existingLicenseStatus = rowStatus;
+          existingPaymentStatus = rowPay;
+          existingGross = data[i][6] || 0;
+          existingName = data[i][7] || '';
+          existingBrevoStatus = String(data[i][8] || '').trim();
+          break;
+        }
+      }
+
+      // JIKA EMAIL / ORDER DITEMUKAN DI GOOGLE SHEET:
+      if (foundRowIndex > 0) {
+        const isPaid = (
+          existingPaymentStatus === 'COMPLETED' ||
+          existingPaymentStatus === 'PAID' ||
+          existingPaymentStatus === 'SETTLED' ||
+          existingLicenseStatus === 'ACTIVE'
+        );
+
+        if (isPaid) {
+          // Pastikan status lisensi ACTIVE
+          if (existingLicenseStatus !== 'ACTIVE') {
+            sheet.getRange(foundRowIndex, 5).setValue('ACTIVE');
+          }
+
+          // SKENARIO 1: Order sudah paid tapi lisensi belum terkirim via Brevo (atau gagal)
+          let emailSentNow = false;
+          let brevoErr = null;
+          const needsBrevoSend = !existingBrevoStatus || !existingBrevoStatus.includes('TERKIRIM');
+
+          if (needsBrevoSend && existingEmail && existingEmail.includes('@') && existingLicense) {
+            try {
+              const brevoRes = sendBrevoEmail(existingEmail, existingLicense, existingOrderId, false, existingName);
+              if (brevoRes.success) {
+                emailSentNow = true;
+                sheet.getRange(foundRowIndex, 9).setValue('TERKIRIM (Brevo)');
+                if (brevoRes.messageId) sheet.getRange(foundRowIndex, 10).setValue(brevoRes.messageId);
+              } else {
+                brevoErr = brevoRes.error;
+                sheet.getRange(foundRowIndex, 9).setValue('GAGAL (' + brevoRes.error + ')');
+              }
+            } catch (err) {
+              brevoErr = err.toString();
+            }
+          }
+
+          updateDashboardStats(ss);
+
+          // SKENARIO 2: Sudah paid dan sudah pernah claim -> Tunjukkan lisensi di popup dengan tombol copy dan tombol mulai main
+          return createJsonResponse({
+            success: true,
+            isExisting: true,
+            isAlreadyClaimed: true,
+            licenseKey: existingLicense,
+            email: existingEmail,
+            orderId: existingOrderId,
+            name: existingName,
+            grossRevenue: existingGross,
+            paymentStatus: 'paid',
+            emailSent: emailSentNow || existingBrevoStatus.includes('TERKIRIM'),
+            brevoError: brevoErr,
+            message: 'Alhamdulillah! Pembayaran resmi Anda telah terkonfirmasi lunas. Lisensi siap digunakan!'
+          });
+        } else {
+          // Jika status di sheet masih UNPAID / PENDING, coba sinkronisasi ulang ke Scalev API
+          if (SCALEV_API_KEY && !SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY')) {
+            const scalevRecheck = verifyScalevPayment(existingOrderId || existingEmail);
+            if (scalevRecheck.verified) {
+              sheet.getRange(foundRowIndex, 5).setValue('ACTIVE');
+              sheet.getRange(foundRowIndex, 6).setValue('COMPLETED');
+              if (scalevRecheck.grossRevenue > 0) {
+                sheet.getRange(foundRowIndex, 7).setValue(scalevRecheck.grossRevenue).setNumberFormat('"Rp"#,##0');
+              }
+              if (scalevRecheck.customerName && (!existingName || existingName === '-')) {
+                sheet.getRange(foundRowIndex, 8).setValue(scalevRecheck.customerName);
+              }
+
+              sendBrevoEmail(existingEmail, existingLicense, existingOrderId, false, scalevRecheck.customerName || existingName);
+              sheet.getRange(foundRowIndex, 9).setValue('TERKIRIM (Brevo)');
+              updateDashboardStats(ss);
+
+              return createJsonResponse({
+                success: true,
+                licenseKey: existingLicense,
+                email: existingEmail,
+                orderId: existingOrderId,
+                paymentStatus: 'paid',
+                message: 'Pembayaran baru saja terverifikasi lunas di Scalev! Lisensi resmi telah diaktifkan.'
+              });
+            }
+          }
+
+          return createJsonResponse({
+            success: false,
+            verified: false,
+            email: existingEmail,
+            orderId: existingOrderId,
+            paymentStatus: existingPaymentStatus.toLowerCase(),
+            message: 'Pesanan untuk email ' + existingEmail + ' masih berstatus ' + existingPaymentStatus + '. Silakan selesaikan pembayaran.'
+          });
+        }
+      }
+
+      // ====================================================================
+      // TAHAP 2: JIKA EMAIL BELUM ADA DI SHEET, VALIDASI KE SCALEV API
+      // ====================================================================
+      const lookupTarget = email || orderId;
       let scalevVerificationNote = 'Verifikasi Scalev API: Nonaktif';
       let grossRevenue = 0;
       let paymentStatus = 'PAID';
 
       if (SCALEV_API_KEY && !SCALEV_API_KEY.includes('PASTE_YOUR_SCALEV_API_KEY') && lookupTarget) {
         const scalevCheck = verifyScalevPayment(lookupTarget);
+
         if (!scalevCheck.verified) {
           return createJsonResponse({
             success: false,
@@ -221,7 +357,7 @@ function handleRequest(e, httpMethod) {
             email: email,
             grossRevenue: scalevCheck.grossRevenue || 0,
             paymentStatus: scalevCheck.paymentStatus || 'unpaid',
-            message: scalevCheck.message || 'Pembayaran belum terkonfirmasi lunas di Scalev.'
+            message: scalevCheck.message || 'Pembayaran belum terkonfirmasi lunas di Scalev. Pastikan email saat checkout sudah benar.'
           });
         }
 
@@ -229,76 +365,41 @@ function handleRequest(e, httpMethod) {
         grossRevenue = scalevCheck.grossRevenue || 0;
         paymentStatus = (scalevCheck.paymentStatus || 'PAID').toUpperCase();
 
-        // GANTIKAN LANGSUNG DENGAN ORDER ID RESMI SCALEV (misal: 261107ZATESNF)
         if (scalevCheck.officialOrderId) {
           orderId = scalevCheck.officialOrderId;
         }
-
-        // Ambil data pelanggan resmi langsung dari database Scalev
         if (scalevCheck.customerEmail && (!email || !email.includes('@'))) {
           email = scalevCheck.customerEmail.toLowerCase();
         }
         if (scalevCheck.customerName && !name) {
           name = scalevCheck.customerName;
         }
+      } else {
+        return createJsonResponse({
+          success: false,
+          verified: false,
+          message: 'Email (' + email + ') belum terdaftar di database lisensi. Pastikan email yang dimasukkan sama persis dengan email saat checkout.'
+        });
       }
 
       if (!email || !email.includes('@')) {
         return createJsonResponse({ success: false, message: 'Alamat email pembeli diperlukan untuk pengiriman lisensi resmi.' });
       }
 
-      // Idempotency: Cek apakah Order ID atau Email sudah pernah terdaftar di Google Sheet
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        const rowOrderId = String(data[i][1]).trim();
-        const rowEmail = String(data[i][2]).trim().toLowerCase();
-        const rowStatus = String(data[i][4]).trim().toUpperCase();
-
-        if ((orderId && rowOrderId === orderId) || (email && rowEmail === email && rowStatus === 'ACTIVE')) {
-          const existingLicense = data[i][3];
-
-          // LANGSUNG GANTIKAN Kolom Order ID di sheet dengan Order ID Scalev resmi!
-          if (orderId && rowOrderId !== orderId) {
-            sheet.getRange(i + 1, 2).setValue(orderId);
-          }
-          if (grossRevenue > 0 && (!data[i][6] || Number(data[i][6]) === 0)) {
-            sheet.getRange(i + 1, 7).setValue(grossRevenue).setNumberFormat('"Rp"#,##0');
-          }
-          if (paymentStatus && (!data[i][5] || data[i][5] === '')) {
-            sheet.getRange(i + 1, 6).setValue(paymentStatus);
-          }
-          if (name && (!data[i][7] || data[i][7] === '-')) {
-            sheet.getRange(i + 1, 8).setValue(name);
-          }
-
-          updateDashboardStats(ss);
-          return createJsonResponse({
-            success: true,
-            isExisting: true,
-            licenseKey: existingLicense,
-            email: email || data[i][2],
-            orderId: orderId || rowOrderId,
-            grossRevenue: grossRevenue || data[i][6] || 0,
-            name: name || data[i][7] || '',
-            paymentStatus: 'paid',
-            message: 'Lisensi aktif ditemukan. Order ID di sheet telah digantikan dengan Order ID Scalev!'
-          });
-        }
-      }
-
+      // Generate lisensi baru unik (WALI-XXXX)
       const licenseKey = generateUniqueLicense(sheet);
       const now = new Date();
 
-      // Kirim Email Murni Brevo REST API v3
+      // Kirim Email via Brevo REST API v3
       const brevoResult = sendBrevoEmail(email, licenseKey, orderId, false, name);
 
       sheet.appendRow([
         now,                                                      // Col 1 (A): Timestamp
-        orderId,                                                  // Col 2 (B): Scalev Order ID (e.g. 261107ZATESNF)
+        orderId,                                                  // Col 2 (B): Scalev Order ID
         email,                                                    // Col 3 (C): Email
         licenseKey,                                               // Col 4 (D): License Key (WALI-XXXX)
         'ACTIVE',                                                 // Col 5 (E): Status Lisensi
-        paymentStatus,                                            // Col 6 (F): Payment Status (Scalev: 'PAID')
+        paymentStatus,                                            // Col 6 (F): Payment Status
         grossRevenue,                                             // Col 7 (G): Gross Revenue (Rp)
         name || '-',                                              // Col 8 (H): Nama Pelanggan
         brevoResult.success ? 'TERKIRIM (Brevo)' : 'GAGAL (' + brevoResult.error + ')', // Col 9 (I)
@@ -317,15 +418,13 @@ function handleRequest(e, httpMethod) {
         licenseKey: licenseKey,
         email: email,
         orderId: orderId,
+        name: name,
+        paymentStatus: 'paid',
+        isNew: true,
         emailSent: brevoResult.success,
         brevoMessageId: brevoResult.messageId,
         mailError: brevoResult.error,
-        adminWaUrl: 'https://wa.me/' + ADMIN_WA + '?text=' + encodeURIComponent(
-          'Halo Admin ' + BRAND_NAME + ', pesanan saya: ' + orderId + ' (' + email + '). Lisensi saya: ' + licenseKey
-        ),
-        message: brevoResult.success
-          ? 'Lisensi resmi berhasil dibuat dan dikirimkan ke email Anda via Brevo!'
-          : 'Lisensi berhasil dibuat (' + licenseKey + '), namun pengiriman Brevo gagal. Silakan hubungi WhatsApp Admin.'
+        message: 'Alhamdulillah! Pembayaran resmi terkonfirmasi lunas. Lisensi telah diaktifkan dan dikirim ke email.'
       });
     }
 
@@ -1338,7 +1437,11 @@ function verifyScalevPayment(orderId) {
   }
 
   try {
-    const cleanOrderId = String(orderId).trim();
+    const cleanTarget = String(orderId || '').trim();
+    if (!cleanTarget) {
+      return { configured: true, verified: false, message: 'Parameter target kosong.' };
+    }
+
     const options = {
       method: 'get',
       headers: {
@@ -1349,35 +1452,66 @@ function verifyScalevPayment(orderId) {
       muteHttpExceptions: true
     };
 
-    // 1. Coba cari langsung berdasarkan ID / UUID / Nomor Order
-    let url = 'https://api.scalev.com/v3/orders/' + encodeURIComponent(cleanOrderId);
-    let response = UrlFetchApp.fetch(url, options);
-    let statusCode = response.getResponseCode();
-    let content = response.getContentText();
     let json = null;
+    let statusCode = 0;
 
-    try {
-      json = JSON.parse(content);
-    } catch (e) {}
-
-    // 2. Jika 404 atau tidak ditemukan langsung, cari lewat list query search
-    if (statusCode === 404 || !json || json.errors) {
-      let searchUrl = 'https://api.scalev.com/v3/orders?search=' + encodeURIComponent(cleanOrderId);
-      response = UrlFetchApp.fetch(searchUrl, options);
+    // 1. JIKA TARGET ADALAH EMAIL (MENGANDUNG '@')
+    if (cleanTarget.includes('@')) {
+      const emailLower = cleanTarget.toLowerCase();
+      // Ambil daftar order terbaru dari Scalev API v3
+      const listUrl = 'https://api.scalev.com/v3/orders?limit=100';
+      const response = UrlFetchApp.fetch(listUrl, options);
       statusCode = response.getResponseCode();
-      content = response.getContentText();
-      let searchJson = null;
+      const content = response.getContentText();
+      let listJson = null;
+      try { listJson = JSON.parse(content); } catch (e) {}
+
+      const orderList = (listJson && (listJson.data || listJson.orders || (Array.isArray(listJson) ? listJson : []))) || [];
+      if (Array.isArray(orderList) && orderList.length > 0) {
+        // Cari pesanan yang email pelanggannya cocok
+        const matched = orderList.filter(function(item) {
+          const cust = item.customer || {};
+          const em = String(cust.email || item.customer_email || item.email || '').trim().toLowerCase();
+          return em === emailLower;
+        });
+
+        if (matched.length > 0) {
+          // Prioritaskan yang sudah lunas (paid / settled / completed)
+          const paidOrder = matched.find(function(item) {
+            const st = String(item.payment_status || item.status || '').toLowerCase();
+            return st === 'paid' || st === 'settled' || st === 'completed';
+          });
+          json = paidOrder || matched[0];
+        }
+      }
+    } else {
+      // 2. JIKA TARGET ADALAH NOMOR PESANAN / ORDER ID (misal: 261107PJXVFRB)
+      let url = 'https://api.scalev.com/v3/orders/' + encodeURIComponent(cleanTarget);
+      let response = UrlFetchApp.fetch(url, options);
+      statusCode = response.getResponseCode();
+      let content = response.getContentText();
       try {
-        searchJson = JSON.parse(content);
+        json = JSON.parse(content);
       } catch (e) {}
 
-      if (searchJson && searchJson.data && searchJson.data.length > 0) {
-        // Prioritaskan transaksi yang sudah lunas (paid / settled / completed)
-        const paidItem = searchJson.data.find(function(item) {
-          const st = String(item.payment_status || item.status || '').toLowerCase();
-          return st === 'paid' || st === 'settled' || st === 'completed';
-        });
-        json = paidItem || searchJson.data[0];
+      // Jika 404 atau tidak ditemukan langsung, cari lewat list query search
+      if (statusCode === 404 || !json || json.errors) {
+        let searchUrl = 'https://api.scalev.com/v3/orders?search=' + encodeURIComponent(cleanTarget);
+        response = UrlFetchApp.fetch(searchUrl, options);
+        statusCode = response.getResponseCode();
+        content = response.getContentText();
+        let searchJson = null;
+        try {
+          searchJson = JSON.parse(content);
+        } catch (e) {}
+
+        if (searchJson && searchJson.data && searchJson.data.length > 0) {
+          const paidItem = searchJson.data.find(function(item) {
+            const st = String(item.payment_status || item.status || '').toLowerCase();
+            return st === 'paid' || st === 'settled' || st === 'completed';
+          });
+          json = paidItem || searchJson.data[0];
+        }
       }
     }
 
@@ -1389,7 +1523,7 @@ function verifyScalevPayment(orderId) {
       const customerEmail = customer.email || json.customer_email || json.email || '';
       const customerName = customer.name || json.customer_name || json.name || '';
       const customerPhone = customer.phone || json.customer_phone || json.phone || '';
-      const officialOrderId = String(json.order_id || json.order_number || json.code || json.id || cleanOrderId).trim();
+      const officialOrderId = String(json.order_id || json.order_number || json.code || json.id || cleanTarget).trim();
       const grossRevenue = extractGrossRevenue(json);
 
       return {
@@ -1413,7 +1547,7 @@ function verifyScalevPayment(orderId) {
         verified: false,
         statusCode: statusCode,
         grossRevenue: 0,
-        message: 'Nomor pesanan (' + cleanOrderId + ') tidak ditemukan di database Scalev.'
+        message: 'Pesanan untuk (' + cleanTarget + ') tidak ditemukan di database Scalev.'
       };
     }
   } catch (err) {
@@ -1422,8 +1556,7 @@ function verifyScalevPayment(orderId) {
       configured: true,
       verified: false,
       grossRevenue: 0,
-      error: err.toString(),
-      message: 'Gagal menghubungi server Scalev: ' + err.message
+      message: 'Gagal menghubungi server Scalev: ' + err.toString()
     };
   }
 }
