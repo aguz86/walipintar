@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut } from 'lucide-react';
+import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { SFX, playAnimalSound, speakText } from '../utils/audio';
 
 interface ParentModalProps {
@@ -32,6 +33,44 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [unlocked, setUnlocked] = useState(false);
   const [gateError, setGateError] = useState('');
   const [soundTestResult, setSoundTestResult] = useState('');
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const OFFICIAL_DOMAIN = 'https://walipintar.my.id';
+  const LP_SCALEV_URL = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
+  // Anchor ke LP Scalev via domain resmi walipintar.my.id/beli
+  const SHARE_URL = 'https://walipintar.my.id/beli';
+
+  const shareText =
+    'Halo Ayah & Bunda! Saya mau rekomendasikan game edukasi anak yang sangat bagus untuk si kecil: Wali Pintar 🌱. Isinya 17 game belajar interaktif usia 2-8 tahun, 100% bebas iklan & bisa offline tanpa kuota internet. Yuk ajak anak-anak kita pintar bersama! Cek penawaran resminya di sini: ' +
+    SHARE_URL;
+
+  const handleShareWhatsApp = () => {
+    SFX.ding();
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareFacebook = () => {
+    SFX.ding();
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SHARE_URL)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareInstagramCopy = async () => {
+    SFX.ding();
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(SHARE_URL);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2500);
+      } else {
+        prompt('Salin link untuk dibagikan di Instagram Story/DM:', SHARE_URL);
+      }
+    } catch {
+      prompt('Salin link untuk dibagikan di Instagram Story/DM:', SHARE_URL);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -156,6 +195,105 @@ export const ParentModal: React.FC<ParentModalProps> = ({
               </div>
             )}
 
+            {/* SEKSI AJAK TETANGGA & KERABAT (TOMBOL SHARE & QR WEB WALIPINTAR) */}
+            <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50 rounded-2xl border-2 border-emerald-300 p-3.5 sm:p-4 shadow-xs text-left">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs text-xl shrink-0">
+                    🤝
+                  </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-emerald-950 leading-tight">
+                      Ajak tetangga dan kerabat kamu
+                    </h4>
+                    <p className="text-[11.5px] sm:text-xs font-bold text-emerald-800">
+                      agar anak-anak sekitarmu bisa pintar bersama
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 text-[10px] font-black uppercase tracking-wider bg-emerald-200/90 text-emerald-900 px-2 py-0.5 rounded-full border border-emerald-300">
+                  Rekomendasi
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                Bantu anak-anak sekitar bermain game edukasi yang 100% bebas iklan dan bisa dimainkan offline tanpa kuota internet!
+              </p>
+
+              {/* Grid 4 Tombol Share: Share WA, Share FB, Share IG, QR Web Walipintar */}
+              <div className="grid grid-cols-2 gap-2 mb-2.5">
+                {/* 1. Link Share WA */}
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  className="py-2.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="Bagikan ke WhatsApp Tetangga & Kerabat"
+                >
+                  <span className="text-base">💬</span>
+                  <span>Share WA</span>
+                </button>
+
+                {/* 2. Link Share FB */}
+                <button
+                  type="button"
+                  onClick={handleShareFacebook}
+                  className="py-2.5 px-3 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="Bagikan ke Facebook"
+                >
+                  <span className="text-base">👥</span>
+                  <span>Share FB</span>
+                </button>
+
+                {/* 3. Link Share IG / Salin Tautan */}
+                <button
+                  type="button"
+                  onClick={handleShareInstagramCopy}
+                  className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-[#f09433] via-[#dc2743] to-[#bc1888] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="Salin Link Rekomendasi untuk Instagram Story / DM"
+                >
+                  <span className="text-base">📸</span>
+                  <span>{linkCopied ? '✅ Tersalin!' : 'Share IG'}</span>
+                </button>
+
+                {/* 4. QR Web Walipintar */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    SFX.ding();
+                    setShowQrModal(true);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="Tampilkan QR Code Web Walipintar untuk di-scan HP"
+                >
+                  <QrCode className="w-4 h-4 text-emerald-400" />
+                  <span>QR Web</span>
+                </button>
+              </div>
+
+              {/* Footer info: domain resmi walipintar.my.id & anchor ke LP Scalev */}
+              <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                <a
+                  href={OFFICIAL_DOMAIN}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-700 hover:text-emerald-700 font-bold flex items-center gap-1 truncate"
+                  title="Wajib buka domain resmi Walipintar.my.id"
+                >
+                  <span>🌐 Walipintar.my.id</span>
+                  <ExternalLink className="w-3 h-3 text-slate-400" />
+                </a>
+                <a
+                  href={LP_SCALEV_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-700 hover:text-emerald-900 font-extrabold flex items-center gap-1 shrink-0 hover:underline"
+                >
+                  <span>Anchor LP Scalev</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
             {/* Screen time tracking & limits */}
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200">
               <div className="flex items-center justify-between mb-2">
@@ -249,6 +387,86 @@ export const ParentModal: React.FC<ParentModalProps> = ({
               >
                 {lang === 'id' ? 'Selesai' : 'Done'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* POPUP MODAL QR WEB WALIPINTAR */}
+        {showQrModal && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
+            <div className="w-full max-w-xs rounded-3xl bg-white p-5 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in text-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                aria-label="Tutup QR"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto mb-2 text-2xl shadow-xs">
+                🌱
+              </div>
+
+              <h4 className="text-base font-black text-slate-900 mb-0.5">
+                QR Web Wali Pintar
+              </h4>
+              <p className="text-[11px] font-bold text-slate-500 mb-3.5 leading-snug">
+                Arahkan kamera smartphone tetangga & kerabat Anda ke kode ini
+              </p>
+
+              {/* KOTAK QR CODE SVG HASIL GENERATE VECTOR (100% OFFLINE CAPABLE) */}
+              <div className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto mb-3">
+                <QRCodeSVG
+                  value={SHARE_URL}
+                  size={180}
+                  level="H"
+                  includeMargin={false}
+                  className="mx-auto"
+                />
+              </div>
+
+              <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-200 text-[11px] text-emerald-950 font-bold mb-3 leading-snug text-left">
+                <div className="text-[10px] text-emerald-800 font-extrabold uppercase tracking-wider mb-0.5">
+                  Tautan Rekomendasi Resmi:
+                </div>
+                <div className="font-mono text-emerald-900 text-xs break-all font-bold">
+                  {SHARE_URL}
+                </div>
+                <p className="text-[10px] text-emerald-700 font-medium mt-1">
+                  *Otomatis mengarah ke halaman pemesanan resmi (LP Scalev)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleShareInstagramCopy}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-98"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{linkCopied ? '✅ Tautan Tersalin!' : 'Salin Tautan Web'}</span>
+                </button>
+
+                <a
+                  href={LP_SCALEV_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
+                >
+                  <span>Buka Halaman LP Scalev</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <a
+                  href={OFFICIAL_DOMAIN}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-[11px] text-slate-400 hover:text-emerald-700 underline pt-1 font-semibold"
+                >
+                  Buka Domain Walipintar.my.id
+                </a>
+              </div>
             </div>
           </div>
         )}

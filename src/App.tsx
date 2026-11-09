@@ -577,23 +577,25 @@ export default function App() {
       </header>
 
       {/* SUB-HEADER TAGLINE BANNER (Mobile Optimized) */}
-      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white shadow-xs border-b border-emerald-700/30">
-        <div className="max-w-5xl mx-auto px-2.5 sm:px-3 py-1.5 flex items-center justify-center gap-1.5 sm:gap-2 text-center">
-          <span className="text-xs sm:text-sm animate-pulse shrink-0">✨</span>
-          <p className="text-[10px] sm:text-xs md:text-sm font-black tracking-wide leading-tight sm:leading-snug truncate sm:whitespace-normal">
-            {data.lang === 'id'
-              ? 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'
-              : 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'}
-          </p>
-          <span className="text-xs sm:text-sm shrink-0">🌱</span>
+      {!mainCategory && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 text-white shadow-xs border-b border-emerald-700/30">
+          <div className="max-w-5xl mx-auto px-2.5 sm:px-3 py-1.5 flex items-center justify-center gap-1.5 sm:gap-2 text-center">
+            <span className="text-xs sm:text-sm animate-pulse shrink-0">✨</span>
+            <p className="text-[10px] sm:text-xs md:text-sm font-black tracking-wide leading-tight sm:leading-snug truncate sm:whitespace-normal">
+              {data.lang === 'id'
+                ? 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'
+                : 'Zona bermain dan belajar si kecil agar lebih pintar dan berwawasan luas'}
+            </p>
+            <span className="text-xs sm:text-sm shrink-0">🌱</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col">
         {/* If a category is selected and no mini-game is open, show Category Quick-Switcher Header Bar */}
         {mainCategory && !activeGameId && (
-          <div className="bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 px-2 sm:px-4 py-1.5 shadow-2xs sticky top-[49px] sm:top-[57px] z-30">
+          <div className="bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 px-2 sm:px-4 py-1.5 shadow-2xs sticky top-[49px] sm:top-[57px] z-30 landscape:hidden md:landscape:block">
             <div className="max-w-5xl mx-auto flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
               <button
                 onClick={handleBackToCategories}

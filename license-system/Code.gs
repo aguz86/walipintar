@@ -52,7 +52,7 @@ function getSecureConfig(key, fallbackVal) {
 const ADMIN_SECRET_KEY = getSecureConfig('ADMIN_SECRET_KEY', 'WALI_ADMIN_SECRET_KEY_2026');
 const BREVO_API_KEY = getSecureConfig('BREVO_API_KEY', 'xkeysib-PASTE_YOUR_BREVO_API_KEY_HERE');
 const BREVO_SENDER_NAME = getSecureConfig('BREVO_SENDER_NAME', 'Wali Pintar Official');
-const BREVO_SENDER_EMAIL = getSecureConfig('BREVO_SENDER_EMAIL', 'halo@walipintar.my.id');
+const BREVO_SENDER_EMAIL = getSecureConfig('BREVO_SENDER_EMAIL', 'admin@walipintar.my.id');
 const SCALEV_API_KEY = getSecureConfig('SCALEV_API_KEY', 'PASTE_YOUR_SCALEV_API_KEY_HERE');
 
 // =====================================================================
@@ -103,6 +103,8 @@ function ujiCobaSistem_KlikDiSini() {
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🎮 WaliPintar Admin')
+    .addItem('📢 Broadcast Pembaruan / Update Fitur ke Pembeli', 'menuBroadcastUpdate')
+    .addSeparator()
     .addItem('🔄 Tarik & Sinkron Semua Order Scalev API', 'menuSyncScalevOrders')
     .addItem('📊 Buat / Segarkan Tab Laporan & Statistik', 'menuGenerateReport')
     .addSeparator()
@@ -295,6 +297,9 @@ function handleRequest(e, httpMethod) {
             grossRevenue: existingGross,
             paymentStatus: 'paid',
             emailSent: emailSentNow || existingBrevoStatus.includes('TERKIRIM'),
+            emailSentNow: emailSentNow,
+            wasBrevoPending: needsBrevoSend,
+            brevoSenderEmail: BREVO_SENDER_EMAIL,
             brevoError: brevoErr,
             message: 'Alhamdulillah! Pembayaran resmi Anda telah terkonfirmasi lunas. Lisensi siap digunakan!'
           });
@@ -350,14 +355,18 @@ function handleRequest(e, httpMethod) {
         const scalevCheck = verifyScalevPayment(lookupTarget);
 
         if (!scalevCheck.verified) {
+          const isNotOrdered = scalevCheck.notOrdered || (scalevCheck.message && scalevCheck.message.toLowerCase().includes('belum pernah order'));
           return createJsonResponse({
             success: false,
             verified: false,
+            notOrdered: isNotOrdered,
             orderId: orderId,
             email: email,
             grossRevenue: scalevCheck.grossRevenue || 0,
             paymentStatus: scalevCheck.paymentStatus || 'unpaid',
-            message: scalevCheck.message || 'Pembayaran belum terkonfirmasi lunas di Scalev. Pastikan email saat checkout sudah benar.'
+            message: isNotOrdered
+              ? 'email kamu belum pernah order, ayo beli dulu'
+              : (scalevCheck.message || 'Pembayaran belum terkonfirmasi lunas di Scalev. Silakan selesaikan pembayaran.')
           });
         }
 
@@ -378,7 +387,9 @@ function handleRequest(e, httpMethod) {
         return createJsonResponse({
           success: false,
           verified: false,
-          message: 'Email (' + email + ') belum terdaftar di database lisensi. Pastikan email yang dimasukkan sama persis dengan email saat checkout.'
+          notOrdered: true,
+          email: email,
+          message: 'email kamu belum pernah order, ayo beli dulu'
         });
       }
 
@@ -388,13 +399,13 @@ function handleRequest(e, httpMethod) {
 
       // Generate lisensi baru unik (WALI-XXXX)
       const licenseKey = generateUniqueLicense(sheet);
-      const now = new Date();
+      const orderPaidTime = (scalevCheck && scalevCheck.paymentTime) ? scalevCheck.paymentTime : new Date();
 
       // Kirim Email via Brevo REST API v3
       const brevoResult = sendBrevoEmail(email, licenseKey, orderId, false, name);
 
       sheet.appendRow([
-        now,                                                      // Col 1 (A): Timestamp
+        orderPaidTime,                                            // Col 1 (A): Waktu Pembayaran Order Resmi
         orderId,                                                  // Col 2 (B): Scalev Order ID
         email,                                                    // Col 3 (C): Email
         licenseKey,                                               // Col 4 (D): License Key (WALI-XXXX)
@@ -409,6 +420,7 @@ function handleRequest(e, httpMethod) {
       ]);
 
       const lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
       sheet.getRange(lastRow, 7).setNumberFormat('"Rp"#,##0');
 
       updateDashboardStats(ss);
@@ -422,6 +434,9 @@ function handleRequest(e, httpMethod) {
         paymentStatus: 'paid',
         isNew: true,
         emailSent: brevoResult.success,
+        emailSentNow: brevoResult.success,
+        wasBrevoPending: true,
+        brevoSenderEmail: BREVO_SENDER_EMAIL,
         brevoMessageId: brevoResult.messageId,
         mailError: brevoResult.error,
         message: 'Alhamdulillah! Pembayaran resmi terkonfirmasi lunas. Lisensi telah diaktifkan dan dikirim ke email.'
@@ -598,6 +613,79 @@ function handleRequest(e, httpMethod) {
       });
     }
 
+    // ------------------------------------------------------------------------
+    // ACTION 6: BROADCAST_UPDATE (Broadcast Pembaruan via API dengan Secret)
+    // ------------------------------------------------------------------------
+    if (action === 'broadcast_update') {
+      const secret = params.secret || postData.secret || '';
+      if (secret !== ADMIN_SECRET_KEY) {
+        return createJsonResponse({ success: false, message: 'Akses ditolak: Kunci rahasia admin salah.' });
+      }
+
+      const versi = (params.versi || postData.versi || 'v2.5.0').trim();
+      const tanggal = (params.tanggal || postData.tanggal || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy')).trim();
+      const jenisPerbaikan = (params.jenis || params.jenis_perbaikan || postData.jenis || postData.jenis_perbaikan || 'Pembaruan tampilan & performa game edukatif.').trim();
+      const status = 'Free 100% (Gratis Selamanya untuk Pembeli Resmi)';
+      const rangeParam = (params.range || postData.range || '').trim();
+
+      const lastRow = sheet.getLastRow();
+      let startRow = 2;
+      let endRow = lastRow;
+
+      if (rangeParam && rangeParam.toLowerCase() !== 'semua') {
+        const cleanStr = rangeParam.toUpperCase().replace(/C/g, '').trim();
+        if (cleanStr.includes('-')) {
+          const parts = cleanStr.split('-');
+          startRow = parseInt(parts[0], 10) || 2;
+          endRow = parseInt(parts[1], 10) || lastRow;
+        } else if (cleanStr.includes(':')) {
+          const parts = cleanStr.split(':');
+          startRow = parseInt(parts[0], 10) || 2;
+          endRow = parseInt(parts[1], 10) || lastRow;
+        } else if (!isNaN(parseInt(cleanStr, 10))) {
+          endRow = parseInt(cleanStr, 10);
+        }
+      }
+
+      startRow = Math.max(2, startRow);
+      endRow = Math.min(lastRow, Math.max(startRow, endRow));
+
+      const numRows = endRow - startRow + 1;
+      const rangeValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+
+      let successCount = 0;
+      let failCount = 0;
+      const seen = new Set();
+
+      for (let i = 0; i < rangeValues.length; i++) {
+        const email = String(rangeValues[i][2] || '').trim().toLowerCase();
+        const license = String(rangeValues[i][3] || '').trim();
+        const name = String(rangeValues[i][7] || '').trim();
+
+        if (email && email.includes('@') && !seen.has(email)) {
+          seen.add(email);
+          const res = sendBrevoBroadcastUpdateEmail(email, name, license, {
+            versi: versi,
+            tanggal: tanggal,
+            jenisPerbaikan: jenisPerbaikan,
+            status: status
+          });
+          if (res.success) successCount++;
+          else failCount++;
+          Utilities.sleep(50);
+        }
+      }
+
+      return createJsonResponse({
+        success: true,
+        sent: successCount,
+        failed: failCount,
+        totalUnique: seen.size,
+        range: 'C' + startRow + ':C' + endRow,
+        message: 'Broadcast selesai diproses: ' + successCount + ' terkirim, ' + failCount + ' gagal.'
+      });
+    }
+
     return createJsonResponse({ success: false, message: 'Aksi tidak dikenal.' });
   } catch (error) {
     return createJsonResponse({ success: false, error: error.toString() });
@@ -705,6 +793,379 @@ function sendBrevoEmail(toEmail, licenseKey, orderId, isResend, customerName) {
  * FITUR MENU ADMIN GOOGLE SHEETS
  * ============================================================================
  */
+
+/**
+ * 📢 FITUR BROADCAST PEMBARUAN / UPDATE FITUR KE SELURUH PEMBELI (BREVO API)
+ * Fitur:
+ * 1. Opsi rentang baris penerima Kolom C (misal C2-C10, C2:C25, atau semua).
+ * 2. Isian: Jenis perbaikan, Tanggal rilis, Versi aplikasi.
+ * 3. Status: Otomatis 'Free 100% (Gratis Selamanya untuk Pembeli Resmi)'.
+ * 4. Desain email: Tabel Rapi, Favicon Sosmed Modern, Logo & Tombol Akses Game.
+ */
+function menuBroadcastUpdate() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = initLicensesSheet(ss);
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow <= 1) {
+    ui.alert('ℹ️ Data Masih Kosong', 'Belum ada data email pembeli di sheet "' + SHEET_LICENSES + '".', ui.ButtonSet.OK);
+    return;
+  }
+
+  // 1. OPSI RENTANG BARIS KOLOM C (PENERIMA)
+  const rangePrompt = ui.prompt(
+    '📢 Broadcast Pembaruan Fitur (Langkah 1/4: Rentang Baris Kolom C)',
+    'Tentukan rentang baris penerima di Kolom C (Email Pembeli):\n\n' +
+    '• Contoh: "2-10" (kirim ke baris C2 sampai C10)\n' +
+    '• Contoh: "C2:C25"\n' +
+    '• Ketik "semua" atau kosongkan untuk kirim ke seluruh pembeli (baris C2 s/d C' + lastRow + '):\n\n' +
+    'Masukkan pilihan Anda:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (rangePrompt.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('Broadcast dibatalkan.');
+    return;
+  }
+
+  const rangeInput = rangePrompt.getResponseText().trim();
+  let startRow = 2;
+  let endRow = lastRow;
+
+  if (rangeInput && rangeInput.toLowerCase() !== 'semua' && rangeInput.toLowerCase() !== 'all') {
+    const cleanStr = rangeInput.toUpperCase().replace(/C/g, '').trim();
+    if (cleanStr.includes('-')) {
+      const parts = cleanStr.split('-');
+      startRow = parseInt(parts[0], 10) || 2;
+      endRow = parseInt(parts[1], 10) || lastRow;
+    } else if (cleanStr.includes(':')) {
+      const parts = cleanStr.split(':');
+      startRow = parseInt(parts[0], 10) || 2;
+      endRow = parseInt(parts[1], 10) || lastRow;
+    } else if (!isNaN(parseInt(cleanStr, 10))) {
+      endRow = parseInt(cleanStr, 10);
+    }
+  }
+
+  // Pengaman batasan baris (selalu mulai dari baris 2 untuk melewati header C1)
+  startRow = Math.max(2, startRow);
+  endRow = Math.min(lastRow, Math.max(startRow, endRow));
+
+  // Ambil data penerima unik dalam rentang tersebut
+  const numRows = endRow - startRow + 1;
+  const rangeValues = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
+
+  const recipients = [];
+  const seenEmails = new Set();
+
+  for (let i = 0; i < rangeValues.length; i++) {
+    const row = rangeValues[i];
+    const email = String(row[2] || '').trim().toLowerCase(); // Kolom C = Index 2 (Email)
+    const license = String(row[3] || '').trim();            // Kolom D = Index 3 (License Key)
+    const name = String(row[7] || '').trim();               // Kolom H = Index 7 (Nama Pelanggan)
+    const currentRowNumber = startRow + i;
+
+    if (email && email.includes('@') && !seenEmails.has(email)) {
+      seenEmails.add(email);
+      recipients.push({
+        rowNumber: currentRowNumber,
+        email: email,
+        name: name,
+        license: license
+      });
+    }
+  }
+
+  if (recipients.length === 0) {
+    ui.alert('❌ Tidak ada alamat email valid di Kolom C pada baris C' + startRow + ' sampai C' + endRow + '.');
+    return;
+  }
+
+  // 2. ISIAN NOMOR VERSI APLIKASI
+  const versiPrompt = ui.prompt(
+    '📢 Broadcast Pembaruan Fitur (Langkah 2/4: Versi Aplikasi)',
+    'Masukkan nomor versi aplikasi yang baru:\n(Contoh: v2.5.0):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (versiPrompt.getSelectedButton() !== ui.Button.OK) return;
+  const versi = versiPrompt.getResponseText().trim() || 'v2.5.0';
+
+  // 3. ISIAN TANGGAL PEMBARUAN
+  const todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
+  const tglPrompt = ui.prompt(
+    '📢 Broadcast Pembaruan Fitur (Langkah 3/4: Tanggal Rilis)',
+    'Masukkan tanggal pembaruan (format DD/MM/YYYY):\n(Klik OK langsung untuk menggunakan hari ini: ' + todayStr + '):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (tglPrompt.getSelectedButton() !== ui.Button.OK) return;
+  const tanggal = tglPrompt.getResponseText().trim() || todayStr;
+
+  // 4. ISIAN JENIS PERBAIKAN / FITUR BARU
+  const jenisPrompt = ui.prompt(
+    '📢 Broadcast Pembaruan Fitur (Langkah 4/4: Jenis Perbaikan)',
+    'Jelaskan jenis perbaikan dan fitur baru yang dirilis:\n(Contoh: Menu mewarnai lebih rapi di HP & Tab (vertikal & horisontal), tampilan modern, dan performa lebih lancar):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (jenisPrompt.getSelectedButton() !== ui.Button.OK) return;
+  const jenisPerbaikan = jenisPrompt.getResponseText().trim() || 'Pembaruan tampilan visual, optimasi menu mewarnai di HP & tablet, serta peningkatan performa game edukatif.';
+
+  // Status selalu Free 100%
+  const status = 'Free 100% (Gratis Selamanya untuk Pembeli Resmi)';
+
+  // 5. KONFIRMASI RINGKASAN SEBELUM PENGIRIMAN
+  const confirmMsg =
+    '📋 RINGKASAN DATA BROADCAST PEMBARUAN:\n\n' +
+    '• Rentang Kolom C    : C' + startRow + ' sampai C' + endRow + '\n' +
+    '• Jumlah Penerima   : ' + recipients.length + ' pembeli unik\n' +
+    '• Versi Aplikasi    : ' + versi + '\n' +
+    '• Tanggal Pembaruan : ' + tanggal + '\n' +
+    '• Status Update     : ' + status + '\n' +
+    '• Jenis Perbaikan   : ' + jenisPerbaikan + '\n\n' +
+    '⚠️ Apakah Anda yakin ingin MENGIRIM broadcast email ini ke ' + recipients.length + ' pembeli via Brevo?';
+
+  const confirm = ui.alert('🚀 Konfirmasi Kirim Broadcast', confirmMsg, ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) {
+    ui.alert('Pengiriman broadcast dibatalkan.');
+    return;
+  }
+
+  // 6. PROSES PENGIRIMAN DENGAN LAPORAN REAL-TIME
+  let successCount = 0;
+  let failCount = 0;
+  const errors = [];
+
+  for (let i = 0; i < recipients.length; i++) {
+    const item = recipients[i];
+    try {
+      const res = sendBrevoBroadcastUpdateEmail(item.email, item.name, item.license, {
+        versi: versi,
+        tanggal: tanggal,
+        jenisPerbaikan: jenisPerbaikan,
+        status: status
+      });
+
+      if (res.success) {
+        successCount++;
+      } else {
+        failCount++;
+        errors.push(item.email + ': ' + res.error);
+      }
+    } catch (err) {
+      failCount++;
+      errors.push(item.email + ': ' + err.toString());
+    }
+
+    Utilities.sleep(50);
+  }
+
+  let finalMsg =
+    '🎉 PENGIRIMAN BROADCAST SELESAI!\n\n' +
+    '• Berhasil Terkirim : ' + successCount + ' email pembeli\n' +
+    '• Gagal             : ' + failCount + ' email\n' +
+    '• Total Diproses    : ' + recipients.length + ' email\n' +
+    '• Rentang Baris     : Kolom C' + startRow + ' s/d C' + endRow;
+
+  if (errors.length > 0) {
+    finalMsg += '\n\nDetail error (maks 3):\n' + errors.slice(0, 3).join('\n');
+  }
+
+  ui.alert('✅ Laporan Pengiriman Broadcast', finalMsg, ui.ButtonSet.OK);
+}
+
+/**
+ * Pengiriman Email Broadcast Pembaruan via Brevo REST API v3
+ */
+function sendBrevoBroadcastUpdateEmail(toEmail, customerName, licenseKey, updateData) {
+  if (!BREVO_API_KEY || BREVO_API_KEY.includes('PASTE_YOUR_BREVO_API_KEY')) {
+    return { success: false, error: 'Brevo API Key belum diisi di Code.gs.' };
+  }
+
+  const subject = '🎉 Update Aplikasi ' + BRAND_NAME + ' (' + updateData.versi + '): Pembaruan Tampilan & Fitur (100% Gratis)';
+  const htmlContent = generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData);
+  const recipientName = customerName && customerName.trim() ? customerName.trim() : 'Ayah & Bunda Hebat';
+
+  const payload = {
+    sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+    to: [{ email: toEmail, name: recipientName }],
+    subject: subject,
+    htmlContent: htmlContent
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'api-key': BREVO_API_KEY, 'Accept': 'application/json' },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch('https://api.brevo.com/v3/smtp/email', options);
+    const statusCode = response.getResponseCode();
+    const responseText = response.getContentText();
+
+    if (statusCode === 201 || statusCode === 200) {
+      let resJson = {};
+      try { resJson = JSON.parse(responseText); } catch (e) {}
+      return { success: true, messageId: resJson.messageId || 'OK', error: null };
+    } else {
+      return { success: false, error: 'HTTP ' + statusCode + ' - ' + responseText };
+    }
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+/**
+ * Generator Template HTML Email Broadcast Pembaruan (Dengan Tabel Rapi Sesuai Permintaan)
+ */
+function generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData) {
+  const LOGO_URL = APP_URL + '/assets/logo-email.png';
+  const greeting = customerName && customerName.trim() ? 'Halo Bunda / Ayah ' + customerName.trim() + '! 👋' : 'Halo Ayah & Bunda Hebat! 👋';
+  const playUrl = licenseKey ? APP_URL + '/?key=' + encodeURIComponent(licenseKey) : APP_URL;
+
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background-color: #f8fafc; padding: 24px; border-radius: 24px; color: #1e293b; border: 1px solid #e2e8f0;">
+      
+      <!-- LOGO WEB & HEADER -->
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="${LOGO_URL}" width="80" height="80" alt="${BRAND_NAME}" style="display: block; margin: 0 auto 12px auto; width: 80px; height: 80px; border-radius: 20px; border: 3px solid #bbf7d0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18); object-fit: cover;" />
+        <span style="display: inline-block; background-color: #dcfce7; color: #166534; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+          🚀 PEMBARUAN APLIKASI RESMI
+        </span>
+        <h1 style="color: #065f46; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">🌱 ${BRAND_NAME}</h1>
+        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Zona Bermain & Belajar Edukatif Si Kecil &bull; 100% Bebas Iklan &bull; Siap Offline</p>
+      </div>
+
+      <!-- KARTU UTAMA BROADCAST -->
+      <div style="background-color: #ffffff; padding: 26px 22px; border-radius: 20px; border: 2px solid #e2e8f0; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 800;">${greeting}</h2>
+        <p style="color: #475569; font-size: 13.5px; line-height: 1.6; margin-bottom: 18px;">
+          Kabar gembira! Kami baru saja merilis pembaruan tampilan dan peningkatan fitur di aplikasi <strong>${BRAND_NAME}</strong> agar si kecil makin nyaman, lancar, dan ceria saat bermain sambil belajar di rumah.
+        </p>
+
+        <!-- TABEL RINCIAN PEMBARUAN (SESUAI PERMINTAAN USER: Jenis Perbaikan, Tanggal, Versi, Status: Free 100%) -->
+        <div style="background-color: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 16px; overflow: hidden; margin: 18px 0;">
+          <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 12px 16px; font-size: 13px; font-weight: 800; letter-spacing: 0.5px;">
+            📋 TABEL RINCIAN PEMBARUAN APLIKASI
+          </div>
+
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; font-size: 13px;">
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 12px 14px; font-weight: 700; color: #475569; width: 35%; background-color: #f1f5f9;">Versi Aplikasi</td>
+              <td style="padding: 12px 14px; font-weight: 900; color: #0f172a;">
+                <span style="background-color: #e0f2fe; color: #0369a1; padding: 3px 10px; border-radius: 8px; font-family: monospace; font-size: 13.5px; border: 1px solid #bae6fd;">${updateData.versi}</span>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 12px 14px; font-weight: 700; color: #475569; background-color: #f1f5f9;">Tanggal Rilis</td>
+              <td style="padding: 12px 14px; font-weight: 800; color: #334155;">📅 ${updateData.tanggal}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 12px 14px; font-weight: 700; color: #475569; background-color: #f1f5f9; vertical-align: top;">Jenis Perbaikan</td>
+              <td style="padding: 12px 14px; font-weight: 600; color: #0f172a; line-height: 1.6;">
+                ${updateData.jenisPerbaikan}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 14px; font-weight: 700; color: #475569; background-color: #f1f5f9;">Status Update</td>
+              <td style="padding: 12px 14px;">
+                <span style="display: inline-block; background-color: #dcfce7; color: #15803d; font-weight: 900; font-size: 13px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid #86efac; box-shadow: 0 1px 3px rgba(16,185,129,0.15);">
+                  ✅ ${updateData.status}
+                </span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- PENGINGAT LISENSI PEMBELI -->
+        ${licenseKey ? `
+          <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 2px dashed #10b981; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0;">
+            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #047857; letter-spacing: 1px; display: block; margin-bottom: 4px;">
+              KODE LISENSI RESMI ANDA:
+            </span>
+            <div style="font-size: 24px; font-weight: 900; color: #064e3b; letter-spacing: 2.5px; font-family: ui-monospace, monospace;">
+              ${licenseKey}
+            </div>
+            <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">
+              *Sebagai pembeli resmi, Anda menikmati pembaruan ini GRATIS 100% tanpa biaya tambahan.
+            </span>
+          </div>
+        ` : ''}
+
+        <!-- TOMBOL BUKA UPDATE SEKARANG -->
+        <div style="text-align: center; margin: 22px 0 16px 0;">
+          <a href="${playUrl}" target="_blank" style="display: block; background-color: #10b981; color: #ffffff; padding: 15px 24px; border-radius: 14px; font-size: 15.5px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);">
+            🚀 Buka & Coba Pembaruan Sekarang
+          </a>
+          <span style="font-size: 11px; color: #64748b; margin-top: 6px; display: block;">
+            *Klik tombol di atas untuk langsung membuka aplikasi dan menikmati fitur baru.
+          </span>
+        </div>
+
+        <!-- CARA MENGAKTIFKAN PEMBARUAN DI HP -->
+        <div style="background-color: #f8fafc; border-left: 4px solid #10b981; padding: 12px 14px; border-radius: 0 12px 12px 0; margin-top: 18px;">
+          <div style="font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">Cara Mengaktifkan Pembaruan di Perangkat Anda:</div>
+          <p style="font-size: 12px; color: #475569; margin: 0; line-height: 1.6;">
+            Cukup buka atau refresh website di browser HP/Tablet Anda, atau buka ikon aplikasi di Layar Utama HP. Pembaruan akan otomatis aktif dan tetap <strong>100% siap dimainkan offline tanpa kuota</strong>!
+          </p>
+        </div>
+
+        <!-- SEKSI MEDIA SOSIAL RESMI DENGAN FAVICON MODERN -->
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
+          <p style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1.2px; margin: 0 0 14px 0;">
+            Ikuti Media Sosial Resmi Wali Pintar
+          </p>
+
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 auto; max-width: 480px;">
+            <tr>
+              <!-- YouTube -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://youtube.com/@walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #fee2e2; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(239, 68, 68, 0.08);">
+                  <img src="${APP_URL}/assets/icons/youtube.png" width="24" height="24" alt="YouTube" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #dc2626;">YouTube</span>
+                </a>
+              </td>
+              <!-- Facebook -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://facebook.com/walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #dbeafe; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(37, 99, 235, 0.08);">
+                  <img src="${APP_URL}/assets/icons/facebook.png" width="24" height="24" alt="Facebook" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #1d4ed8;">Facebook</span>
+                </a>
+              </td>
+              <!-- Instagram -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://instagram.com/walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #fce7f3; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(219, 39, 119, 0.08);">
+                  <img src="${APP_URL}/assets/icons/instagram.png" width="24" height="24" alt="Instagram" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #be185d;">Instagram</span>
+                </a>
+              </td>
+              <!-- TikTok -->
+              <td align="center" style="padding: 4px; width: 25%;">
+                <a href="https://tiktok.com/@walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);">
+                  <img src="${APP_URL}/assets/icons/tiktok.png" width="24" height="24" alt="TikTok" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #0f172a;">TikTok</span>
+                </a>
+              </td>
+            </tr>
+          </table>
+          <p style="font-size: 11px; color: #94a3b8; margin: 12px 0 0 0; line-height: 1.5;">
+            Dapatkan inspirasi stimulasi anak, tips parenting, dan update game edukatif di <strong>@walipintar</strong>.
+          </p>
+        </div>
+      </div>
+
+      <!-- FOOTER EMAIL -->
+      <div style="text-align: center; margin-top: 20px; font-size: 11.5px; color: #94a3b8; line-height: 1.6;">
+        Email broadcast resmi dikirim otomatis melalui sistem lisensi <strong>${BRAND_NAME}</strong>.<br>
+        Butuh bantuan teknis / pertanyaan? Hubungi Customer Service kami:<br>
+        <a href="https://wa.me/${ADMIN_WA}" style="color: #059669; font-weight: bold; text-decoration: none;">💬 WhatsApp Admin (+62 857-0480-8186)</a><br>
+        &copy; ${BRAND_NAME} &bull; Seluruh hak cipta dilindungi undang-undang.
+      </div>
+    </div>
+  `;
+}
 
 function menuGenerateManual() {
   const ui = SpreadsheetApp.getUi();
@@ -1058,7 +1519,7 @@ function menuTestBrevoConnection() {
 function initLicensesSheet(ss) {
   let sheet = ss.getSheetByName(SHEET_LICENSES);
   const EXPECTED_HEADERS = [
-    'Timestamp',              // Col 1 (A)
+    'Waktu Pembayaran Order', // Col 1 (A) - Waktu pembayaran resmi transaksi dari Scalev
     'Order ID Scalev',        // Col 2 (B) - Langsung Order ID Scalev resmi (misal: 261107ZATESNF)
     'Email',                  // Col 3 (C)
     'License Key',            // Col 4 (D) - WALI-XXXX
@@ -1079,7 +1540,7 @@ function initLicensesSheet(ss) {
 
     const headerRange = sheet.getRange(1, 1, 1, EXPECTED_HEADERS.length);
     headerRange.setBackground('#059669').setFontColor('#ffffff').setFontWeight('bold');
-    sheet.setColumnWidth(1, 150);
+    sheet.setColumnWidth(1, 180);
     sheet.setColumnWidth(2, 170);
     sheet.setColumnWidth(3, 220);
     sheet.setColumnWidth(4, 150);
@@ -1092,14 +1553,17 @@ function initLicensesSheet(ss) {
     sheet.setColumnWidth(11, 100);
     sheet.setColumnWidth(12, 220);
   } else {
-    // Pastikan Kolom B selalu berlabel 'Order ID Scalev'
+    // Pastikan Kolom A selalu berlabel 'Waktu Pembayaran Order' dan Kolom B 'Order ID Scalev'
+    sheet.getRange(1, 1).setValue('Waktu Pembayaran Order');
+    sheet.setColumnWidth(1, 180);
     sheet.getRange(1, 2).setValue('Order ID Scalev');
     const lastCol = Math.max(sheet.getLastColumn(), 1);
     const currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
     const headerStr = currentHeaders.join('|').toLowerCase();
-    if (!headerStr.includes('gross revenue') || !headerStr.includes('payment status')) {
+    if (!headerStr.includes('gross revenue') || !headerStr.includes('payment status') || !headerStr.includes('waktu pembayaran')) {
       sheet.getRange(1, 1, 1, EXPECTED_HEADERS.length).setValues([EXPECTED_HEADERS]);
       sheet.getRange(1, 1, 1, EXPECTED_HEADERS.length).setBackground('#059669').setFontColor('#ffffff').setFontWeight('bold');
+      sheet.setColumnWidth(1, 180);
       sheet.setColumnWidth(2, 170);
       sheet.setColumnWidth(6, 130);
       sheet.setColumnWidth(7, 150);
@@ -1363,7 +1827,7 @@ function generateLicenseHtmlEmail(licenseKey, orderId, customerName) {
 
         <!-- SEKSI MEDIA SOSIAL RESMI (YOUTUBE, FACEBOOK, INSTAGRAM, TIKTOK) -->
         <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center;">
-          <p style="font-size: 11.5px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 12px 0;">
+          <p style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1.2px; margin: 0 0 14px 0;">
             Ikuti Media Sosial Resmi Wali Pintar
           </p>
 
@@ -1371,35 +1835,35 @@ function generateLicenseHtmlEmail(licenseKey, orderId, customerName) {
             <tr>
               <!-- YouTube -->
               <td align="center" style="padding: 4px; width: 25%;">
-                <a href="https://youtube.com/@walipintar" target="_blank" style="display: block; background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #e11d48; text-align: center;">
-                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">▶️</span>
-                  <span>YouTube</span>
+                <a href="https://youtube.com/@walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #fee2e2; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(239, 68, 68, 0.08);">
+                  <img src="${APP_URL}/assets/icons/youtube.png" width="24" height="24" alt="YouTube" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #dc2626;">YouTube</span>
                 </a>
               </td>
               <!-- Facebook -->
               <td align="center" style="padding: 4px; width: 25%;">
-                <a href="https://facebook.com/walipintar" target="_blank" style="display: block; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #1d4ed8; text-align: center;">
-                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">👥</span>
-                  <span>Facebook</span>
+                <a href="https://facebook.com/walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #dbeafe; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(37, 99, 235, 0.08);">
+                  <img src="${APP_URL}/assets/icons/facebook.png" width="24" height="24" alt="Facebook" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #1d4ed8;">Facebook</span>
                 </a>
               </td>
               <!-- Instagram -->
               <td align="center" style="padding: 4px; width: 25%;">
-                <a href="https://instagram.com/walipintar" target="_blank" style="display: block; background-color: #fdf2f8; border: 1px solid #fbcfe8; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #be185d; text-align: center;">
-                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">📸</span>
-                  <span>Instagram</span>
+                <a href="https://instagram.com/walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #fce7f3; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(219, 39, 119, 0.08);">
+                  <img src="${APP_URL}/assets/icons/instagram.png" width="24" height="24" alt="Instagram" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #be185d;">Instagram</span>
                 </a>
               </td>
               <!-- TikTok -->
               <td align="center" style="padding: 4px; width: 25%;">
-                <a href="https://tiktok.com/@walipintar" target="_blank" style="display: block; background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 6px; text-decoration: none; font-size: 12px; font-weight: 700; color: #0f172a; text-align: center;">
-                  <span style="display: block; font-size: 16px; line-height: 1; margin-bottom: 3px;">🎵</span>
-                  <span>TikTok</span>
+                <a href="https://tiktok.com/@walipintar" target="_blank" style="display: block; background-color: #ffffff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px 4px; text-decoration: none; text-align: center; box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);">
+                  <img src="${APP_URL}/assets/icons/tiktok.png" width="24" height="24" alt="TikTok" style="display: block; margin: 0 auto 5px auto; width: 24px; height: 24px; border: 0;" />
+                  <span style="display: block; font-size: 11.5px; font-weight: 700; color: #0f172a;">TikTok</span>
                 </a>
               </td>
             </tr>
           </table>
-          <p style="font-size: 11px; color: #94a3b8; margin: 10px 0 0 0; line-height: 1.5;">
+          <p style="font-size: 11px; color: #94a3b8; margin: 12px 0 0 0; line-height: 1.5;">
             Dapatkan inspirasi stimulasi anak, tips parenting, dan update game edukatif di <strong>@walipintar</strong>.
           </p>
         </div>
@@ -1525,6 +1989,7 @@ function verifyScalevPayment(orderId) {
       const customerPhone = customer.phone || json.customer_phone || json.phone || '';
       const officialOrderId = String(json.order_id || json.order_number || json.code || json.id || cleanTarget).trim();
       const grossRevenue = extractGrossRevenue(json);
+      const paymentTime = extractPaymentTime(json);
 
       return {
         configured: true,
@@ -1533,21 +1998,24 @@ function verifyScalevPayment(orderId) {
         paymentStatus: paymentStatus,
         officialOrderId: officialOrderId,
         grossRevenue: grossRevenue,
+        paymentTime: paymentTime,
+        paidAt: paymentTime,
         customerEmail: customerEmail,
         customerName: customerName,
         customerPhone: customerPhone,
         rawOrder: json,
         message: isPaid
           ? 'Pembayaran terverifikasi lunas di Scalev (Gross: Rp ' + formatNumberId(grossRevenue) + ').'
-          : 'Pembayaran di Scalev belum lunas (Status: ' + paymentStatus + ').'
+          : 'invoice email : ' + (customerEmail || cleanTarget) + ' masih belum terbayar (Status: ' + paymentStatus + ').'
       };
     } else {
       return {
         configured: true,
         verified: false,
+        notOrdered: true,
         statusCode: statusCode,
         grossRevenue: 0,
-        message: 'Pesanan untuk (' + cleanTarget + ') tidak ditemukan di database Scalev.'
+        message: 'email kamu belum pernah order, ayo beli dulu'
       };
     }
   } catch (err) {
@@ -1559,6 +2027,41 @@ function verifyScalevPayment(orderId) {
       message: 'Gagal menghubungi server Scalev: ' + err.toString()
     };
   }
+}
+
+/**
+ * Ekstraksi Waktu Pembayaran Resmi dari Objek Order Scalev API v3
+ * Mengembalikan objek Date waktu pembayaran saat order berstatus lunas
+ */
+function extractPaymentTime(json) {
+  if (!json) return new Date();
+
+  var candidates = [
+    json.paid_at,
+    json.payment_completed_at,
+    json.completed_at,
+    json.settled_at,
+    json.payment_time,
+    json.paid_time,
+    json.payment_date,
+    (json.payment && (json.payment.paid_at || json.payment.completed_at || json.payment.settled_at || json.payment.created_at || json.payment.date)),
+    json.updated_at,
+    json.created_at,
+    json.order_date,
+    json.date
+  ];
+
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    if (c) {
+      var d = new Date(c);
+      if (!isNaN(d.getTime())) {
+        return d;
+      }
+    }
+  }
+
+  return new Date();
 }
 
 /**
@@ -1644,7 +2147,7 @@ function getColumnIndices(headerRow) {
 
   for (var c = 0; c < headerRow.length; c++) {
     var title = String(headerRow[c]).trim().toLowerCase();
-    if (title.includes('timestamp')) map.timestamp = c;
+    if (title.includes('timestamp') || title.includes('waktu') || title.includes('tanggal')) map.timestamp = c;
     else if (title.includes('order')) map.orderId = c;
     else if (title.includes('email') && !title.includes('brevo')) map.email = c;
     else if (title.includes('license') || title.includes('lisensi')) map.license = c;
@@ -1747,6 +2250,10 @@ function syncOrdersFromScalev(ss) {
       const existingRow = orderRowMap[officialOrderId] || (customerEmail ? emailRowMap[customerEmail] : null);
 
       if (existingRow) {
+        const orderPaidTime = extractPaymentTime(order);
+        if (orderPaidTime) {
+          sheet.getRange(existingRow, 1).setValue(orderPaidTime).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+        }
         sheet.getRange(existingRow, 2).setValue(officialOrderId);
         if (customerEmail) sheet.getRange(existingRow, 3).setValue(customerEmail);
         sheet.getRange(existingRow, 6).setValue(paymentStatus);
@@ -1756,9 +2263,9 @@ function syncOrdersFromScalev(ss) {
       } else if (isPaid && customerEmail) {
         // Buatkan lisensi baru untuk pesanan paid yang belum ada di sheet
         const licenseKey = generateUniqueLicense(sheet);
-        const now = new Date();
+        const orderPaidTime = extractPaymentTime(order);
         sheet.appendRow([
-          now,
+          orderPaidTime,
           officialOrderId,
           customerEmail,
           licenseKey,
@@ -1772,6 +2279,7 @@ function syncOrdersFromScalev(ss) {
           'Sinkronisasi Otomatis Scalev API'
         ]);
         const lastRow = sheet.getLastRow();
+        sheet.getRange(lastRow, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
         sheet.getRange(lastRow, 7).setNumberFormat('"Rp"#,##0');
 
         orderRowMap[officialOrderId] = lastRow;
