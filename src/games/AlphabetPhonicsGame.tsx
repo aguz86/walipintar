@@ -27,6 +27,7 @@ import {
   WordBuilderItem,
 } from '../data/alphabet';
 import { SFX, speakText, unlockAudio } from '../utils/audio';
+import { SlideScrollContainer } from '../components/SlideScrollContainer';
 
 interface AlphabetPhonicsGameProps {
   onBack: () => void;
@@ -350,6 +351,13 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
     setPlayingLetter(null);
   };
 
+  // Pastikan lagu/suara A-Z otomatis berhenti jika pengguna berpindah dari tab Kartu A-Z
+  useEffect(() => {
+    if (activeTab !== 'cards' && isAutoPlaying) {
+      stopAutoPlay();
+    }
+  }, [activeTab, isAutoPlaying]);
+
   const startAutoPlay = () => {
     unlockAudio();
     SFX.ding();
@@ -616,99 +624,110 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
           </span>
         </div>
 
-        {/* Karaoke Auto Play Button */}
-        <button
-          onClick={isAutoPlaying ? stopAutoPlay : startAutoPlay}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs cursor-pointer transition-all ${
-            isAutoPlaying
-              ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
-          }`}
-          title="Putar Lagu Suara A sampai Z"
-        >
-          {isAutoPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-          <span className="hidden sm:inline">
-            {isAutoPlaying ? (lang === 'id' ? 'Berhenti' : 'Stop') : (lang === 'id' ? 'Lagu A-Z' : 'Song A-Z')}
-          </span>
-        </button>
+        {/* Karaoke Auto Play Button - HANYA UNTUK HALAMAN KARTU A-Z */}
+        {activeTab === 'cards' ? (
+          <button
+            onClick={isAutoPlaying ? stopAutoPlay : startAutoPlay}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl font-black text-xs cursor-pointer transition-all ${
+              isAutoPlaying
+                ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+            }`}
+            title={lang === 'id' ? 'Putar Lagu Suara A sampai Z' : 'Auto Play A-Z Letters'}
+            aria-label="Putar Lagu Suara A-Z"
+          >
+            {isAutoPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span className="hidden sm:inline">
+              {isAutoPlaying ? (lang === 'id' ? 'Berhenti' : 'Stop') : (lang === 'id' ? 'Lagu A-Z' : 'Song A-Z')}
+            </span>
+          </button>
+        ) : (
+          <div className="w-9 sm:w-20" aria-hidden="true" />
+        )}
       </div>
 
       {/* 5 Distinct Activity Tabs */}
-      <div className="flex items-center gap-1 sm:gap-2 mb-3 overflow-x-auto no-scrollbar pb-1 bg-white/70 backdrop-blur-xs p-1.5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <button
-          onClick={() => {
-            setActiveTab('cards');
-            SFX.bloop();
-          }}
-          className={`flex-1 min-w-[90px] py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'cards'
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+      <div className="mb-3 bg-white/80 backdrop-blur-xs p-1.5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <SlideScrollContainer
+          showScrollbar={true}
+          showChevrons={true}
+          gradientColor="from-white"
         >
-          <BookOpen className="w-3.5 h-3.5" />
-          <span>{lang === 'id' ? 'Kartu A-Z' : 'Cards'}</span>
-        </button>
+          <button
+            onClick={() => {
+              setActiveTab('cards');
+              SFX.bloop();
+            }}
+            className={`flex-1 min-w-[95px] py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'cards'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>{lang === 'id' ? 'Kartu A-Z' : 'Cards'}</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('bubble');
-            SFX.bloop();
-          }}
-          className={`flex-1 min-w-[100px] py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'bubble'
-              ? 'bg-rose-500 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>{lang === 'id' ? 'Gelembung' : 'Bubble Pop'}</span>
-        </button>
+          <button
+            onClick={() => {
+              setActiveTab('bubble');
+              SFX.bloop();
+            }}
+            className={`flex-1 min-w-[105px] py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'bubble'
+                ? 'bg-rose-500 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{lang === 'id' ? 'Gelembung' : 'Bubble Pop'}</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('wordbuilder');
-            SFX.bloop();
-          }}
-          className={`flex-1 min-w-[100px] py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'wordbuilder'
-              ? 'bg-amber-500 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Shuffle className="w-3.5 h-3.5" />
-          <span>{lang === 'id' ? 'Susun Kata' : 'Word Builder'}</span>
-        </button>
+          <button
+            onClick={() => {
+              setActiveTab('wordbuilder');
+              SFX.bloop();
+            }}
+            className={`flex-1 min-w-[105px] py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'wordbuilder'
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>{lang === 'id' ? 'Susun Kata' : 'Word Builder'}</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('quiz');
-            SFX.bloop();
-          }}
-          className={`flex-1 min-w-[80px] py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'quiz'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          <span>{lang === 'id' ? 'Kuis' : 'Quiz'}</span>
-        </button>
+          <button
+            onClick={() => {
+              setActiveTab('quiz');
+              SFX.bloop();
+            }}
+            className={`flex-1 min-w-[85px] py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'quiz'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>{lang === 'id' ? 'Kuis' : 'Quiz'}</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setActiveTab('trace');
-            SFX.bloop();
-          }}
-          className={`flex-1 min-w-[80px] py-2 px-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-            activeTab === 'trace'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <PenTool className="w-3.5 h-3.5" />
-          <span>{lang === 'id' ? 'Tulis' : 'Trace'}</span>
-        </button>
+          <button
+            onClick={() => {
+              setActiveTab('trace');
+              SFX.bloop();
+            }}
+            className={`flex-1 min-w-[85px] py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'trace'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <PenTool className="w-3.5 h-3.5" />
+            <span>{lang === 'id' ? 'Tulis' : 'Trace'}</span>
+          </button>
+        </SlideScrollContainer>
       </div>
 
       {/* ================= TAB 1: CARDS & PHONICS ================= */}
@@ -716,13 +735,18 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
         <div className="flex-1 flex flex-col gap-3">
           {/* Vowels / Consonants Filter Chips */}
           <div className="flex items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-1.5">
+            <SlideScrollContainer
+              showScrollbar={true}
+              showChevrons={true}
+              gradientColor="from-[#f1fbe8]"
+              className="flex-1 min-w-0"
+            >
               <button
                 onClick={() => {
                   setFilterType('all');
                   SFX.bloop();
                 }}
-                className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                   filterType === 'all'
                     ? 'bg-slate-800 text-white shadow-xs'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -735,7 +759,7 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
                   setFilterType('vowels');
                   SFX.bloop();
                 }}
-                className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                   filterType === 'vowels'
                     ? 'bg-rose-500 text-white shadow-xs'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -748,7 +772,7 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
                   setFilterType('consonants');
                   SFX.bloop();
                 }}
-                className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                   filterType === 'consonants'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -756,9 +780,9 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
               >
                 {lang === 'id' ? 'Konsonan' : 'Consonants'}
               </button>
-            </div>
+            </SlideScrollContainer>
 
-            <span className="text-[11px] font-bold text-slate-500">
+            <span className="text-[11px] font-black text-slate-600 shrink-0 bg-white/90 px-2.5 py-1 rounded-xl border border-slate-200/90 shadow-2xs">
               {displayedLetters.length} {lang === 'id' ? 'Huruf' : 'Letters'}
             </span>
           </div>

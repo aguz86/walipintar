@@ -1094,13 +1094,13 @@ function generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData) 
           </div>
         ` : ''}
 
-        <!-- TOMBOL BUKA UPDATE SEKARANG -->
-        <div style="text-align: center; margin: 22px 0 16px 0;">
-          <a href="${playUrl}" target="_blank" style="display: block; background-color: #10b981; color: #ffffff; padding: 15px 24px; border-radius: 14px; font-size: 15.5px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);">
-            🚀 Buka & Coba Pembaruan Sekarang
+        <!-- TOMBOL CTA PERBARUI GAME SEKARANG (GRATIS) -->
+        <div style="text-align: center; margin: 24px 0 16px 0;">
+          <a href="${playUrl}" target="_blank" style="display: block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; padding: 16px 24px; border-radius: 14px; font-size: 16px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35); letter-spacing: 0.3px;">
+            🎮 Perbarui Game Sekarang (Gratis)
           </a>
-          <span style="font-size: 11px; color: #64748b; margin-top: 6px; display: block;">
-            *Klik tombol di atas untuk langsung membuka aplikasi dan menikmati fitur baru.
+          <span style="font-size: 11.5px; color: #64748b; margin-top: 8px; display: block; font-weight: 600;">
+            *Klik tombol di atas untuk membuka <a href="https://walipintar.my.id" target="_blank" style="color: #059669; text-decoration: underline; font-weight: 800;">walipintar.my.id</a> dan otomatis menikmati game versi terbaru.
           </span>
         </div>
 

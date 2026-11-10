@@ -38,6 +38,7 @@ import { MonsterGame } from './games/MonsterGame';
 import { AlphabetPhonicsGame } from './games/AlphabetPhonicsGame';
 import { ColoringDrawingGame } from './games/ColoringDrawingGame';
 import { SFX, speakText, unlockAudio } from './utils/audio';
+import { SlideScrollContainer } from './components/SlideScrollContainer';
 
 interface UserData {
   lang: 'id' | 'en';
@@ -596,7 +597,13 @@ export default function App() {
         {/* If a category is selected and no mini-game is open, show Category Quick-Switcher Header Bar */}
         {mainCategory && !activeGameId && (
           <div className="bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 px-2 sm:px-4 py-1.5 shadow-2xs sticky top-[49px] sm:top-[57px] z-30 landscape:hidden md:landscape:block">
-            <div className="max-w-5xl mx-auto flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
+            <SlideScrollContainer
+              showScrollbar={false}
+              showChevrons={true}
+              gradientColor="from-slate-100"
+              className="max-w-5xl mx-auto"
+              innerClassName="justify-between"
+            >
               <button
                 onClick={handleBackToCategories}
                 className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-black text-xs shrink-0 cursor-pointer shadow-2xs transition-colors"
@@ -643,7 +650,7 @@ export default function App() {
                   <span>{data.lang === 'id' ? 'Abjad' : 'Alphabet'}</span>
                 </button>
               </div>
-            </div>
+            </SlideScrollContainer>
           </div>
         )}
 

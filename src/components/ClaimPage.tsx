@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { SFX } from '../utils/audio';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 interface ClaimPageProps {
   onUnlockSuccess: (licenseKey: string) => void;
@@ -237,13 +238,13 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
           <div>
             <a
-              href="/beli"
+              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
               <span>🛒</span>
-              <span>Belum Membeli? Selesaikan Pembayaran di Sini</span>
+              <span>Belum Membeli? Selesaikan Pembayaran di Scalev</span>
             </a>
           </div>
 
@@ -254,7 +255,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
-              <span>💬</span>
+              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
               <span>Butuh Bantuan? WhatsApp Admin (0857-0480-8186)</span>
             </a>
           </div>
@@ -361,12 +362,12 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
                 <div className="space-y-2.5">
                   <a
-                    href="/beli"
+                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/checkout-flow-baru-1?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/checkout-flow-baru-1'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 cursor-pointer transition-all active:scale-98"
                   >
-                    <span>🛒 Beli Lisensi Resmi Sekarang</span>
+                    <span>🛒 Beli Lisensi Resmi di Scalev</span>
                     <span>➔</span>
                   </a>
 
@@ -386,7 +387,8 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-1.5 text-[11.5px] text-slate-500 hover:text-emerald-700 underline transition-colors pt-1"
                   >
-                    <span>Sudah bayar dengan email lain? Chat Admin</span>
+                    <WhatsAppIcon className="w-3.5 h-3.5 shadow-2xs rounded-full" />
+                    <span>Sudah bayar dengan email lain? Chat WhatsApp Admin</span>
                   </a>
                 </div>
               </>
@@ -422,7 +424,8 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     rel="noopener noreferrer"
                     className="w-full py-2.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
                   >
-                    <span>💬 WhatsApp Admin (0857-0480-8186)</span>
+                    <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+                    <span>WhatsApp Admin (0857-0480-8186)</span>
                   </a>
 
                   <button

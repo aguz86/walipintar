@@ -609,3 +609,249 @@ export const STICKER_PACKS = [
     stickers: ['🍎', '🍓', '🍌', '🍦', '🍩', '🍰', '🍫', '🍕', '🍉', '🍪'],
   },
 ];
+
+// Contoh Desain & Warna Harmonis untuk Referensi Anak di Pojok Gambar
+export const SAMPLE_PAGE_COLORS: Record<string, Record<string, string>> = {
+  cat: {
+    head: '#fde047',
+    'ear-l': '#fb923c',
+    'ear-r': '#fb923c',
+    body: '#fdba74',
+    'paws-l': '#fed7aa',
+    'paws-r': '#fed7aa',
+    tail: '#fb923c',
+    belly: '#fef08a',
+  },
+  rabbit: {
+    head: '#f8fafc',
+    'ear-l': '#e2e8f0',
+    'ear-r': '#e2e8f0',
+    'ear-inner-l': '#f472b6',
+    'ear-inner-r': '#f472b6',
+    body: '#f1f5f9',
+    belly: '#fce7f3',
+    'paw-l': '#e2e8f0',
+    'paw-r': '#e2e8f0',
+  },
+  panda: {
+    head: '#ffffff',
+    'ear-l': '#1e293b',
+    'ear-r': '#1e293b',
+    'eye-patch-l': '#334155',
+    'eye-patch-r': '#334155',
+    body: '#f8fafc',
+    arms: '#1e293b',
+  },
+  lion: {
+    mane: '#ea580c',
+    face: '#fde047',
+    snout: '#fef08a',
+    'ear-l': '#f59e0b',
+    'ear-r': '#f59e0b',
+    body: '#facc15',
+  },
+  duck: {
+    head: '#facc15',
+    beak: '#f97316',
+    body: '#fde047',
+    wing: '#eab308',
+    water: '#38bdf8',
+  },
+  frog: {
+    'eye-bg-l': '#86efac',
+    'eye-bg-r': '#86efac',
+    head: '#22c55e',
+    belly: '#fef08a',
+    'leg-l': '#16a34a',
+    'leg-r': '#16a34a',
+  },
+  penguin: {
+    'body-outer': '#1e293b',
+    belly: '#ffffff',
+    beak: '#f97316',
+    'flipper-l': '#334155',
+    'flipper-r': '#334155',
+    'feet-l': '#f59e0b',
+    'feet-r': '#f59e0b',
+  },
+  whale: {
+    body: '#0284c7',
+    belly: '#bae6fd',
+    fin: '#0369a1',
+    'water-spout': '#38bdf8',
+  },
+  turtle: {
+    shell: '#15803d',
+    'shell-pattern': '#86efac',
+    head: '#4ade80',
+    'leg-fl': '#22c55e',
+    'leg-bl': '#22c55e',
+    tail: '#16a34a',
+  },
+  elephant: {
+    'ear-l': '#94a3b8',
+    head: '#cbd5e1',
+    trunk: '#94a3b8',
+    body: '#cbd5e1',
+    legs: '#64748b',
+  },
+  apple: {
+    fruit: '#ef4444',
+    leaf: '#22c55e',
+    stem: '#78350f',
+  },
+  banana: {
+    body: '#facc15',
+    'tip-top': '#854d0e',
+    'tip-bottom': '#ca8a04',
+  },
+  watermelon: {
+    rind: '#16a34a',
+    pulp: '#ef4444',
+    seeds: '#1e293b',
+  },
+  strawberry: {
+    berry: '#dc2626',
+    leaves: '#22c55e',
+    stem: '#15803d',
+  },
+  icecream: {
+    cone: '#d97706',
+    'scoop-1': '#f472b6',
+    'scoop-2': '#38bdf8',
+    cherry: '#dc2626',
+    'cherry-stem': '#15803d',
+  },
+  donut: {
+    dough: '#d97706',
+    frosting: '#ec4899',
+    hole: '#f8fafc',
+  },
+  cake: {
+    'tier-1': '#f472b6',
+    'tier-2': '#fef08a',
+    'frosting-drip': '#78350f',
+    candle: '#38bdf8',
+    flame: '#f97316',
+  },
+  car: {
+    'body-bottom': '#ef4444',
+    cabin: '#dc2626',
+    'window-f': '#38bdf8',
+    'wheel-l': '#1e293b',
+    'wheel-r': '#1e293b',
+    light: '#fde047',
+  },
+  rocket: {
+    nose: '#ef4444',
+    fuselage: '#f8fafc',
+    'fin-l': '#3b82f6',
+    'fin-r': '#3b82f6',
+    window: '#38bdf8',
+    flame: '#f97316',
+  },
+  airplane: {
+    fuselage: '#38bdf8',
+    'wing-main': '#f8fafc',
+    'wing-bottom': '#f8fafc',
+    'tail-fin': '#ef4444',
+    cockpit: '#0284c7',
+  },
+  sailboat: {
+    hull: '#854d0e',
+    'sail-big': '#f8fafc',
+    'sail-small': '#f43f5e',
+    flag: '#facc15',
+    waves: '#0284c7',
+  },
+  train: {
+    boiler: '#3b82f6',
+    cab: '#ef4444',
+    'cab-window': '#38bdf8',
+    chimney: '#1e293b',
+    smoke: '#e2e8f0',
+    wheels: '#475569',
+  },
+  sunflower: {
+    center: '#78350f',
+    petals: '#facc15',
+    stem: '#16a34a',
+    'leaf-l': '#22c55e',
+    'leaf-r': '#22c55e',
+  },
+  rainbow: {
+    'arc-red': '#ef4444',
+    'arc-yellow': '#facc15',
+    'arc-blue': '#3b82f6',
+    'cloud-l': '#e0f2fe',
+    'cloud-r': '#e0f2fe',
+  },
+  house: {
+    roof: '#dc2626',
+    walls: '#fef08a',
+    door: '#78350f',
+    window: '#38bdf8',
+    chimney: '#ea580c',
+  },
+  'star-moon': {
+    crescent: '#facc15',
+    'star-big': '#fde047',
+    'star-small': '#fef08a',
+  },
+  trex: {
+    head: '#15803d',
+    body: '#16a34a',
+    belly: '#86efac',
+    arm: '#15803d',
+    leg: '#166534',
+  },
+  brachio: {
+    head: '#0d9488',
+    neck: '#14b8a6',
+    body: '#2dd4bf',
+    tail: '#14b8a6',
+    legs: '#0f766e',
+  },
+  triceratops: {
+    frill: '#f97316',
+    horns: '#fef08a',
+    snout: '#ea580c',
+    body: '#fb923c',
+    legs: '#c2410c',
+  },
+  crown: {
+    base: '#eab308',
+    points: '#facc15',
+    'gem-center': '#ef4444',
+    'gem-l': '#3b82f6',
+    'gem-r': '#10b981',
+  },
+  robot: {
+    head: '#94a3b8',
+    antenna: '#ef4444',
+    body: '#64748b',
+    screen: '#38bdf8',
+    arms: '#cbd5e1',
+    legs: '#475569',
+  },
+  butterfly: {
+    'wing-tl': '#f43f5e',
+    'wing-tr': '#f43f5e',
+    'wing-bl': '#a855f7',
+    'wing-br': '#a855f7',
+    body: '#1e293b',
+    head: '#334155',
+  },
+};
+
+/**
+ * Mengambil warna contoh desain untuk bagian tertentu dari gambar mewarnai
+ */
+export function getSampleColorForPart(pageId: string, partId: string): string {
+  const pageColors = SAMPLE_PAGE_COLORS[pageId];
+  if (pageColors && pageColors[partId]) {
+    return pageColors[partId];
+  }
+  return '#fde047';
+}
+

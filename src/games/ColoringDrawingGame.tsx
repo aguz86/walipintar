@@ -27,8 +27,10 @@ import {
   PALETTE_THEMES,
   STICKER_PACKS,
   ColoringPage,
+  getSampleColorForPart,
 } from '../data/coloringPages';
 import { SFX, speakText, unlockAudio } from '../utils/audio';
+import { SlideScrollContainer } from '../components/SlideScrollContainer';
 
 interface ColoringDrawingGameProps {
   onBack: () => void;
@@ -79,16 +81,17 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
 
   // Tools in free drawing: 'brush' | 'rainbow' | 'glitter' | 'eraser' | 'sticker'
   const [tool, setTool] = useState<'brush' | 'rainbow' | 'glitter' | 'eraser' | 'sticker'>('brush');
-  const [brushSize, setBrushSize] = useState<number>(level === 0 ? 18 : level === 1 ? 12 : 7);
+  const [brushSize, setBrushSize] = useState<number>(level === 0 ? 26 : level === 1 ? 16 : 8);
 
   // Sticker pack selection
   const [activeStickerPackIdx, setActiveStickerPackIdx] = useState(0);
   const currentStickerPack = STICKER_PACKS[activeStickerPackIdx] || STICKER_PACKS[0];
   const [selectedSticker, setSelectedSticker] = useState(currentStickerPack.stickers[0]);
 
-  // Gallery modal & Catalog modal
+  // Gallery modal & Catalog modal & Sample modal
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [showSampleModal, setShowSampleModal] = useState(false);
   const [savedArtworks, setSavedArtworks] = useState<SavedArtwork[]>([]);
 
   // Daily Challenge logic (deterministic based on day of year)
@@ -100,6 +103,7 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const canvasHistoryRef = useRef<ImageData[]>([]);
   const rainbowHueRef = useRef(0);
 
@@ -138,16 +142,68 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
     }
   };
 
-  // Initialize canvas on free mode
+  // Dynamically initialize and resize canvas to fit container perfectly (eliminates offset & dead zones)
+  const initCanvasSize = () => {
+    const container = canvasContainerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+
+    const rect = container.getBoundingClientRect();
+    const width = Math.floor(rect.width) || 800;
+    const height = Math.floor(rect.height) || 550;
+
+    if (width <= 0 || height <= 0) return;
+
+    // Preserve existing drawing if canvas already has content
+    let savedCanvas: HTMLCanvasElement | null = null;
+    if (canvas.width > 0 && canvas.height > 0) {
+      try {
+        savedCanvas = document.createElement('canvas');
+        savedCanvas.width = canvas.width;
+        savedCanvas.height = canvas.height;
+        const tempCtx = savedCanvas.getContext('2d');
+        if (tempCtx) {
+          tempCtx.drawImage(canvas, 0, 0);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        if (savedCanvas) {
+          ctx.drawImage(savedCanvas, 0, 0, width, height);
+        }
+      }
+      saveCanvasState();
+    }
+  };
+
+  // Initialize canvas on free mode and keep it responsive
   useEffect(() => {
     if (mode === 'free') {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      saveCanvasState();
+      const timer = setTimeout(() => {
+        initCanvasSize();
+      }, 40);
+
+      const handleResize = () => {
+        initCanvasSize();
+      };
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', handleResize);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('orientationchange', handleResize);
+      };
     }
   }, [mode]);
 
@@ -266,21 +322,51 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
     });
   };
 
-  // Drawing Canvas Pointer Events
+  const handleApplySampleColors = () => {
+    SFX.fanfare();
+    const sampleMap: Record<string, string> = {};
+    activePage.parts.forEach((p) => {
+      sampleMap[p.id] = getSampleColorForPart(activePage.id, p.id);
+    });
+    setPageColors((prev) => ({
+      ...prev,
+      [activePage.id]: sampleMap,
+    }));
+    setShowSampleModal(false);
+    speakText(lang === 'id' ? 'Contoh warna berhasil ditiru!' : 'Sample colors applied!', lang);
+  };
+
+  // Helper to accurately extract (x, y) on canvas without any offset or letterbox distortion
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / (rect.width || 1);
+    const scaleY = canvas.height / (rect.height || 1);
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  };
+
+  // Drawing Canvas Pointer Events - Ultra-responsive touch & immediate dot on touch
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     unlockAudio();
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Capture pointer so fast finger dragging is tracked smoothly
+    try {
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    const { x, y } = getCanvasCoords(e);
+
     if (tool === 'sticker') {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-
       ctx.font = `${brushSize * 3.5 + 24}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -291,16 +377,51 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
     }
 
     isDrawingRef.current = true;
-    draw(e);
+    lastPointRef.current = { x, y };
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Immediately draw a smooth circular dot at the point of touch
+    // (This guarantees instant visual feedback on touch/tap without needing to drag)
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (tool === 'eraser') {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (tool === 'rainbow') {
+      rainbowHueRef.current = (rainbowHueRef.current + 8) % 360;
+      ctx.fillStyle = `hsl(${rainbowHueRef.current}, 95%, 52%)`;
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (tool === 'glitter') {
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = selectedColor;
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e) {
+      try {
+        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+    }
     if (isDrawingRef.current) {
       isDrawingRef.current = false;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.beginPath();
+      lastPointRef.current = null;
       saveCanvasState();
     }
   };
@@ -312,11 +433,8 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const { x, y } = getCanvasCoords(e);
+    const last = lastPointRef.current || { x, y };
 
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
@@ -324,30 +442,29 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
 
     if (tool === 'eraser') {
       ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
       ctx.lineTo(x, y);
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x, y);
     } else if (tool === 'rainbow') {
-      rainbowHueRef.current = (rainbowHueRef.current + 8) % 360;
+      rainbowHueRef.current = (rainbowHueRef.current + 5) % 360;
       ctx.strokeStyle = `hsl(${rainbowHueRef.current}, 95%, 52%)`;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
       ctx.lineTo(x, y);
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x, y);
     } else if (tool === 'glitter') {
-      // Glitter starlight stroke
       ctx.strokeStyle = '#facc15';
       ctx.shadowColor = '#eab308';
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
       ctx.lineTo(x, y);
       ctx.stroke();
       ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
 
-      // Random sparkle dots around path
-      if (Math.random() > 0.4) {
+      // Sparkles
+      if (Math.random() > 0.35) {
         const sparkX = x + (Math.random() - 0.5) * brushSize * 2.5;
         const sparkY = y + (Math.random() - 0.5) * brushSize * 2.5;
         ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#fde047';
@@ -357,11 +474,13 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
       }
     } else {
       ctx.strokeStyle = selectedColor;
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
       ctx.lineTo(x, y);
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x, y);
     }
+
+    lastPointRef.current = { x, y };
   };
 
   // Convert SVG coloring page to PNG Data URL for saving
@@ -549,44 +668,95 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
       {/* ================= MODE 1: COLORING BOOK ================= */}
       {mode === 'coloring' && (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Quick Categories Bar (Slim, Smooth Horizontal Scroll) */}
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 shrink-0">
-            {COLORING_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => {
-                  setSelectedCategory(cat.id);
-                  setSelectedPageIndex(0);
-                  SFX.pop();
-                }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-xl whitespace-nowrap text-[11px] sm:text-xs font-black transition-all cursor-pointer min-h-[32px] sm:min-h-[34px] shrink-0 ${
-                  selectedCategory === cat.id
-                    ? 'bg-emerald-600 text-white shadow-2xs scale-102'
-                    : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
-                }`}
-              >
-                <span>{cat.emoji}</span>
-                <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
-              </button>
-            ))}
+          {/* Quick Categories Bar (Slideable with clear visual indicator & chevrons) */}
+          <div className="py-1 shrink-0">
+            <SlideScrollContainer
+              showScrollbar={true}
+              showChevrons={true}
+              gradientColor="from-[#d4eeff]"
+            >
+              {COLORING_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setSelectedPageIndex(0);
+                    SFX.pop();
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap text-[11px] sm:text-xs font-black transition-all cursor-pointer min-h-[34px] shrink-0 ${
+                    selectedCategory === cat.id
+                      ? 'bg-emerald-600 text-white shadow-2xs scale-102'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs'
+                  }`}
+                >
+                  <span>{cat.emoji}</span>
+                  <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
+                </button>
+              ))}
+            </SlideScrollContainer>
           </div>
 
           {/* Responsive Split View: Portrait (Stacked) vs Landscape/Tablet (Side-by-Side) */}
           <div className="flex-1 flex flex-col md:flex-row landscape:flex-row gap-2 sm:gap-2.5 min-h-0 overflow-hidden mt-1">
             {/* STAGE A: CANVAS BOARD (FLEXIBLE HEIGHT & WIDTH) */}
             <div className="flex-1 relative flex items-center justify-center bg-white rounded-3xl border-2 sm:border-3 border-slate-200/90 shadow-sm p-2 sm:p-3 overflow-hidden touch-none select-none min-h-[220px]">
-              {/* Daily Challenge Star Badge */}
-              {isDailyChallenge && (
-                <div className="absolute top-2.5 left-2.5 z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-xs">
-                  <Star className="w-3 h-3 fill-current text-yellow-200" />
-                  <span>{lang === 'id' ? 'Tantangan Hari Ini!' : 'Daily Challenge!'}</span>
-                </div>
-              )}
+              {/* CONTOH DESAIN SUDAH DIWARNAI DI UJUNG GAMBAR DENGAN JUDUL DI BAWAHNYA */}
+              <div
+                className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 z-20 flex flex-col items-center bg-white/95 backdrop-blur-md p-1 sm:p-1.5 rounded-2xl border-2 border-emerald-400 shadow-md select-none group"
+                title={lang === 'id' ? 'Contoh Desain yang Sudah Diwarnai (Ketuk untuk memperbesar)' : 'Sample Colored Design (Tap to enlarge)'}
+              >
+                {/* Thumbnail Gambar Contoh Desain yang Sudah Diwarnai */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    SFX.ding();
+                    setShowSampleModal(true);
+                  }}
+                  className="relative w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-xl overflow-hidden flex items-center justify-center p-1 border border-emerald-200/90 shadow-2xs cursor-pointer active:scale-95 transition-transform"
+                  aria-label="Lihat Contoh Desain"
+                >
+                  <svg viewBox={activePage.viewBox} className="w-full h-full pointer-events-none filter drop-shadow-2xs">
+                    {activePage.parts.map((part) => (
+                      <path
+                        key={part.id}
+                        d={part.d}
+                        fill={getSampleColorForPart(activePage.id, part.id)}
+                        stroke="#1e293b"
+                        strokeWidth="2.8"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    ))}
+                  </svg>
+                  <span className="absolute top-0.5 right-0.5 text-[7.5px] sm:text-[9px] bg-emerald-600 text-white font-black px-1 rounded-sm shadow-2xs leading-tight">
+                    IDE
+                  </span>
+                </button>
 
-              {/* Progress Count Badge */}
-              <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 bg-slate-100/90 backdrop-blur-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl text-[10px] sm:text-[11px] font-black text-slate-700 border border-slate-200/90 shadow-2xs">
-                <span>{currentCompletedCount} / {activePage.parts.length}</span>
-                {isCurrentPageFinished && <span className="text-emerald-600">🎉 Selesai!</span>}
+                {/* JUDUL DIBAWAH GAMBAR CONTOH */}
+                <div className="mt-1 text-center max-w-[62px] sm:max-w-[78px] md:max-w-[95px] leading-tight">
+                  <span className="text-[8px] sm:text-[9px] font-black text-emerald-800 uppercase tracking-tight block">
+                    {lang === 'id' ? 'Contoh Desain' : 'Design Sample'}
+                  </span>
+                  <span className="text-[7.5px] sm:text-[8.5px] font-extrabold text-slate-700 truncate block mt-0.5" title={lang === 'id' ? activePage.nameId : activePage.nameEn}>
+                    {lang === 'id' ? activePage.nameId : activePage.nameEn}
+                  </span>
+                </div>
+              </div>
+
+              {/* Badges di Pojok Kanan Atas (Tantangan & Progres Bagian) */}
+              <div className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 z-10 flex items-center gap-1.5">
+                {isDailyChallenge && (
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl text-[10px] sm:text-[11px] font-black flex items-center gap-1 shadow-xs">
+                    <Star className="w-3 h-3 fill-current text-yellow-200" />
+                    <span>{lang === 'id' ? 'Tantangan!' : 'Daily!'}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1 bg-slate-100/90 backdrop-blur-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl text-[10px] sm:text-[11px] font-black text-slate-700 border border-slate-200/90 shadow-2xs">
+                  <span>{currentCompletedCount} / {activePage.parts.length}</span>
+                  {isCurrentPageFinished && <span className="text-emerald-600">🎉</span>}
+                </div>
               </div>
 
               {/* Previous Page Arrow (Left) */}
@@ -661,10 +831,15 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
             <div className="w-full md:w-64 landscape:w-60 lg:w-72 bg-white p-2 sm:p-2.5 rounded-2xl sm:rounded-3xl border-2 border-slate-200/90 shadow-2xs flex flex-col justify-between shrink-0 overflow-y-auto no-scrollbar">
               {/* Palette Themes Switcher */}
               <div className="flex items-center justify-between gap-1 border-b border-slate-100 pb-1.5 mb-1">
-                <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wide">
-                  {lang === 'id' ? 'Pilih Palet:' : 'Palette:'}
+                <span className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wide shrink-0">
+                  {lang === 'id' ? 'Palet:' : 'Palette:'}
                 </span>
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                <SlideScrollContainer
+                  showScrollbar={false}
+                  showChevrons={true}
+                  gradientColor="from-white"
+                  className="flex-1 min-w-0"
+                >
                   {PALETTE_THEMES.map((theme, tIdx) => (
                     <button
                       key={theme.id}
@@ -674,7 +849,7 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                         setSelectedColorName(lang === 'id' ? theme.colors[0].nameId : theme.colors[0].nameEn);
                         SFX.bloop();
                       }}
-                      className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-[10px] font-black cursor-pointer transition-all shrink-0 ${
+                      className={`px-2.5 py-1 rounded-lg text-[10.5px] font-black cursor-pointer transition-all shrink-0 whitespace-nowrap ${
                         activePaletteIndex === tIdx
                           ? 'bg-emerald-600 text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -683,7 +858,7 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                       {theme.nameId.split(' ')[0]}
                     </button>
                   ))}
-                </div>
+                </SlideScrollContainer>
               </div>
 
               {/* Colors Grid (Large Touch Targets >= 42px) */}
@@ -833,9 +1008,9 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
             {/* Brush Sizes */}
             <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-xl">
               {[
-                { size: 6, label: 'Halus' },
-                { size: 12, label: 'Sedang' },
-                { size: 22, label: 'Tebal' },
+                { size: 8, label: 'Halus' },
+                { size: 16, label: 'Sedang' },
+                { size: 26, label: 'Tebal' },
               ].map((s) => (
                 <button
                   key={s.size}
@@ -843,8 +1018,8 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                     setBrushSize(s.size);
                     SFX.bloop();
                   }}
-                  className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[10px] sm:text-[11px] font-black cursor-pointer transition-all ${
-                    brushSize === s.size ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600'
+                  className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-[10.5px] sm:text-xs font-black cursor-pointer transition-all min-h-[30px] flex items-center justify-center ${
+                    brushSize === s.size ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   {s.label}
@@ -891,62 +1066,84 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
 
           {/* Sticker Bar if Tool is Sticker */}
           {tool === 'sticker' && (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 p-1.5 rounded-2xl mb-1 overflow-x-auto no-scrollbar shrink-0">
-              <span className="text-[11px] font-black text-amber-900 shrink-0">
-                {lang === 'id' ? 'Pilih Stiker:' : 'Stickers:'}
-              </span>
-              {currentStickerPack.stickers.map((stk) => (
-                <button
-                  key={stk}
-                  onClick={() => {
-                    setSelectedSticker(stk);
-                    SFX.pop();
-                  }}
-                  className={`text-xl sm:text-2xl p-1 rounded-xl cursor-pointer transition-transform shrink-0 ${
-                    selectedSticker === stk ? 'scale-120 bg-amber-200 ring-2 ring-amber-500' : 'hover:scale-110'
-                  }`}
-                >
-                  {stk}
-                </button>
-              ))}
+            <div className="bg-amber-50 border border-amber-200 p-1.5 rounded-2xl mb-1 shrink-0">
+              <div className="flex items-center justify-between px-1 mb-1">
+                <span className="text-[11px] font-black text-amber-900">
+                  {lang === 'id' ? 'Pilih Stiker:' : 'Stickers:'}
+                </span>
+                <span className="text-[9.5px] font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-md">
+                  ↔ Geser Stiker
+                </span>
+              </div>
+              <SlideScrollContainer
+                showScrollbar={true}
+                showChevrons={true}
+                gradientColor="from-amber-50"
+              >
+                {currentStickerPack.stickers.map((stk) => (
+                  <button
+                    key={stk}
+                    onClick={() => {
+                      setSelectedSticker(stk);
+                      SFX.pop();
+                    }}
+                    className={`text-xl sm:text-2xl p-1.5 rounded-xl cursor-pointer transition-transform shrink-0 ${
+                      selectedSticker === stk ? 'scale-120 bg-amber-200 ring-2 ring-amber-500 shadow-2xs' : 'hover:scale-110'
+                    }`}
+                  >
+                    {stk}
+                  </button>
+                ))}
+              </SlideScrollContainer>
             </div>
           )}
 
           {/* Color Bar if Brush */}
           {tool !== 'sticker' && tool !== 'eraser' && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-white px-2 py-1.5 rounded-2xl border border-slate-200/90 shadow-2xs shrink-0 mb-1">
-              <span className="text-[11px] font-black text-slate-700 shrink-0 pl-1">
-                {lang === 'id' ? 'Warna Kuas:' : 'Brush Color:'}
-              </span>
-              {currentPalette.colors.map((col) => (
-                <button
-                  key={col.hex}
-                  onClick={() => handleSelectColor(col.hex, col.nameId, col.nameEn)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0 cursor-pointer transition-transform ${
-                    selectedColor === col.hex ? 'scale-120 ring-3 ring-slate-900 shadow-2xs' : 'hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: col.hex }}
-                  aria-label={col.nameId}
-                  title={lang === 'id' ? col.nameId : col.nameEn}
-                />
-              ))}
+            <div className="bg-white px-2 py-1.5 rounded-2xl border border-slate-200/90 shadow-2xs shrink-0 mb-1">
+              <div className="flex items-center justify-between px-1 mb-1">
+                <span className="text-[11px] font-black text-slate-700">
+                  {lang === 'id' ? 'Warna Kuas:' : 'Brush Color:'}
+                </span>
+                <span className="text-[9.5px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                  ↔ Geser Pilihan Warna
+                </span>
+              </div>
+              <SlideScrollContainer
+                showScrollbar={true}
+                showChevrons={true}
+                gradientColor="from-white"
+              >
+                {currentPalette.colors.map((col) => (
+                  <button
+                    key={col.hex}
+                    onClick={() => handleSelectColor(col.hex, col.nameId, col.nameEn)}
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0 cursor-pointer transition-transform ${
+                      selectedColor === col.hex ? 'scale-115 ring-3 ring-slate-900 shadow-xs' : 'hover:scale-105 border border-slate-200'
+                    }`}
+                    style={{ backgroundColor: col.hex }}
+                    aria-label={col.nameId}
+                    title={lang === 'id' ? col.nameId : col.nameEn}
+                  />
+                ))}
+              </SlideScrollContainer>
             </div>
           )}
 
           {/* Interactive Responsive Canvas */}
           <div
             ref={canvasContainerRef}
-            className="flex-1 bg-white rounded-3xl border-2 sm:border-3 border-slate-300 shadow-sm overflow-hidden relative touch-none select-none flex items-center justify-center min-h-[220px]"
+            className="flex-1 bg-white rounded-3xl border-2 sm:border-3 border-slate-300 shadow-sm overflow-hidden relative touch-none select-none min-h-[260px] w-full"
           >
             <canvas
               ref={canvasRef}
-              width={900}
-              height={600}
               onPointerDown={startDrawing}
               onPointerMove={draw}
               onPointerUp={stopDrawing}
+              onPointerCancel={stopDrawing}
               onPointerLeave={stopDrawing}
-              className="w-full h-full object-contain cursor-crosshair bg-white"
+              className="w-full h-full block cursor-crosshair bg-white touch-none"
+              style={{ touchAction: 'none' }}
             />
           </div>
         </div>
@@ -978,24 +1175,26 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
             </div>
 
             {/* Filter Categories inside Catalog */}
-            <div className="p-2 sm:p-3 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {COLORING_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id);
-                    SFX.pop();
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap cursor-pointer transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                  }`}
-                >
-                  <span>{cat.emoji} </span>
-                  <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
-                </button>
-              ))}
+            <div className="p-2 sm:p-3 bg-slate-50 border-b border-slate-200">
+              <SlideScrollContainer showScrollbar={true} showChevrons={true} gradientColor="from-slate-50">
+                {COLORING_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      SFX.pop();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap cursor-pointer transition-all ${
+                      selectedCategory === cat.id
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    <span>{cat.emoji} </span>
+                    <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
+                  </button>
+                ))}
+              </SlideScrollContainer>
             </div>
 
             {/* Grid of Pages */}
@@ -1146,6 +1345,73 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black text-xs cursor-pointer"
               >
                 {lang === 'id' ? 'Tutup Galeri' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL CONTOH DESAIN PEMBESAR ================= */}
+      {showSampleModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-4 sm:p-5 shadow-2xl border-4 border-emerald-400 flex flex-col items-center text-center">
+            <div className="flex items-center justify-between w-full mb-1">
+              <span className="text-[11px] sm:text-xs font-black uppercase text-emerald-800 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                🎨 {lang === 'id' ? 'Contoh Desain Mewarnai' : 'Coloring Design Sample'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSampleModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Gambar Besar Contoh Desain yang Sudah Diwarnai */}
+            <div className="w-48 h-48 sm:w-56 sm:h-56 bg-emerald-50/70 rounded-2xl p-3 border-2 border-emerald-200 flex items-center justify-center my-2 shadow-inner">
+              <svg viewBox={activePage.viewBox} className="w-full h-full filter drop-shadow-md">
+                {activePage.parts.map((part) => (
+                  <path
+                    key={part.id}
+                    d={part.d}
+                    fill={getSampleColorForPart(activePage.id, part.id)}
+                    stroke="#1e293b"
+                    strokeWidth="2.8"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                ))}
+              </svg>
+            </div>
+
+            {/* Judul di Bawah Gambar Contoh */}
+            <h4 className="text-base sm:text-lg font-black text-slate-900 mt-1">
+              {lang === 'id' ? activePage.nameId : activePage.nameEn}
+            </h4>
+            <p className="text-xs text-slate-500 font-semibold mb-4 leading-relaxed">
+              {lang === 'id'
+                ? 'Contoh kombinasi warna yang sudah jadi. Si kecil bisa mewarnai sendiri atau meniru contoh ini!'
+                : 'Finished design idea. Your child can color freely or copy this sample!'}
+            </p>
+
+            {/* Tombol Aksi */}
+            <div className="flex items-center gap-2 w-full">
+              <button
+                type="button"
+                onClick={handleApplySampleColors}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+                <span>{lang === 'id' ? 'Tiru Warna Ini' : 'Use These Colors'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSampleModal(false)}
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm cursor-pointer"
+              >
+                {lang === 'id' ? 'Tutup' : 'Close'}
               </button>
             </div>
           </div>

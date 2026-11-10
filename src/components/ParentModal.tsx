@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SFX, playAnimalSound, speakText } from '../utils/audio';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -41,34 +42,64 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   // Anchor ke LP Scalev via domain resmi walipintar.my.id/beli
   const SHARE_URL = 'https://walipintar.my.id/beli';
 
-  const shareText =
-    'Halo Ayah & Bunda! Saya mau rekomendasikan game edukasi anak yang sangat bagus untuk si kecil: Wali Pintar 🌱. Isinya 17 game belajar interaktif usia 2-8 tahun, 100% bebas iklan & bisa offline tanpa kuota internet. Yuk ajak anak-anak kita pintar bersama! Cek penawaran resminya di sini: ' +
-    SHARE_URL;
+  // POV Orang Tua (Ayah / Bunda) yang ramah & tulus sharing ke kerabat/tetangga (bukan hard selling)
+  const shareTextWa =
+    `Halo bunda-bunda dan kerabat tercinta! 👋😊\n\n` +
+    `Mau sedikit cerita nih, akhir-akhir ini si kecil di rumah lagi senang dan anteng banget main game edukasi "Wali Pintar" 🌱.\n\n` +
+    `Jujur yang bikin saya tenang banget sebagai orang tua:\n` +
+    `✨ 100% Bebas Iklan – Aman banget, nggak khawatir si kecil kepencet iklan atau tontonan aneh.\n` +
+    `✨ Bisa Dimainkan OFFLINE – Nggak butuh kuota internet sama sekali, jadi hemat kuota dan aman dimainkan di mana aja (pas di jalan atau lagi kumpul keluarga).\n` +
+    `✨ Pas Banget Buat Usia 3–8 Tahun – Ada mewarnai kreatif, belajar huruf & angka, tebak hewan, suara binatang, sampai puzzle seru.\n\n` +
+    `Anak-anak jadi senang karena rasanya kayak main biasa, padahal sebenarnya lagi mengasah motorik dan kosakata baru tanpa bikin kecanduan gadget berlebihan.\n\n` +
+    `Kalau bunda atau kerabat lagi cari alternatif kegiatan positif buat si kecil di rumah, coba intip infonya di sini ya:\n` +
+    `${SHARE_URL}\n\n` +
+    `Semoga infonya bermanfaat buat buah hati kita bersama ya! 🥰🌱`;
+
+  const shareTextFb =
+    `Sharing info sesama orang tua yang punya anak usia 3–8 tahun! 👋😊\n\n` +
+    `Akhir-akhir ini si kecil di rumah lagi suka banget main game edukasi "Wali Pintar" 🌱. Yang bikin saya suka dan tenang:\n` +
+    `1. 100% Bebas Iklan (nggak khawatir ada konten dewasa/iklan aneh muncul)\n` +
+    `2. Bisa dimainkan OFFLINE tanpa kuota internet\n` +
+    `3. Isinya lengkap buat melatih motorik, mewarnai, huruf, angka, dan tebak suara binatang\n\n` +
+    `Cocok banget jadi alternatif aktivitas screen-time yang mendidik dan aman buat anak.\n\n` +
+    `Kalau mau intip atau lihat infonya, tautannya ada di sini ya: ${SHARE_URL}`;
 
   const handleShareWhatsApp = () => {
     SFX.ding();
-    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareTextWa)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleShareFacebook = () => {
+  const handleShareFacebook = async () => {
     SFX.ding();
-    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SHARE_URL)}`;
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareTextFb);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2500);
+      }
+    } catch {
+      // ignore
+    }
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SHARE_URL)}&quote=${encodeURIComponent(shareTextFb)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleShareInstagramCopy = async () => {
     SFX.ding();
+    const igText =
+      `Rekomendasi game edukasi anak usia 3–8 tahun yang aman & positif dari sesama orang tua 🌱\n` +
+      `100% Bebas Iklan & Siap Main Offline tanpa kuota internet: ${SHARE_URL}`;
     try {
       if (navigator.clipboard) {
-        await navigator.clipboard.writeText(SHARE_URL);
+        await navigator.clipboard.writeText(igText);
         setLinkCopied(true);
         setTimeout(() => setLinkCopied(false), 2500);
       } else {
-        prompt('Salin link untuk dibagikan di Instagram Story/DM:', SHARE_URL);
+        prompt('Salin pesan cerita rekomendasi orang tua untuk Instagram Story/DM:', igText);
       }
     } catch {
-      prompt('Salin link untuk dibagikan di Instagram Story/DM:', SHARE_URL);
+      prompt('Salin pesan cerita rekomendasi orang tua untuk Instagram Story/DM:', igText);
     }
   };
 
@@ -217,7 +248,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                Bantu anak-anak sekitar bermain game edukasi yang 100% bebas iklan dan bisa dimainkan offline tanpa kuota internet!
+                Bagikan pengalaman positif Anda ke sesama orang tua atau keluarga. Pesan telah disusun hangat dari sudut pandang seorang ibu/ayah yang ingin anak-anak usia 3–8 tahun sekitar bermain game edukatif yang aman, bebas iklan, dan siap offline!
               </p>
 
               {/* Grid 4 Tombol Share: Share WA, Share FB, Share IG, QR Web Walipintar */}
@@ -229,7 +260,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   className="py-2.5 px-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
                   title="Bagikan ke WhatsApp Tetangga & Kerabat"
                 >
-                  <span className="text-base">💬</span>
+                  <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
                   <span>Share WA</span>
                 </button>
 

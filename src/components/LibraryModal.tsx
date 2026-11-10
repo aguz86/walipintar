@@ -3,6 +3,7 @@ import { X, Volume2, Sparkles, Search } from 'lucide-react';
 import { ANIMALS, FRUITS, VEGGIES, PLANTS, VEHICLES, SHAPE_ITEMS, GameItem, ALL_ITEMS } from '../data/items';
 import { ItemIcon } from './ItemIcon';
 import { SFX, playAnimalSound, speakText, hasAnimalSound } from '../utils/audio';
+import { SlideScrollContainer } from './SlideScrollContainer';
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -139,7 +140,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
           </div>
 
           {/* Categories Tab Strip */}
-          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+          <SlideScrollContainer showScrollbar={true} showChevrons={true} gradientColor="from-white">
             {CATEGORIES.map((cat, idx) => (
               <button
                 key={cat.id}
@@ -165,7 +166,7 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
                 </span>
               </button>
             ))}
-          </div>
+          </SlideScrollContainer>
         </div>
 
         {/* Items Grid with Zero Book Placeholders */}

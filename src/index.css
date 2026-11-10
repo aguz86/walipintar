@@ -64,3 +64,38 @@
 .animate-scale-up {
   animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Slide Indicator & Affordance Utilities */
+@keyframes slideHintBounce {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+
+.animate-slide-hint {
+  animation: slideHintBounce 1.5s ease-in-out infinite;
+}
+
+/* Custom styled horizontal slide scrollbar - clearly shows as a slideable list */
+.slide-scrollbar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.5) rgba(226, 232, 240, 0.6);
+}
+.slide-scrollbar::-webkit-scrollbar {
+  height: 5px;
+}
+.slide-scrollbar::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.6);
+  border-radius: 999px;
+  margin: 0 4px;
+}
+.slide-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.5);
+  border-radius: 999px;
+}
+.slide-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.8);
+}

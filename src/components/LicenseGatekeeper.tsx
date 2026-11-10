@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, MessageCircle, AlertTriangle, X, CheckCircle2, Loader2, KeyRound } from 'lucide-react';
 import { SFX, unlockAudio } from '../utils/audio';
+import { WhatsAppIcon } from './WhatsAppIcon';
 
 interface LicenseGatekeeperProps {
   onUnlock: (licenseKey: string) => void;
@@ -495,13 +496,13 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         <div className="mt-5 space-y-2 text-xs font-bold text-slate-600">
           <div>
             <a
-              href="/beli"
+              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
               <span>🛒</span>
-              <span>Belum Punya Lisensi? Beli Lisensi Resmi (Rp 110.000)</span>
+              <span>Belum Punya Lisensi? Beli Lisensi Resmi di Scalev</span>
             </a>
           </div>
 
@@ -512,7 +513,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
-              <span>💬</span>
+              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
               <span>Butuh Bantuan? Hubungi WhatsApp Admin (085704808186)</span>
             </a>
           </div>
@@ -684,12 +685,12 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
                 <div className="space-y-2.5">
                   <a
-                    href="/beli"
+                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/checkout-flow-baru-1?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/checkout-flow-baru-1'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 cursor-pointer transition-all active:scale-98"
                   >
-                    <span>🛒 Beli Lisensi Resmi Sekarang</span>
+                    <span>🛒 Beli Lisensi Resmi di Scalev</span>
                     <span>➔</span>
                   </a>
 
@@ -709,7 +710,8 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-1.5 text-[11.5px] text-slate-500 hover:text-emerald-700 underline transition-colors pt-1"
                   >
-                    <span>Sudah bayar dengan email lain? Chat Admin</span>
+                    <WhatsAppIcon className="w-3.5 h-3.5 shadow-2xs rounded-full" />
+                    <span>Sudah bayar dengan email lain? Chat WhatsApp Admin</span>
                   </a>
                 </div>
               </>
@@ -745,7 +747,8 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                     rel="noopener noreferrer"
                     className="w-full py-2.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
                   >
-                    <span>💬 WhatsApp Admin (0857-0480-8186)</span>
+                    <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+                    <span>WhatsApp Admin (0857-0480-8186)</span>
                   </a>
 
                   <button
@@ -789,19 +792,20 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                 href="https://wa.me/6285704808186?text=Halo%20Admin%20Wali%20Pintar%2C%20saya%20mengalami%20kendala%20lisensi%20tidak%20bisa%20diaktifkan"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+                className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
               >
-                <span>💬 Hubungi Admin WhatsApp (085704808186)</span>
+                <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+                <span>Hubungi Admin WhatsApp (085704808186)</span>
               </a>
 
               {/* Beli Lisensi Resmi */}
               <a
-                href="/beli"
+                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
               >
-                <span>🛒 Beli Lisensi Resmi</span>
+                <span>🛒 Beli Lisensi Resmi di Scalev</span>
               </a>
 
               {/* Coba Lagi */}
