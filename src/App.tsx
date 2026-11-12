@@ -37,7 +37,7 @@ import { OrderGame } from './games/OrderGame';
 import { MonsterGame } from './games/MonsterGame';
 import { AlphabetPhonicsGame } from './games/AlphabetPhonicsGame';
 import { ColoringDrawingGame } from './games/ColoringDrawingGame';
-import { SFX, speakText, unlockAudio } from './utils/audio';
+import { SFX, speakText, unlockAudio, stopSpeaking } from './utils/audio';
 import { SlideScrollContainer } from './components/SlideScrollContainer';
 
 interface UserData {
@@ -326,6 +326,7 @@ export default function App() {
   const totalStars = Object.values(data.bestScores).reduce((a, b) => a + b, 0);
 
   const handleSelectCategory = (cat: 'educational' | 'coloring' | 'alphabet') => {
+    stopSpeaking();
     unlockAudio();
     SFX.fanfare();
     setMainCategory(cat);
@@ -334,6 +335,7 @@ export default function App() {
   };
 
   const handleStartGame = (gameId: string) => {
+    stopSpeaking();
     unlockAudio();
     SFX.bloop();
     setActiveGameId(gameId);
@@ -383,17 +385,20 @@ export default function App() {
   };
 
   const handlePlayAgain = () => {
+    stopSpeaking();
     setVictoryData(null);
     SFX.bloop();
   };
 
   const handleBackToHome = () => {
+    stopSpeaking();
     setActiveGameId(null);
     setVictoryData(null);
     SFX.bloop();
   };
 
   const handleBackToCategories = () => {
+    stopSpeaking();
     setActiveGameId(null);
     setMainCategory(null);
     setVictoryData(null);

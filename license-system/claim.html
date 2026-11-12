@@ -658,7 +658,7 @@
       </button>
 
       <a href="https://walipintar.myscalev.com/checkout-flow-baru-1" target="_blank" class="btn-secondary" id="btnScalevPay" style="background: #fef3c7; border-color: #fde68a; color: #92400e; font-weight: 800; display:flex; align-items:center; justify-content:center; gap:6px;">
-        <span>🛒 Beli Lisensi Resmi di Scalev</span>
+        <span>🛒 Beli Lisensi Sekarang</span>
       </a>
 
       <a href="https://wa.me/6285704808186" target="_blank" class="btn-wa-modal" id="btnUnpaidWa" style="display:flex;align-items:center;justify-content:center;gap:6px;">
@@ -810,7 +810,7 @@
 
           if (isNotOrdered) {
             document.getElementById('unpaidTitle').innerHTML = 'email kamu belum pernah order, ayo beli dulu';
-            unpaidMessageText.textContent = `Email ${email} belum pernah terdaftar di transaksi pembelian. Silakan selesaikan pembelian lisensi resmi di Scalev untuk mulai bermain!`;
+            unpaidMessageText.textContent = `Email ${email} belum pernah terdaftar di transaksi pembelian. Silakan selesaikan pembelian lisensi resmi sekarang untuk mulai bermain!`;
           } else if (data && data.message) {
             unpaidMessageText.textContent = data.message.replace(/^AKSES DITOLAK:\s*/i, '');
           } else {

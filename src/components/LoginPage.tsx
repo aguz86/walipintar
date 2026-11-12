@@ -318,7 +318,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
               <span>🛒</span>
-              <span>Belum Punya Lisensi? Beli Lisensi Resmi di Scalev</span>
+              <span>Belum Punya Lisensi? Beli Lisensi Sekarang</span>
             </a>
           </div>
 

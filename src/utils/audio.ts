@@ -441,7 +441,14 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
     };
 
     utterance.onend = done;
-    utterance.onerror = done;
+    utterance.onerror = (e) => {
+      // Jika speech dibatalkan (misal user keluar menu), jangan lanjutkan callback onEnd
+      if (e?.error === 'canceled' || e?.error === 'interrupted') {
+        finished = true;
+        return;
+      }
+      done();
+    };
 
     setTimeout(() => {
       try {
@@ -452,8 +459,25 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
       }
     }, 60);
 
-    setTimeout(done, 6000);
+    setTimeout(() => {
+      if (!finished && !window.speechSynthesis.speaking) {
+        done();
+      }
+    }, 6000);
   } catch {
     onEnd?.();
+  }
+}
+
+/**
+ * Menghentikan seluruh pemutaran suara / Text-to-Speech secara instan
+ */
+export function stopSpeaking(): void {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // Ignore
+    }
   }
 }

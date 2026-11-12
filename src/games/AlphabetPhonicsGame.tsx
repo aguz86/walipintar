@@ -26,7 +26,7 @@ import {
   AlphabetItem,
   WordBuilderItem,
 } from '../data/alphabet';
-import { SFX, speakText, unlockAudio } from '../utils/audio';
+import { SFX, speakText, stopSpeaking, unlockAudio } from '../utils/audio';
 import { SlideScrollContainer } from '../components/SlideScrollContainer';
 
 interface AlphabetPhonicsGameProps {
@@ -68,6 +68,7 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
 
   // Auto-play Karaoke A-Z state
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const isAutoPlayingRef = useRef(false);
   const autoPlayIndexRef = useRef(0);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -288,14 +289,54 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
   const [traceColor, setTraceColor] = useState('#ef4444');
   const [traceCleared, setTraceCleared] = useState(0);
 
-  // Cleanup auto-play on unmount
+  // Stop auto-play and all speech immediately
+  const stopAutoPlay = () => {
+    isAutoPlayingRef.current = false;
+    setIsAutoPlaying(false);
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+    stopSpeaking();
+    setPlayingLetter(null);
+  };
+
+  // Handler saat user menekan tombol Kembali keluar dari menu
+  const handleExit = () => {
+    stopAutoPlay();
+    stopSpeaking();
+    onBack();
+  };
+
+  // Cleanup auto-play dan seluruh suara saat unmount / keluar menu
   useEffect(() => {
     return () => {
+      isAutoPlayingRef.current = false;
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      stopSpeaking();
+    };
+  }, []);
+
+  // Pastikan seluruh suara & auto-play A-Z otomatis berhenti jika pengguna berpindah dari tab Kartu A-Z
+  useEffect(() => {
+    if (activeTab !== 'cards') {
+      stopAutoPlay();
+      stopSpeaking();
+    }
+  }, [activeTab]);
+
+  // Hentikan suara jika browser / tab HP diminimize atau beralih aplikasi
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopAutoPlay();
+        stopSpeaking();
       }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -324,6 +365,11 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
   // Play audio for a letter
   const handlePlayLetter = (item: AlphabetItem, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    // Jika sedang auto-play lagu A-Z, hentikan dulu
+    if (isAutoPlayingRef.current) {
+      stopAutoPlay();
+    }
+    stopSpeaking();
     unlockAudio();
     SFX.pop();
     setPlayingLetter(item.letter);
@@ -342,32 +388,20 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
   };
 
   // Auto Play A-Z Sequence (Karaoke)
-  const stopAutoPlay = () => {
-    setIsAutoPlaying(false);
-    if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setPlayingLetter(null);
-  };
-
-  // Pastikan lagu/suara A-Z otomatis berhenti jika pengguna berpindah dari tab Kartu A-Z
-  useEffect(() => {
-    if (activeTab !== 'cards' && isAutoPlaying) {
-      stopAutoPlay();
-    }
-  }, [activeTab, isAutoPlaying]);
-
   const startAutoPlay = () => {
+    stopSpeaking();
     unlockAudio();
     SFX.ding();
+    isAutoPlayingRef.current = true;
     setIsAutoPlaying(true);
     autoPlayIndexRef.current = 0;
     playNextInSequence();
   };
 
   const playNextInSequence = () => {
+    if (!isAutoPlayingRef.current) return;
     if (autoPlayIndexRef.current >= ALPHABET_LIST.length) {
+      isAutoPlayingRef.current = false;
       setIsAutoPlaying(false);
       setPlayingLetter(null);
       SFX.fanfare();
@@ -389,8 +423,10 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
         : `${currentItem.letter}... is for ${currentItem.wordEn}!`;
 
     speakText(phrase, lang, () => {
+      if (!isAutoPlayingRef.current) return;
       autoPlayIndexRef.current += 1;
       autoPlayTimerRef.current = setTimeout(() => {
+        if (!isAutoPlayingRef.current) return;
         playNextInSequence();
       }, 500);
     });
@@ -602,7 +638,7 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
       {/* Top Header Bar */}
       <div className="flex items-center justify-between gap-2 mb-2 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-xs">
         <button
-          onClick={onBack}
+          onClick={handleExit}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs md:text-sm cursor-pointer transition-colors"
           aria-label="Kembali"
         >

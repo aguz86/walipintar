@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check } from 'lucide-react';
+import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check, Download, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SFX, playAnimalSound, speakText } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -36,6 +36,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [soundTestResult, setSoundTestResult] = useState('');
   const [showQrModal, setShowQrModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [qrDownloading, setQrDownloading] = useState(false);
+  const [qrDownloaded, setQrDownloaded] = useState(false);
 
   const OFFICIAL_DOMAIN = 'https://walipintar.my.id';
   const LP_SCALEV_URL = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
@@ -100,6 +102,127 @@ export const ParentModal: React.FC<ParentModalProps> = ({
       }
     } catch {
       prompt('Salin pesan cerita rekomendasi orang tua untuk Instagram Story/DM:', igText);
+    }
+  };
+
+  const handleDownloadQR = async () => {
+    try {
+      setQrDownloading(true);
+      const svgElement = document.getElementById('walipintar-qr-svg') as SVGSVGElement | null;
+      if (!svgElement) throw new Error('SVG QR element tidak ditemukan');
+
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+
+      const qrImg = new Image();
+      qrImg.crossOrigin = 'anonymous';
+
+      await new Promise<void>((resolve, reject) => {
+        qrImg.onload = () => resolve();
+        qrImg.onerror = () => reject(new Error('Gagal memuat gambar QR'));
+        qrImg.src = blobURL;
+      });
+
+      // Canvas dimensi HD (600 x 780 px)
+      const canvas = document.createElement('canvas');
+      const width = 600;
+      const height = 780;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context gagal diinisialisasi');
+
+      // 1. Background Kartu Putih Bersih
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+
+      // Garis Aksen Hijau Emerald di Atas
+      ctx.fillStyle = '#10B981';
+      ctx.fillRect(0, 0, width, 18);
+
+      // 2. Header Wali Pintar
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#065F46';
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText('Wali Pintar 🌱', width / 2, 75);
+
+      ctx.fillStyle = '#334155';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('Game Edukasi Anak 3–8 Tahun (Bebas Iklan)', width / 2, 112);
+
+      ctx.fillStyle = '#64748B';
+      ctx.font = '15px sans-serif';
+      ctx.fillText('Arahkan kamera smartphone Anda ke kode QR berikut:', width / 2, 145);
+
+      // 3. Kotak QR Code di Tengah (Jernih & Tanpa Tertutup Apapun)
+      const qrBoxSize = 400;
+      const qrBoxX = (width - qrBoxSize) / 2;
+      const qrBoxY = 170;
+
+      // Container background QR
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(qrBoxX - 12, qrBoxY - 12, qrBoxSize + 24, qrBoxSize + 24);
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(qrBoxX - 12, qrBoxY - 12, qrBoxSize + 24, qrBoxSize + 24);
+
+      // Gambar QR Code (tidak boleh tertutup apapun)
+      ctx.drawImage(qrImg, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize);
+
+      URL.revokeObjectURL(blobURL);
+
+      // 4. Footer Watermark Link (tepat di bawah QR, tidak menutupi QR sama sekali)
+      const footerY = 635;
+
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(50, footerY);
+      ctx.lineTo(width - 50, footerY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748B';
+      ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('Pindai Kamera Smartphone atau Kunjungi Link:', width / 2, footerY + 30);
+
+      // Watermark link badge
+      const badgeW = 360;
+      const badgeH = 48;
+      const badgeX = (width - badgeW) / 2;
+      const badgeY = footerY + 42;
+
+      ctx.fillStyle = '#ECFDF5';
+      ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+      ctx.strokeStyle = '#10B981';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+
+      ctx.fillStyle = '#065F46';
+      ctx.font = 'bold 23px monospace';
+      ctx.fillText('walipintar.my.id/beli', width / 2, badgeY + 32);
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '13px sans-serif';
+      ctx.fillText('100% Aman • Bebas Iklan • Siap Dimainkan Offline', width / 2, height - 20);
+
+      // 5. Unduh otomatis file PNG
+      const dataUrl = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = dataUrl;
+      downloadLink.download = 'QR_WaliPintar_Edukasi.png';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      SFX.pop();
+      setQrDownloaded(true);
+      setTimeout(() => setQrDownloaded(false), 3000);
+    } catch (err) {
+      console.error('Gagal mengunduh QR:', err);
+    } finally {
+      setQrDownloading(false);
     }
   };
 
@@ -319,7 +442,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   rel="noopener noreferrer"
                   className="text-emerald-700 hover:text-emerald-900 font-extrabold flex items-center gap-1 shrink-0 hover:underline"
                 >
-                  <span>Anchor LP Scalev</span>
+                  <span>Beli Lisensi Resmi</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
@@ -446,15 +569,25 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                 Arahkan kamera smartphone tetangga & kerabat Anda ke kode ini
               </p>
 
-              {/* KOTAK QR CODE SVG HASIL GENERATE VECTOR (100% OFFLINE CAPABLE) */}
+              {/* KOTAK QR CODE SVG HASIL GENERATE VECTOR (100% OFFLINE CAPABLE) DENGAN FOOTER WATERMARK LINK */}
               <div className="bg-white p-3.5 rounded-2xl border-2 border-slate-200 shadow-inner inline-block mx-auto mb-3">
                 <QRCodeSVG
+                  id="walipintar-qr-svg"
                   value={SHARE_URL}
                   size={180}
                   level="H"
                   includeMargin={false}
                   className="mx-auto"
                 />
+                {/* FOOTER WATERMARK LINK - TEPAT DI BAWAH QR, TIDAK MENUTUPI QR CODE */}
+                <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col items-center justify-center">
+                  <span className="text-[9.5px] font-bold text-slate-400 tracking-wider uppercase">
+                    Pindai atau Kunjungi:
+                  </span>
+                  <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 mt-0.5 shadow-2xs">
+                    walipintar.my.id/beli
+                  </span>
+                </div>
               </div>
 
               <div className="bg-emerald-50 rounded-xl p-2.5 border border-emerald-200 text-[11px] text-emerald-950 font-bold mb-3 leading-snug text-left">
@@ -465,17 +598,42 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   {SHARE_URL}
                 </div>
                 <p className="text-[10px] text-emerald-700 font-medium mt-1">
-                  *Otomatis mengarah ke halaman pemesanan resmi (LP Scalev)
+                  *Otomatis mengarah ke halaman pemesanan resmi
                 </p>
               </div>
 
               <div className="space-y-2">
+                {/* TOMBOL UNDUH / DOWNLOAD GAMBAR QR (DENGAN FOOTER WATERMARK) */}
+                <button
+                  type="button"
+                  onClick={handleDownloadQR}
+                  disabled={qrDownloading}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/25 cursor-pointer transition-all active:scale-98 disabled:opacity-75"
+                >
+                  {qrDownloading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Menyiapkan Gambar QR...</span>
+                    </>
+                  ) : qrDownloaded ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-200" />
+                      <span>✅ QR Berhasil Diunduh!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>Unduh Gambar QR</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleShareInstagramCopy}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all active:scale-98"
+                  className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-all active:scale-98"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-3.5 h-3.5 text-slate-500" />
                   <span>{linkCopied ? '✅ Tautan Tersalin!' : 'Salin Tautan Web'}</span>
                 </button>
 
@@ -485,8 +643,8 @@ export const ParentModal: React.FC<ParentModalProps> = ({
                   rel="noopener noreferrer"
                   className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-colors"
                 >
-                  <span>Buka Halaman LP Scalev</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Buka Halaman Pembelian</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                 </a>
 
                 <a

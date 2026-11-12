@@ -244,7 +244,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
             >
               <span>🛒</span>
-              <span>Belum Membeli? Selesaikan Pembayaran di Scalev</span>
+              <span>Belum Punya Lisensi? Beli Lisensi Sekarang</span>
             </a>
           </div>
 
@@ -367,7 +367,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 cursor-pointer transition-all active:scale-98"
                   >
-                    <span>🛒 Beli Lisensi Resmi di Scalev</span>
+                    <span>🛒 Beli Lisensi Sekarang</span>
                     <span>➔</span>
                   </a>
 
