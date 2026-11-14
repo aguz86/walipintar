@@ -40,7 +40,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   const [qrDownloaded, setQrDownloaded] = useState(false);
 
   const OFFICIAL_DOMAIN = 'https://walipintar.my.id';
-  const LP_SCALEV_URL = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
+  const LP_SCALEV_URL = 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia';
   // Anchor ke LP Scalev via domain resmi walipintar.my.id/beli
   const SHARE_URL = 'https://walipintar.my.id/beli';
 

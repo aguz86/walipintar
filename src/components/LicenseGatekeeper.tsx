@@ -496,7 +496,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         <div className="mt-5 space-y-2 text-xs font-bold text-slate-600">
           <div>
             <a
-              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+              href="https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
@@ -685,7 +685,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
                 <div className="space-y-2.5">
                   <a
-                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/checkout-flow-baru-1?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/checkout-flow-baru-1'}
+                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 cursor-pointer transition-all active:scale-98"
@@ -800,7 +800,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
               {/* Beli Lisensi Resmi */}
               <a
-                href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+                href="https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"

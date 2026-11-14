@@ -187,7 +187,7 @@ export default function App() {
 
     // External Redirects
     if (p === '/beli' || p === '/beli/' || p === '/checkout' || p === '/checkout/') {
-      window.location.href = 'https://walipintar.myscalev.com/checkout-flow-baru-1';
+      window.location.href = 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia';
       return;
     }
 

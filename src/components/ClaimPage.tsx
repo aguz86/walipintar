@@ -30,7 +30,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     document.title = 'Klaim Lisensi Pembelian - Wali Pintar';
   }, []);
 
-  // Check URL parameters for email
+  // Check URL parameters for email & optional order metadata from Thank You Page redirect
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -58,7 +58,19 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     setIsLoading(true);
 
     try {
-      const apiUrl = `${GAS_API_URL}?action=create&email=${encodeURIComponent(cleanEmail)}`;
+      const urlParams = new URLSearchParams(window.location.search);
+      const query = new URLSearchParams({
+        action: 'create',
+        email: cleanEmail,
+      });
+      const orderIdParam = urlParams.get('order_id') || urlParams.get('orderId') || urlParams.get('refId') || '';
+      const namaParam = urlParams.get('nama') || urlParams.get('name') || urlParams.get('customer_name') || '';
+      const produkParam = urlParams.get('produk') || urlParams.get('product') || urlParams.get('product_name') || '';
+      if (orderIdParam && !orderIdParam.startsWith('{')) query.set('order_id', orderIdParam.trim());
+      if (namaParam && !namaParam.startsWith('{')) query.set('nama', namaParam.trim());
+      if (produkParam && !produkParam.startsWith('{')) query.set('produk', produkParam.trim());
+
+      const apiUrl = `${GAS_API_URL}?${query.toString()}`;
       const res = await fetch(apiUrl);
       const data = await res.json();
       setIsLoading(false);
@@ -238,7 +250,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
           <div>
             <a
-              href="https://walipintar.myscalev.com/checkout-flow-baru-1"
+              href="https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
@@ -362,7 +374,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
                 <div className="space-y-2.5">
                   <a
-                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/checkout-flow-baru-1?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/checkout-flow-baru-1'}
+                    href={unpaidModalData.email ? `https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia?email=${encodeURIComponent(unpaidModalData.email)}` : 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 cursor-pointer transition-all active:scale-98"
