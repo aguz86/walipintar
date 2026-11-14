@@ -6,13 +6,13 @@
  * 1. Scalev (Meta Ads - Redirect URL)  -> ditangani oleh `doGet(e)` -> tab `Scalev_Orders`
  * 2. Lynk.id (Affiliate - Webhook POST)-> ditangani oleh `doPost(e)` -> tab `Lynk_Orders`
  * 3. Frontend Web Game (`?action=check`, `?action=create`, `?action=resend`)
- *    -> Mengecek lintas tab `Scalev_Orders`, `Lynk_Orders`, dan `Licenses` (legacy)
+ *    -> Mengecek lintas tab `Scalev_Orders` dan `Lynk_Orders`
  * 4. Email Delivery 100% Brevo REST API v3 (UrlFetchApp, tanpa MailApp/Gmail limit)
  *    + Template lengkap: Tombol Salin Otomatis, 1-Klik Main, Panduan PWA Offline, & Sosmed.
  * 5. Proteksi Anti-Duplikat Lintas Sheet (`Scalev_Orders` vs `Lynk_Orders`):
  *    LockService + Pemindaian Dinamis Semua Tab + CacheService + SpreadsheetApp.flush().
  * 6. Menu Lengkap Google Sheets:
- *    - 📊 Menu Laporan: Generate `Report_Scalev`, `Report_Lynk` (Komisi Affiliate), & Cek Duplikat.
+ *    - 📊 Menu Laporan: Generate `Report_Scalev`, `lynk_affiliate` (Komisi Affiliate), & Cek Duplikat.
  *    - 🎮 WaliPintar Admin: Broadcast Pembaruan, Sync Scalev API v3, Generate Manual,
  *      Kirim Ulang Email, Hapus Lisensi, Reset Sheet, Uji Brevo & Scalev API.
  *
@@ -44,9 +44,8 @@
 const TAB_SCALEV_ORDERS = 'Scalev_Orders';
 const TAB_LYNK_ORDERS   = 'Lynk_Orders';
 const TAB_REPORT_SCALEV = 'Report_Scalev';
-const TAB_REPORT_LYNK   = 'Report_Lynk';
+const TAB_REPORT_LYNK   = 'lynk_affiliate';
 const TAB_DASHBOARD     = 'Dashboard';
-const TAB_LEGACY        = 'Licenses'; // Kompatibilitas mundur jika ada data lama
 
 // Konfigurasi Brand & URL Resmi
 const BRAND_NAME  = 'Wali Pintar';
@@ -166,6 +165,16 @@ function ensureSheetHeaders(ss, sheetName, headers, headerBg) {
 }
 
 function initAllSheets(ss) {
+  // 1. Migrasi otomatis: ganti nama `Report_Lynk` -> `lynk_affiliate` (pertahankan rate komisi)
+  const oldReportLynk = ss.getSheetByName('Report_Lynk');
+  const currentReportLynk = ss.getSheetByName(TAB_REPORT_LYNK);
+  if (oldReportLynk && !currentReportLynk) {
+    oldReportLynk.setName(TAB_REPORT_LYNK);
+  } else if (oldReportLynk && currentReportLynk && ss.getSheets().length > 1) {
+    ss.deleteSheet(oldReportLynk);
+  }
+
+  // 2. Pastikan tab utama tersedia terlebih dahulu
   const scalevSheet = ensureSheetHeaders(ss, TAB_SCALEV_ORDERS, [
     'Waktu Pembayaran',
     'Order ID Scalev',
@@ -206,6 +215,12 @@ function initAllSheets(ss) {
     'Total Komisi'
   ], '#1e3a8a');
 
+  // 3. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
+  const legacyLicensesSheet = ss.getSheetByName('Licenses');
+  if (legacyLicensesSheet && ss.getSheets().length > 1) {
+    ss.deleteSheet(legacyLicensesSheet);
+  }
+
   return { scalevSheet: scalevSheet, lynkSheet: lynkSheet };
 }
 
@@ -219,7 +234,7 @@ function onOpen() {
   ui.createMenu('📊 Menu Laporan')
     .addItem('📊 Segarkan Dashboard Monitoring', 'generateDashboard')
     .addItem('📈 Generate Laporan Scalev (Report_Scalev)', 'generateScalevReport')
-    .addItem('🤝 Generate Laporan Affiliate Lynk (Report_Lynk)', 'generateLynkReport')
+    .addItem('🤝 Generate Laporan Affiliate Lynk (lynk_affiliate)', 'generateLynkReport')
     .addItem('🔄 Segarkan Semua Laporan & Dashboard', 'generateAllReports')
     .addSeparator()
     .addItem('📐 Rapikan Lebar Kolom Semua Sheet (Auto-Width)', 'menuAutoFitAllSheets')
@@ -249,9 +264,15 @@ function onOpen() {
 function menuInitializeTabs() {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
+  generateScalevReport(true);
+  generateLynkReport(true);
   generateDashboard(true);
   autoFitAllSheets(ss);
-  SpreadsheetApp.getUi().alert('✅ Berhasil', 'Semua tab (Scalev_Orders, Lynk_Orders, Report_Scalev, Report_Lynk, Dashboard) siap dengan lebar kolom otomatis.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert(
+    '✅ Berhasil',
+    'Semua tab (Scalev_Orders, Lynk_Orders, Report_Scalev, lynk_affiliate, Dashboard) siap & lebar kolom otomatis. Tab lama "Licenses" (jika ada) sudah dibersihkan.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 // ============================================================================
@@ -389,11 +410,10 @@ function handleScalevOrder(params) {
       });
     }
 
-    // Cek juga di Lynk_Orders & Legacy `Licenses` jika user klaim dari /claim (baik dari Lynk maupun Scalev)
+    // Cek juga di Lynk_Orders jika user klaim dari /claim
     if (orderId || email) {
       const altSheets = [
-        { sh: lynkSheet, src: 'Lynk.id', noteCol: 11 },
-        { sh: ss.getSheetByName(TAB_LEGACY), src: 'Licenses', noteCol: 0 }
+        { sh: lynkSheet, src: 'Lynk.id', noteCol: 11 }
       ];
       for (let a = 0; a < altSheets.length; a++) {
         if (!altSheets[a].sh) continue;
@@ -871,8 +891,26 @@ function constantTimeEqual(a, b) {
 }
 
 // ============================================================================
-// 📊 3. AUTOMATED REPORTING (`Dashboard`, `Report_Scalev`, `Report_Lynk` & AUTO-WIDTH)
+// 📊 3. AUTOMATED REPORTING (`Dashboard`, `Report_Scalev`, `lynk_affiliate` & AUTO-WIDTH)
 // ============================================================================
+/**
+ * Menilai apakah sebuah baris order benar-benar LUNAS (PAID/COMPLETED/SETTLED/SUCCESS)
+ * DAN telah menghasilkan kode lisensi resmi (`WALI-...`) berstatus `ACTIVE`.
+ */
+function isOrderTrulyPaidWithLicense(licenseKey, statusLisensi, paymentStatus) {
+  const lic = String(licenseKey || '').trim().toUpperCase();
+  const stLic = String(statusLisensi || '').trim().toUpperCase();
+  const paySt = String(paymentStatus || '').trim().toUpperCase();
+
+  if (!lic || !lic.startsWith('WALI-')) return false;
+  if (stLic !== 'ACTIVE') return false;
+
+  const unpaidStatuses = ['UNPAID', 'PENDING', 'CANCELED', 'CANCELLED', 'FAILED', 'EXPIRED', 'REFUNDED', 'VOID', 'DRAFT', 'INACTIVE'];
+  if (unpaidStatuses.indexOf(paySt) !== -1) return false;
+
+  const paidStatuses = ['PAID', 'COMPLETED', 'SETTLED', 'SUCCESS', 'LUNAS'];
+  return paidStatuses.indexOf(paySt) !== -1;
+}
 function getJakartaDateKey(dateObj) {
   return Utilities.formatDate(dateObj || new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
 }
@@ -978,7 +1016,7 @@ function generateAllReports() {
   generateDashboard(true);
   autoFitAllSheets();
   try {
-    SpreadsheetApp.getUi().alert('✅ Selesai', 'Dashboard, Report_Scalev, dan Report_Lynk berhasil diperbarui dengan lebar kolom otomatis!', SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert('✅ Selesai', 'Dashboard, Report_Scalev, dan lynk_affiliate berhasil diperbarui dengan lebar kolom otomatis!', SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {}
 }
 
@@ -996,7 +1034,6 @@ function generateDashboard(silent) {
 
     let scalevRevenue = 0;
     let lynkRevenue = 0;
-    let legacyRevenue = 0;
     let totalPaidTx = 0;
     let revenueToday = 0;
     let totalLicenses = 0;
@@ -1007,8 +1044,7 @@ function generateDashboard(silent) {
 
     const sources = [
       { sh: sheets.scalevSheet, type: 'SCALEV' },
-      { sh: sheets.lynkSheet, type: 'LYNK' },
-      { sh: ss.getSheetByName(TAB_LEGACY), type: 'LEGACY' }
+      { sh: sheets.lynkSheet, type: 'LYNK' }
     ];
 
     sources.forEach(function(src) {
@@ -1027,23 +1063,19 @@ function generateDashboard(silent) {
         const rev = parseRevenueNumber(data[i][6]);
         const catatan = String(data[i][data[i].length - 1] || '').trim().toUpperCase();
         const isToday = isSameJakartaDay(waktu, todayKey);
+        const hasValidLicense = license.toUpperCase().startsWith('WALI-');
 
-        totalLicenses++;
-        if (statusLisensi === 'ACTIVE') activeLicenses++;
-        if (isToday) licensesToday++;
+        if (hasValidLicense) {
+          totalLicenses++;
+          if (statusLisensi === 'ACTIVE') activeLicenses++;
+          if (isToday) licensesToday++;
+        }
 
-        const isPaid = (
-          paymentStatus === 'PAID' ||
-          paymentStatus === 'COMPLETED' ||
-          paymentStatus === 'SETTLED' ||
-          paymentStatus === 'SUCCESS' ||
-          (!paymentStatus && statusLisensi === 'ACTIVE')
-        );
+        const isPaid = isOrderTrulyPaidWithLicense(license, statusLisensi, paymentStatus);
         if (isPaid) {
           totalPaidTx++;
           if (src.type === 'SCALEV') scalevRevenue += rev;
           else if (src.type === 'LYNK') lynkRevenue += rev;
-          else legacyRevenue += rev;
           if (isToday) revenueToday += rev;
         }
 
@@ -1054,7 +1086,7 @@ function generateDashboard(silent) {
       }
     });
 
-    const totalRevenue = scalevRevenue + lynkRevenue + legacyRevenue;
+    const totalRevenue = scalevRevenue + lynkRevenue;
     const avgRevenue = totalPaidTx > 0 ? Math.round(totalRevenue / totalPaidTx) : 0;
     const emailsTodayTotal = getDailyEmailSentCount(emailsTodayFromSheet);
     const updatedAt = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy, HH.mm.ss');
@@ -1075,7 +1107,7 @@ function generateDashboard(silent) {
 
     // Section 1: Summary Gross Revenue (Row 3)
     dashSheet.getRange('A3:D3').merge()
-      .setValue('💰 SUMMARY GROSS REVENUE (SCALEV + LYNK.ID • STATUS PAID / LUNAS)')
+      .setValue('💰 SUMMARY GROSS REVENUE (SCALEV + LYNK.ID • STATUS PAID / LUNAS + BERLISENSI)')
       .setBackground('#047857')
       .setFontColor('#ffffff')
       .setFontWeight('bold')
@@ -1090,7 +1122,7 @@ function generateDashboard(silent) {
       { label: 'Total Transaksi Paid (Lunas)', val: totalPaidTx + ' Transaksi', fmt: '@', color: '#0f172a', bg: '#ffffff', bold: true },
       { label: 'Rata-Rata Gross Revenue per Transaksi Paid', val: avgRevenue, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#f8fafc', bold: false },
       { label: 'Gross Revenue Paid Hari Ini (' + todayDisplay + ')', val: revenueToday, fmt: '"Rp"#,##0', color: '#047857', bg: '#ecfdf5', bold: true },
-      { label: 'Formula Otomatis Sheet (=SUMIF Paid)', val: null, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, isFormula: true }
+      { label: 'Formula Otomatis Sheet (=SUMIFS Paid + Lisensi)', val: null, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, isFormula: true }
     ];
 
     for (let r = 0; r < revRows.length; r++) {
@@ -1104,7 +1136,14 @@ function generateDashboard(silent) {
         .setVerticalAlignment('middle');
       const valCell = dashSheet.getRange(rowIdx, 4);
       if (item.isFormula) {
-        valCell.setFormula('=SUMIF(Scalev_Orders!F:F, "PAID", Scalev_Orders!G:G) + SUMIF(Lynk_Orders!F:F, "PAID", Lynk_Orders!G:G)');
+        valCell.setFormula(
+          '=SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "PAID") + ' +
+          'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "COMPLETED") + ' +
+          'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "SETTLED") + ' +
+          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "PAID") + ' +
+          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "COMPLETED") + ' +
+          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "SETTLED")'
+        );
       } else {
         valCell.setValue(item.val);
       }
@@ -1120,7 +1159,7 @@ function generateDashboard(silent) {
 
     dashSheet.getRange('A3:D10').setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
 
-    // Anti-#ERROR! Guard pada Formula SUMIF (Row 10)
+    // Anti-#ERROR! Guard pada Formula SUMIFS (Row 10)
     SpreadsheetApp.flush();
     const formulaCell = dashSheet.getRange('D10');
     const formulaDisp = String(formulaCell.getDisplayValue() || '');
@@ -1233,26 +1272,21 @@ function generateScalevReport(silent) {
     for (let i = 1; i < data.length; i++) {
       const orderId = String(data[i][1] || '').trim();
       const email = String(data[i][2] || '').trim();
-      if (!orderId && !email) continue;
+      const license = String(data[i][3] || '').trim();
+      if (!orderId && !email && !license) continue;
 
       const statusLisensi = String(data[i][4] || '').trim().toUpperCase();
       const paymentStatus = String(data[i][5] || '').trim().toUpperCase();
       const revenue = parseRevenueNumber(data[i][6]);
       const catatan = String(data[i][data[i].length - 1] || '').trim().toUpperCase();
 
-      const isPaid = (
-        paymentStatus === 'PAID' ||
-        paymentStatus === 'COMPLETED' ||
-        paymentStatus === 'SETTLED' ||
-        paymentStatus === 'SUCCESS' ||
-        (!paymentStatus && statusLisensi === 'ACTIVE')
-      );
+      const isPaid = isOrderTrulyPaidWithLicense(license, statusLisensi, paymentStatus);
 
       if (isPaid) {
         totalTransaksi++;
         totalOmzet += revenue;
       }
-      if (statusLisensi === 'ACTIVE') {
+      if (license.toUpperCase().startsWith('WALI-') && statusLisensi === 'ACTIVE') {
         lisensiAktif++;
       }
       if (catatan.includes('TERKIRIM') && isSameJakartaDay(data[i][0], todayKey)) {
@@ -1310,7 +1344,7 @@ function generateScalevReport(silent) {
         SpreadsheetApp.getUi().alert(
           '📈 Report_Scalev Diperbarui',
           '• Total Omzet: Rp ' + formatNumberId(totalOmzet) + '\n' +
-          '• Total Transaksi: ' + totalTransaksi + '\n' +
+          '• Total Transaksi (Lunas & Berlisensi): ' + totalTransaksi + '\n' +
           '• Lisensi Aktif: ' + lisensiAktif + '\n' +
           '• Email Terkirim Hari Ini: ' + totalEmailsTodayAll,
           SpreadsheetApp.getUi().ButtonSet.OK
@@ -1332,7 +1366,7 @@ function generateLynkReport(silent) {
     const lynkSheet = sheets.lynkSheet;
     const reportSheet = ss.getSheetByName(TAB_REPORT_LYNK);
 
-    // 1. Baca Rate Komisi (%) yang sudah diset manual di Report_Lynk agar tidak tertimpa
+    // 1. Baca Rate Komisi (%) yang sudah diset manual di lynk_affiliate agar tidak tertimpa
     const existingRates = {};
     const existingReportData = reportSheet.getDataRange().getValues();
     for (let r = 1; r < existingReportData.length; r++) {
@@ -1361,7 +1395,8 @@ function generateLynkReport(silent) {
     for (let i = 1; i < lynkData.length; i++) {
       const orderId = String(lynkData[i][1] || '').trim();
       const email = String(lynkData[i][2] || '').trim();
-      if (!orderId && !email) continue;
+      const license = String(lynkData[i][3] || '').trim();
+      if (!orderId && !email && !license) continue;
 
       const statusLisensi = String(lynkData[i][4] || '').trim().toUpperCase();
       const paymentStatus = String(lynkData[i][5] || '').trim().toUpperCase();
@@ -1369,14 +1404,7 @@ function generateLynkReport(silent) {
       const rawAffName = String(lynkData[i][9] || '').trim();
       const affName = rawAffName || 'Direct / Tanpa Affiliate';
 
-      const isPaid = (
-        paymentStatus === 'PAID' ||
-        paymentStatus === 'COMPLETED' ||
-        paymentStatus === 'SETTLED' ||
-        paymentStatus === 'SUCCESS' ||
-        (!paymentStatus && statusLisensi === 'ACTIVE')
-      );
-
+      const isPaid = isOrderTrulyPaidWithLicense(license, statusLisensi, paymentStatus);
       if (!isPaid) continue;
 
       const key = affName.toLowerCase();
@@ -1424,7 +1452,7 @@ function generateLynkReport(silent) {
       ]);
     }
 
-    // 4. Tulis ke tab Report_Lynk
+    // 4. Tulis ke tab lynk_affiliate
     reportSheet.clear();
 
     const headers = ['Nama Affiliate', 'Total Transaksi', 'Total Omzet', 'Rate Komisi (%)', 'Total Komisi'];
@@ -1458,7 +1486,7 @@ function generateLynkReport(silent) {
 
     const noteRow = outputRows.length + 4;
     reportSheet.getRange(noteRow, 1, 1, 5).merge()
-      .setValue('💡 Tips: Ubah angka di kolom "Rate Komisi (%)" (misal: 25), lalu jalankan ulang "Generate Laporan Affiliate Lynk" untuk menghitung ulang komisi otomatis.')
+      .setValue('💡 Tips: Ubah angka di kolom "Rate Komisi (%)" (misal: 25), lalu jalankan ulang "Generate Laporan Affiliate Lynk (lynk_affiliate)" untuk menghitung ulang komisi otomatis.')
       .setWrap(true)
       .setFontColor('#64748b')
       .setFontSize(10);
@@ -1471,9 +1499,9 @@ function generateLynkReport(silent) {
     if (!silent) {
       try {
         SpreadsheetApp.getUi().alert(
-          '🤝 Report_Lynk Diperbarui',
+          '🤝 lynk_affiliate Diperbarui',
           '• Jumlah Affiliate: ' + outputRows.length + '\n' +
-          '• Total Transaksi: ' + grandTotalTx + '\n' +
+          '• Total Transaksi (Lunas & Berlisensi): ' + grandTotalTx + '\n' +
           '• Total Omzet: Rp ' + formatNumberId(grandTotalOmzet) + '\n' +
           '• Total Komisi: Rp ' + formatNumberId(grandTotalKomisi),
           SpreadsheetApp.getUi().ButtonSet.OK
@@ -1483,7 +1511,7 @@ function generateLynkReport(silent) {
   } catch (err) {
     Logger.log('Error generateLynkReport: ' + err.toString());
     if (!silent) {
-      try { SpreadsheetApp.getUi().alert('❌ Error Report Lynk', err.toString(), SpreadsheetApp.getUi().ButtonSet.OK); } catch (e) {}
+      try { SpreadsheetApp.getUi().alert('❌ Error lynk_affiliate', err.toString(), SpreadsheetApp.getUi().ButtonSet.OK); } catch (e) {}
     }
   }
 }
@@ -1496,7 +1524,7 @@ function menuCheckDuplicateLicenses() {
   const seenMap = {};
   const duplicates = [];
 
-  [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY].forEach(function(tabName) {
+  [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
     const sh = ss.getSheetByName(tabName);
     if (!sh || sh.getLastRow() <= 1) return;
 
@@ -1541,7 +1569,7 @@ function handleLicenseCheck(params) {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
 
-  const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY];
+  const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   for (let s = 0; s < sheetsToCheck.length; s++) {
     const sh = ss.getSheetByName(sheetsToCheck[s]);
     if (!sh) continue;
@@ -1588,7 +1616,7 @@ function handleResendLicense(params) {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
 
-  const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY];
+  const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   for (let s = 0; s < sheetsToCheck.length; s++) {
     const sh = ss.getSheetByName(sheetsToCheck[s]);
     if (!sh) continue;
@@ -1597,11 +1625,9 @@ function handleResendLicense(params) {
     if (existing && existing.status === 'ACTIVE') {
       const brevoRes = sendEmailBrevo(email, existing.licenseKey, existing.customerName, existing.orderId, true);
       const statusCol = sheetsToCheck[s] === TAB_LYNK_ORDERS ? 11 : 9;
-      if (sheetsToCheck[s] !== TAB_LEGACY) {
-        sh.getRange(existing.rowIndex, statusCol).setValue(
-          brevoRes.success ? 'TERKIRIM ULANG (Brevo)' : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
-        );
-      }
+      sh.getRange(existing.rowIndex, statusCol).setValue(
+        brevoRes.success ? 'TERKIRIM ULANG (Brevo)' : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
+      );
       return createJsonResponse({
         status: brevoRes.success ? 'success' : 'error',
         success: true,
@@ -1913,7 +1939,7 @@ function menuBroadcastUpdate() {
 
 function collectBroadcastRecipients(ss, targetSource, rangeInput) {
   const tabsToScan = targetSource === 'SEMUA'
-    ? [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY]
+    ? [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS]
     : [targetSource];
 
   const recipients = [];
@@ -2114,7 +2140,7 @@ function menuResendManual() {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
 
-  const tabs = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY];
+  const tabs = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   for (let t = 0; t < tabs.length; t++) {
     const sh = ss.getSheetByName(tabs[t]);
     if (!sh || sh.getLastRow() <= 1) continue;
@@ -2149,7 +2175,7 @@ function deleteMatchingLicenseRows(ss, target) {
   const cleanTarget = String(target || '').trim();
   let deletedCount = 0;
 
-  [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY].forEach(function(tabName) {
+  [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
     const sh = ss.getSheetByName(tabName);
     if (!sh || sh.getLastRow() <= 1) return;
 
@@ -2204,7 +2230,7 @@ function menuDeleteSelectedRow() {
   const activeSheet = ss.getActiveSheet();
   const sheetName = activeSheet.getName();
 
-  if ([TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY].indexOf(sheetName) === -1) {
+  if ([TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].indexOf(sheetName) === -1) {
     ui.alert('Pindahkan kursor Anda terlebih dahulu ke tab "' + TAB_SCALEV_ORDERS + '" atau "' + TAB_LYNK_ORDERS + '" pada baris yang ingin dihapus.');
     return;
   }
@@ -2237,7 +2263,7 @@ function menuDeleteAllOrders() {
   const activeSheet = ss.getActiveSheet();
   const sheetName = activeSheet.getName();
 
-  const isOrderSheet = ([TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY].indexOf(sheetName) !== -1);
+  const isOrderSheet = ([TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].indexOf(sheetName) !== -1);
   const targetSheetName = isOrderSheet ? sheetName : TAB_SCALEV_ORDERS;
   const targetSheet = ss.getSheetByName(targetSheetName);
 
@@ -2350,6 +2376,38 @@ function menuTestBrevoConnection() {
 // ============================================================================
 // 🛡️ MODUL SCALEV API v3: VERIFIKASI REAL-TIME & SINKRONISASI ORDER
 // ============================================================================
+function extractScalevOrderList(json) {
+  if (!json) return [];
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json.results)) return json.results;
+  if (Array.isArray(json.orders)) return json.orders;
+  if (json.data) {
+    if (Array.isArray(json.data)) return json.data;
+    if (Array.isArray(json.data.results)) return json.data.results;
+    if (Array.isArray(json.data.orders)) return json.data.orders;
+    if (Array.isArray(json.data.items)) return json.data.items;
+  }
+  return [];
+}
+
+function isScalevOrderPaidAndValid(order) {
+  if (!order || typeof order !== 'object') return false;
+  const orderStatus = String(order.status || '').trim().toUpperCase();
+  const payStatus = String(order.payment_status || '').trim().toUpperCase();
+
+  const invalidStatuses = ['CANCELED', 'CANCELLED', 'REFUNDED', 'VOID', 'FAILED', 'EXPIRED', 'DRAFT', 'RTS'];
+  if (invalidStatuses.indexOf(orderStatus) !== -1) return false;
+  if (invalidStatuses.indexOf(payStatus) !== -1) return false;
+  if (payStatus === 'UNPAID' || payStatus === 'PENDING') return false;
+
+  if (orderStatus === 'COMPLETED') return true;
+  if (payStatus === 'PAID' || payStatus === 'SETTLED' || payStatus === 'COMPLETED' || payStatus === 'SUCCESS') return true;
+  if (!payStatus && (orderStatus === 'PAID' || orderStatus === 'SETTLED' || orderStatus === 'CONFIRMED' || orderStatus === 'SHIPPED')) {
+    return true;
+  }
+  return false;
+}
+
 function verifyScalevPayment(orderIdOrEmail) {
   if (!SCALEV_API_KEY) {
     return {
@@ -2375,18 +2433,25 @@ function verifyScalevPayment(orderIdOrEmail) {
       muteHttpExceptions: true
     };
 
-    let json = null;
+    let orderObj = null;
     let statusCode = 0;
 
     if (cleanTarget.includes('@')) {
       const emailLower = cleanTarget.toLowerCase();
-      const response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100', options);
+      let response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100&search=' + encodeURIComponent(emailLower), options);
       statusCode = response.getResponseCode();
       let listJson = null;
       try { listJson = JSON.parse(response.getContentText()); } catch (e) {}
+      let orderList = extractScalevOrderList(listJson);
 
-      const orderList = (listJson && (listJson.data || listJson.orders || (Array.isArray(listJson) ? listJson : []))) || [];
-      if (Array.isArray(orderList) && orderList.length > 0) {
+      if (orderList.length === 0) {
+        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100', options);
+        statusCode = response.getResponseCode();
+        try { listJson = JSON.parse(response.getContentText()); } catch (e) {}
+        orderList = extractScalevOrderList(listJson);
+      }
+
+      if (orderList.length > 0) {
         const matched = orderList.filter(function(item) {
           const cust = item.customer || {};
           const em = String(cust.email || item.customer_email || item.email || '').trim().toLowerCase();
@@ -2395,43 +2460,48 @@ function verifyScalevPayment(orderIdOrEmail) {
 
         if (matched.length > 0) {
           const paidOrder = matched.find(function(item) {
-            const st = String(item.payment_status || item.status || '').toLowerCase();
-            return st === 'paid' || st === 'settled' || st === 'completed';
+            return isScalevOrderPaidAndValid(item);
           });
-          json = paidOrder || matched[0];
+          orderObj = paidOrder || matched[0];
         }
       }
     } else {
       let response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders/' + encodeURIComponent(cleanTarget), options);
       statusCode = response.getResponseCode();
-      try { json = JSON.parse(response.getContentText()); } catch (e) {}
+      let rawJson = null;
+      try { rawJson = JSON.parse(response.getContentText()); } catch (e) {}
 
-      if (statusCode === 404 || !json || json.errors) {
-        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?search=' + encodeURIComponent(cleanTarget), options);
+      if (rawJson && rawJson.data && !Array.isArray(rawJson.data) && (rawJson.data.id || rawJson.data.order_id || rawJson.data.order_number)) {
+        orderObj = rawJson.data;
+      } else if (rawJson && (rawJson.order_id || rawJson.order_number || (rawJson.id && !rawJson.errors))) {
+        orderObj = rawJson;
+      }
+
+      if (statusCode === 404 || !orderObj || (rawJson && rawJson.errors)) {
+        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100&search=' + encodeURIComponent(cleanTarget), options);
         statusCode = response.getResponseCode();
         let searchJson = null;
         try { searchJson = JSON.parse(response.getContentText()); } catch (e) {}
-
-        if (searchJson && searchJson.data && searchJson.data.length > 0) {
-          const paidItem = searchJson.data.find(function(item) {
-            const st = String(item.payment_status || item.status || '').toLowerCase();
-            return st === 'paid' || st === 'settled' || st === 'completed';
+        const searchList = extractScalevOrderList(searchJson);
+        if (searchList.length > 0) {
+          const paidItem = searchList.find(function(item) {
+            return isScalevOrderPaidAndValid(item);
           });
-          json = paidItem || searchJson.data[0];
+          orderObj = paidItem || searchList[0];
         }
       }
     }
 
-    if (json && (json.id || json.order_id || json.order_number || json.code)) {
-      const paymentStatus = String(json.payment_status || json.status || '').toLowerCase();
-      const isPaid = (paymentStatus === 'paid' || paymentStatus === 'settled' || paymentStatus === 'completed');
+    if (orderObj && (orderObj.id || orderObj.order_id || orderObj.order_number || orderObj.code)) {
+      const isPaid = isScalevOrderPaidAndValid(orderObj);
+      const paymentStatus = String(orderObj.payment_status || orderObj.status || '').toLowerCase();
 
-      const customer = json.customer || {};
-      const customerEmail = customer.email || json.customer_email || json.email || '';
-      const customerName = customer.name || json.customer_name || json.name || '';
-      const officialOrderId = String(json.order_id || json.order_number || json.code || json.id || cleanTarget).trim();
-      const grossRevenue = extractGrossRevenue(json);
-      const paymentTime = extractPaymentTime(json);
+      const customer = orderObj.customer || {};
+      const customerEmail = customer.email || orderObj.customer_email || orderObj.email || '';
+      const customerName = customer.name || orderObj.customer_name || orderObj.name || '';
+      const officialOrderId = String(orderObj.order_id || orderObj.order_number || orderObj.code || orderObj.id || cleanTarget).trim();
+      const grossRevenue = extractGrossRevenue(orderObj);
+      const paymentTime = extractPaymentTime(orderObj);
 
       return {
         configured: true,
@@ -2445,7 +2515,7 @@ function verifyScalevPayment(orderIdOrEmail) {
         customerName: customerName,
         message: isPaid
           ? 'Pembayaran terverifikasi lunas di Scalev (Rp ' + formatNumberId(grossRevenue) + ').'
-          : 'Pesanan (' + (customerEmail || cleanTarget) + ') masih berstatus ' + paymentStatus + '.'
+          : 'Pesanan (' + (customerEmail || cleanTarget) + ') berstatus ' + (orderObj.status || paymentStatus || 'unpaid') + '.'
       };
     } else {
       return {
@@ -2497,15 +2567,16 @@ function extractPaymentTime(json) {
 
 function extractGrossRevenue(json) {
   if (!json) return 0;
+  const target = (json.data && !Array.isArray(json.data) && json.data.gross_revenue !== undefined) ? json.data : json;
   const candidates = [
-    json.gross_revenue, json.total_amount, json.grand_total, json.total,
-    json.total_price, json.amount, json.order_value, json.net_revenue
+    target.gross_revenue, target.total_amount, target.grand_total, target.total,
+    target.total_price, target.amount, target.order_value, target.net_revenue
   ];
-  if (json.pricing) {
-    candidates.push(json.pricing.gross_revenue, json.pricing.grand_total, json.pricing.total, json.pricing.subtotal);
+  if (target.pricing) {
+    candidates.push(target.pricing.gross_revenue, target.pricing.grand_total, target.pricing.total, target.pricing.subtotal);
   }
-  if (json.payment) {
-    candidates.push(json.payment.gross_amount, json.payment.amount);
+  if (target.payment) {
+    candidates.push(target.payment.gross_amount, target.payment.amount);
   }
 
   for (let i = 0; i < candidates.length; i++) {
@@ -2513,7 +2584,7 @@ function extractGrossRevenue(json) {
     if (num > 0) return num;
   }
 
-  const items = json.order_items || json.items || json.line_items;
+  const items = target.order_items || target.items || target.line_items;
   if (Array.isArray(items) && items.length > 0) {
     let sum = 0;
     for (let j = 0; j < items.length; j++) {
@@ -2534,28 +2605,68 @@ function syncOrdersFromScalev(ss) {
   try {
     const sheets = initAllSheets(ss);
     const scalevSheet = sheets.scalevSheet;
-    const response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100', {
-      method: 'get',
-      headers: {
-        'Authorization': 'Bearer ' + SCALEV_API_KEY,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      muteHttpExceptions: true
-    });
+    const headers = {
+      'Authorization': 'Bearer ' + SCALEV_API_KEY,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
 
-    const statusCode = response.getResponseCode();
-    const content = response.getContentText();
-    if (statusCode < 200 || statusCode >= 300) {
-      return { success: false, message: 'HTTP ' + statusCode + ': ' + content };
+    // Ambil seluruh halaman order dari Scalev API v3 (maks 20 halaman)
+    const allOrders = [];
+    const seenOrderIds = {};
+    let nextUrl = 'https://api.scalev.com/v3/orders?limit=100';
+    let pageCount = 0;
+
+    while (nextUrl && pageCount < 20) {
+      pageCount++;
+      const response = UrlFetchApp.fetch(nextUrl, {
+        method: 'get',
+        headers: headers,
+        muteHttpExceptions: true
+      });
+
+      const statusCode = response.getResponseCode();
+      const content = response.getContentText();
+      if (statusCode < 200 || statusCode >= 300) {
+        if (pageCount === 1) {
+          return { success: false, message: 'HTTP ' + statusCode + ': ' + content };
+        }
+        break;
+      }
+
+      const json = JSON.parse(content);
+      const pageList = extractScalevOrderList(json);
+      if (!pageList || pageList.length === 0) break;
+
+      let addedThisPage = 0;
+      for (let p = 0; p < pageList.length; p++) {
+        const ord = pageList[p];
+        const oid = String(ord.order_id || ord.order_number || ord.code || ord.id || '').trim();
+        if (!oid || seenOrderIds[oid]) continue;
+        seenOrderIds[oid] = true;
+        allOrders.push(ord);
+        addedThisPage++;
+      }
+
+      // Tentukan URL halaman berikutnya bila Scalev memakai cursor/next
+      const dataWrap = (json && json.data && !Array.isArray(json.data)) ? json.data : json;
+      if (dataWrap && dataWrap.next && typeof dataWrap.next === 'string') {
+        nextUrl = dataWrap.next;
+      } else if (dataWrap && dataWrap.has_next && dataWrap.last_id) {
+        nextUrl = 'https://api.scalev.com/v3/orders?limit=100&last_id=' + encodeURIComponent(String(dataWrap.last_id));
+      } else if (pageList.length >= 100 && addedThisPage > 0) {
+        nextUrl = 'https://api.scalev.com/v3/orders?limit=100&page=' + (pageCount + 1);
+      } else {
+        nextUrl = '';
+      }
     }
 
-    const json = JSON.parse(content);
-    const orderList = (json && (json.data || json.orders || (Array.isArray(json) ? json : []))) || [];
-    if (!Array.isArray(orderList) || orderList.length === 0) {
+    if (allOrders.length === 0) {
       return {
         success: true,
         totalFetched: 0,
+        completedCount: 0,
+        completedGrossRevenue: 0,
         paidCount: 0,
         totalGrossRevenuePaid: 0,
         newLicensesCreated: 0,
@@ -2566,49 +2677,85 @@ function syncOrdersFromScalev(ss) {
 
     const existingData = scalevSheet.getDataRange().getValues();
     const orderRowMap = {};
-    const emailRowMap = {};
+    const syntheticEmailRows = {};
 
     for (let i = 1; i < existingData.length; i++) {
       const oid = String(existingData[i][1] || '').trim();
       const em = String(existingData[i][2] || '').trim().toLowerCase();
-      if (oid) orderRowMap[oid] = i + 1;
-      if (em) emailRowMap[em] = i + 1;
+      const lic = String(existingData[i][3] || '').trim();
+      if (oid) {
+        orderRowMap[oid] = { row: i + 1, licenseKey: lic };
+      }
+      // Hanya izinkan fallback kecocokan email untuk baris ID sementara (SCLV-...) agar 2 order dari 1 email tidak saling menimpa!
+      if (em && (!oid || oid.startsWith('SCLV-'))) {
+        if (!syntheticEmailRows[em]) syntheticEmailRows[em] = [];
+        syntheticEmailRows[em].push({ row: i + 1, licenseKey: lic });
+      }
     }
 
     let newLicensesCreated = 0;
     let updatedCount = 0;
     let paidCount = 0;
+    let completedCount = 0;
     let totalGrossRevenuePaid = 0;
+    let completedGrossRevenue = 0;
 
-    for (let k = 0; k < orderList.length; k++) {
-      const order = orderList[k];
+    for (let k = 0; k < allOrders.length; k++) {
+      const order = allOrders[k];
       const officialOrderId = String(order.order_id || order.order_number || order.code || order.id || '').trim();
       if (!officialOrderId) continue;
 
-      const paymentStatus = String(order.payment_status || order.status || '').toUpperCase();
-      const isPaid = (paymentStatus === 'PAID' || paymentStatus === 'COMPLETED' || paymentStatus === 'SETTLED');
+      const rawOrderStatus = String(order.status || '').trim().toUpperCase();
+      const rawPayStatus = String(order.payment_status || order.status || '').trim().toUpperCase();
+      const isPaid = isScalevOrderPaidAndValid(order);
+      const isCompleted = (rawOrderStatus === 'COMPLETED') && isPaid;
+      const normalizedPayStatus = isPaid ? 'PAID' : (rawPayStatus || rawOrderStatus || 'UNPAID');
       const grossRevenue = extractGrossRevenue(order);
 
       const customer = order.customer || {};
       const customerEmail = String(customer.email || order.customer_email || order.email || '').trim().toLowerCase();
       const customerName = String(customer.name || order.customer_name || order.name || '').trim();
 
+      if (isCompleted) {
+        completedCount++;
+        completedGrossRevenue += grossRevenue;
+      }
       if (isPaid) {
         paidCount++;
         totalGrossRevenuePaid += grossRevenue;
       }
 
-      const existingRow = orderRowMap[officialOrderId] || (customerEmail ? emailRowMap[customerEmail] : null);
-      if (existingRow) {
+      let matchedMeta = orderRowMap[officialOrderId] || null;
+      if (!matchedMeta && isPaid && customerEmail && syntheticEmailRows[customerEmail] && syntheticEmailRows[customerEmail].length > 0) {
+        matchedMeta = syntheticEmailRows[customerEmail].shift();
+      }
+
+      if (matchedMeta) {
+        const existingRow = matchedMeta.row;
         const orderPaidTime = extractPaymentTime(order);
         if (orderPaidTime) {
           scalevSheet.getRange(existingRow, 1).setValue(orderPaidTime).setNumberFormat('dd/MM/yyyy HH:mm:ss');
         }
         scalevSheet.getRange(existingRow, 2).setValue(officialOrderId);
         if (customerEmail) scalevSheet.getRange(existingRow, 3).setValue(customerEmail);
-        scalevSheet.getRange(existingRow, 6).setValue(paymentStatus);
+
+        if (isPaid) {
+          if (!matchedMeta.licenseKey || !matchedMeta.licenseKey.toUpperCase().startsWith('WALI-')) {
+            const newLic = generateUniqueLicenseKey(ss);
+            scalevSheet.getRange(existingRow, 4).setValue(newLic);
+            matchedMeta.licenseKey = newLic;
+            newLicensesCreated++;
+          }
+          scalevSheet.getRange(existingRow, 5).setValue('ACTIVE');
+        } else {
+          // Order belum lunas / dibatalkan / refund: nonaktifkan agar tidak dihitung di Total Paid
+          scalevSheet.getRange(existingRow, 5).setValue('INACTIVE');
+        }
+
+        scalevSheet.getRange(existingRow, 6).setValue(normalizedPayStatus);
         scalevSheet.getRange(existingRow, 7).setValue(grossRevenue).setNumberFormat('"Rp"#,##0');
         if (customerName) scalevSheet.getRange(existingRow, 8).setValue(customerName);
+        orderRowMap[officialOrderId] = matchedMeta;
         updatedCount++;
       } else if (isPaid && customerEmail) {
         const licenseKey = generateUniqueLicenseKey(ss);
@@ -2619,7 +2766,7 @@ function syncOrdersFromScalev(ss) {
           customerEmail,
           licenseKey,
           'ACTIVE',
-          paymentStatus,
+          'PAID',
           grossRevenue,
           customerName || '-',
           'Sinkronisasi Otomatis Scalev API'
@@ -2629,19 +2776,21 @@ function syncOrdersFromScalev(ss) {
         scalevSheet.getRange(lastRow, 7).setNumberFormat('"Rp"#,##0');
         SpreadsheetApp.flush();
 
-        orderRowMap[officialOrderId] = lastRow;
-        emailRowMap[customerEmail] = lastRow;
+        orderRowMap[officialOrderId] = { row: lastRow, licenseKey: licenseKey };
         newLicensesCreated++;
       }
     }
 
     autoFitSheetColumns(scalevSheet, 9, 110, 22);
     generateScalevReport(true);
+    generateLynkReport(true);
     generateDashboard(true);
 
     return {
       success: true,
-      totalFetched: orderList.length,
+      totalFetched: allOrders.length,
+      completedCount: completedCount,
+      completedGrossRevenue: completedGrossRevenue,
       paidCount: paidCount,
       totalGrossRevenuePaid: totalGrossRevenuePaid,
       newLicensesCreated: newLicensesCreated,
@@ -2667,11 +2816,11 @@ function menuSyncScalevOrders() {
     ui.alert(
       '🎉 Sinkronisasi Scalev API Berhasil!',
       '• Total Order Ditarik: ' + response.totalFetched + '\n' +
-      '• Order Status PAID: ' + response.paidCount + '\n' +
-      '• Total Omzet (PAID): Rp ' + formatNumberId(response.totalGrossRevenuePaid) + '\n' +
+      '• Order Completed (Scalev): ' + response.completedCount + ' (Rp ' + formatNumberId(response.completedGrossRevenue) + ')\n' +
+      '• Order Lunas / Paid Valid: ' + response.paidCount + ' (Rp ' + formatNumberId(response.totalGrossRevenuePaid) + ')\n' +
       '• Lisensi Baru Diterbitkan: ' + response.newLicensesCreated + '\n' +
       '• Data Diperbarui: ' + response.updatedCount + '\n\n' +
-      'Data tercatat di "' + TAB_SCALEV_ORDERS + '" dan laporan diperbarui di "' + TAB_REPORT_SCALEV + '".',
+      'Data tercatat di "' + TAB_SCALEV_ORDERS + '" & laporan diperbarui di "' + TAB_REPORT_SCALEV + '" + "' + TAB_DASHBOARD + '".',
       ui.ButtonSet.OK
     );
   } else {
@@ -2851,12 +3000,12 @@ function findLicenseColumnIndex(headerRow) {
 }
 
 /**
- * Mengumpulkan seluruh kode lisensi yang sudah ada di SEMUA tab terkait
- * (`Scalev_Orders`, `Lynk_Orders`, `Licenses`, dll.) agar tidak pernah bentrok.
+ * Mengumpulkan seluruh kode lisensi yang sudah ada di SEMUA tab order
+ * (`Scalev_Orders`, `Lynk_Orders`, dll.) agar tidak pernah bentrok.
  */
 function collectAllExistingLicenseKeys(ss) {
   const existingSet = new Set();
-  const priorityTabs = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS, TAB_LEGACY];
+  const priorityTabs = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   const allSheets = ss.getSheets();
 
   const sheetsToScan = [];
@@ -2866,7 +3015,7 @@ function collectAllExistingLicenseKeys(ss) {
   });
   allSheets.forEach(function(sh) {
     const nm = sh.getName();
-    if (priorityTabs.indexOf(nm) === -1 && nm !== TAB_REPORT_SCALEV && nm !== TAB_REPORT_LYNK) {
+    if (priorityTabs.indexOf(nm) === -1 && nm !== TAB_REPORT_SCALEV && nm !== TAB_REPORT_LYNK && nm !== TAB_DASHBOARD && nm !== 'Licenses') {
       sheetsToScan.push(sh);
     }
   });
@@ -2933,11 +3082,37 @@ function generateUniqueLicenseKey(ss) {
 }
 
 function parseRevenueNumber(val) {
-  if (typeof val === 'number' && !isNaN(val)) return val;
-  if (!val) return 0;
-  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  if (typeof val === 'number') return isNaN(val) ? 0 : Math.round(val);
+  if (val === null || val === undefined || val === '') return 0;
+  let str = String(val).trim();
+  if (!str) return 0;
+
+  str = str.replace(/rp|idr|\s+/gi, '');
+
+  // Format API desimal titik (misal "10000.00" atau "993.5")
+  if (/^-?\d+\.\d{1,2}$/.test(str)) {
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : Math.round(n);
+  }
+  // Format US ribuan koma + desimal titik (misal "10,000.00")
+  if (/^-?\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(str)) {
+    const n = parseFloat(str.replace(/,/g, ''));
+    return isNaN(n) ? 0 : Math.round(n);
+  }
+  // Format Indonesia ribuan titik + opsional desimal koma (misal "10.000" atau "10.000,00")
+  if (/^-?\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(str)) {
+    const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
+    return isNaN(n) ? 0 : Math.round(n);
+  }
+  // Fallback desimal koma saja (misal "10000,00")
+  if (/^-?\d+,\d{1,2}$/.test(str)) {
+    const n = parseFloat(str.replace(',', '.'));
+    return isNaN(n) ? 0 : Math.round(n);
+  }
+
+  const cleaned = str.replace(/[^0-9.-]/g, '');
   const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  return isNaN(num) ? 0 : Math.round(num);
 }
 
 function formatNumberId(num) {

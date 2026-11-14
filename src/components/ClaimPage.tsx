@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Loader2, X, Copy, Check } from 'lucide-react';
 import { SFX } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
@@ -13,6 +13,7 @@ const ADMIN_WA_NUMBER = '6285704808186';
 
 export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigate }) => {
   const [email, setEmail] = useState('');
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [paidModalData, setPaidModalData] = useState<{
     email: string;
@@ -24,14 +25,69 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
   } | null>(null);
   const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyOnlyKey, setCopyOnlyKey] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const actionParam = (params.get('action') || '').trim().toLowerCase();
+      const rawKey = (params.get('key') || params.get('license') || params.get('lisensi') || '').trim().toUpperCase();
+      if (actionParam === 'copy' && rawKey.startsWith('WALI-')) {
+        return rawKey;
+      }
+    } catch {
+      // Ignore
+    }
+    return null;
+  });
+
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    const cleanText = text.trim().toUpperCase();
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(cleanText);
+        return true;
+      }
+    } catch {
+      // Fall through to execCommand
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = cleanText;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
 
   // Set document title
   useEffect(() => {
-    document.title = 'Klaim Lisensi Pembelian - Wali Pintar';
-  }, []);
+    document.title = copyOnlyKey ? 'Salin Kode Lisensi - Wali Pintar' : 'Klaim Lisensi Pembelian - Wali Pintar';
+  }, [copyOnlyKey]);
+
+  // Auto-copy saat dibuka dari tombol email ?action=copy&key=WALI-XXXX
+  useEffect(() => {
+    if (!copyOnlyKey) return;
+    let active = true;
+    copyTextToClipboard(copyOnlyKey).then((ok) => {
+      if (active && ok) {
+        setCopied(true);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [copyOnlyKey]);
 
   // Check URL parameters for email & optional order metadata from Thank You Page redirect
   useEffect(() => {
+    if (copyOnlyKey) return;
     try {
       const params = new URLSearchParams(window.location.search);
       const urlEmail = params.get('email') || params.get('customer_email') || params.get('buyer_email') || params.get('mail');
@@ -46,7 +102,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     } catch {
       // Ignore
     }
-  }, []);
+  }, [copyOnlyKey]);
 
   const triggerVerification = async (targetEmail: string) => {
     const cleanEmail = targetEmail.trim().toLowerCase();
@@ -129,18 +185,79 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
   };
 
   const handleCopyCode = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
+    const cleanCode = code.trim().toUpperCase();
+    const ok = await copyTextToClipboard(cleanCode);
+    if (ok) {
+      SFX.ding();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      prompt('Salin lisensi Anda:', code);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
   const handlePlayNow = (license: string) => {
     onUnlockSuccess(license);
   };
+
+  // MODE KHUSUS SALIN LISENSI (?action=copy&key=WALI-XXXX): benar-benar hanya untuk menyalin kode lisensi
+  if (copyOnlyKey) {
+    return (
+      <div className="min-h-screen min-h-dvh bg-gradient-to-b from-emerald-50/70 via-teal-50/50 to-sky-50/70 flex flex-col items-center justify-center p-4 sm:p-6 antialiased selection:bg-emerald-100">
+        <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100 text-center relative overflow-hidden animate-fade-in">
+          <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shadow-2xs">
+            {copied ? <Check className="w-8 h-8 stroke-[2.75]" /> : <Copy className="w-8 h-8" />}
+          </div>
+
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight mb-1.5">
+            Salin Kode Lisensi
+          </h1>
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 mb-5 leading-relaxed">
+            Klik tombol di bawah ini untuk menyalin kode lisensi resmi Anda ke clipboard.
+          </p>
+
+          <div
+            onClick={() => handleCopyCode(copyOnlyKey)}
+            className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-4 mb-4 cursor-pointer hover:bg-emerald-100/60 transition-colors"
+            title="Klik untuk menyalin kode lisensi"
+          >
+            <div className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider mb-1.5">
+              Kode Lisensi Resmi Anda
+            </div>
+            <div className="font-mono text-3xl font-black text-emerald-950 tracking-widest bg-white py-2.5 px-4 rounded-xl border border-emerald-200 inline-block select-all">
+              {copyOnlyKey}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleCopyCode(copyOnlyKey)}
+            className={`w-full h-14 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-[0.98] ${
+              copied
+                ? 'bg-emerald-700 text-white shadow-emerald-500/25'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25'
+            }`}
+          >
+            {copied ? (
+              <>
+                <Check className="w-5 h-5 stroke-[2.75]" />
+                <span>Kode Lisensi Tersalin!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-5 h-5" />
+                <span>Salin Kode Lisensi</span>
+              </>
+            )}
+          </button>
+
+          {copied && (
+            <p className="mt-3 text-xs font-bold text-emerald-700">
+              Kode <span className="font-mono underline">{copyOnlyKey}</span> sudah tersalin ke clipboard.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen min-h-dvh bg-gradient-to-b from-emerald-50/70 via-teal-50/50 to-sky-50/70 flex flex-col items-center justify-center p-4 sm:p-6 antialiased selection:bg-emerald-100">
@@ -198,16 +315,32 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                 ✉️
               </span>
               <input
+                ref={emailInputRef}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@email.com"
-                className="w-full h-14 sm:h-15 pl-12 pr-4 font-bold text-slate-800 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-emerald-500 focus:bg-emerald-50/20 shadow-2xs focus:outline-none transition-all"
+                className="w-full h-14 sm:h-15 pl-12 pr-12 font-bold text-slate-800 text-base sm:text-lg rounded-2xl border-2 border-slate-200 focus:border-emerald-500 focus:bg-emerald-50/20 shadow-2xs focus:outline-none transition-all"
                 autoCapitalize="none"
                 autoComplete="email"
                 spellCheck="false"
                 required
               />
+              {email && !isLoading && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('');
+                    try { localStorage.removeItem('walipintar_email'); } catch {}
+                    emailInputRef.current?.focus();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-90 transition-all cursor-pointer"
+                  aria-label="Hapus email"
+                  title="Hapus email"
+                >
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              )}
             </div>
           </div>
 

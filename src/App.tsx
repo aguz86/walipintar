@@ -104,10 +104,13 @@ export default function App() {
   // Online License Gatekeeper State (Wajib login lisensi sebelum akses game)
   const [activeLicense, setActiveLicense] = useState<string | null>(() => {
     try {
-      // 1. Cek dari URL query parameter jika dibuka langsung dari tombol klaim / email (1-klik langsung masuk tanpa copy-paste)
+      // 1. Cek dari URL query parameter jika dibuka langsung dari tombol 1-klik / email
+      //    PENTING: Abaikan jika ?action=copy atau berada di /claim karena tombol salin khusus untuk menyalin kode lisensi saja.
       const params = new URLSearchParams(window.location.search);
+      const actionParam = (params.get('action') || '').trim().toLowerCase();
+      const isClaimPath = window.location.pathname.toLowerCase().startsWith('/claim');
       const urlKey = params.get('key') || params.get('license') || params.get('lisensi');
-      if (urlKey && urlKey.trim().length === 9 && urlKey.trim().toUpperCase().startsWith('WALI-')) {
+      if (actionParam !== 'copy' && !isClaimPath && urlKey && urlKey.trim().length === 9 && urlKey.trim().toUpperCase().startsWith('WALI-')) {
         const clean = urlKey.trim().toUpperCase();
         localStorage.setItem('walipintar_license', clean);
         return clean;
