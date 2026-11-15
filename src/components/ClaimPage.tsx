@@ -22,6 +22,11 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     emailSent?: boolean;
     emailSentNow?: boolean;
     wasBrevoPending?: boolean;
+    cooldownActive?: boolean;
+    copyOnlyPopup?: boolean;
+    lastEmailDate?: string;
+    nextEligibleDate?: string;
+    remainingDays?: number;
   } | null>(null);
   const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -139,6 +144,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         if (data.orderId) localStorage.setItem('walipintar_order', data.orderId);
         localStorage.setItem('walipintar_auth_time', Date.now().toString());
 
+        const isCooldown = Boolean(data.cooldownActive || data.copyOnlyPopup || (!data.emailSentNow && data.emailSent === false));
         SFX.fanfare();
         setUnpaidModalData(null);
         setPaidModalData({
@@ -148,6 +154,11 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
           emailSent: data.emailSent !== false,
           emailSentNow: !!data.emailSentNow,
           wasBrevoPending: !!data.wasBrevoPending,
+          cooldownActive: isCooldown,
+          copyOnlyPopup: isCooldown,
+          lastEmailDate: data.lastEmailDate,
+          nextEligibleDate: data.nextEligibleDate,
+          remainingDays: typeof data.remainingDays === 'number' ? data.remainingDays : undefined,
         });
       } else {
         // BELUM LUNAS ATAU BELUM PERNAH ORDER
@@ -369,14 +380,14 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         </div>
 
         {/* Tautan Navigasi */}
-        <div className="mt-5 space-y-2.5 text-xs font-bold text-slate-600 pt-4 border-t border-slate-100">
+        <div className="mt-5 space-y-2.5 text-xs font-bold text-slate-600 pt-4 border-t border-slate-100 text-center">
           <div>
             <button
               type="button"
               onClick={() => onNavigate('/login')}
-              className="inline-flex items-center gap-1.5 text-teal-700 hover:text-teal-800 hover:underline transition-colors py-1 px-2 rounded-lg cursor-pointer bg-teal-50/80 border border-teal-200/80"
+              className="inline-block max-w-full text-center text-teal-700 hover:text-teal-800 hover:underline transition-colors py-1.5 px-3 rounded-lg cursor-pointer bg-teal-50/80 border border-teal-200/80 leading-snug"
             >
-              <span>🔑</span>
+              <span className="inline mr-1">🔑</span>
               <span>Sudah Punya Kode Lisensi? Login di Sini (/login)</span>
             </button>
           </div>
@@ -386,9 +397,9 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
               href="https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
+              className="inline-block max-w-full text-center text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg leading-snug"
             >
-              <span>🛒</span>
+              <span className="inline mr-1">🛒</span>
               <span>Belum Punya Lisensi? Beli Lisensi Sekarang</span>
             </a>
           </div>
@@ -398,81 +409,164 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
               href={`https://wa.me/${ADMIN_WA_NUMBER}?text=Halo%20Admin%20Wali%20Pintar%2C%20saya%20butuh%20bantuan%20klaim%20lisensi`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
+              className="inline-block max-w-full text-center text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg leading-snug"
             >
-              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full inline-block align-text-bottom mr-1.5" />
               <span>Butuh Bantuan? WhatsApp Admin (0857-0480-8186)</span>
             </a>
           </div>
         </div>
       </div>
 
-      {/* POPUP JIKA LUNAS: "invoice email : (email) sudah lunas" + "mulai main game sekarang" */}
+      {/* POPUP JIKA LUNAS: < 3 bulan -> Pop-up Copy-Paste; >= 3 bulan atau baru pertama -> Kirim Email Brevo + Main */}
       {paidModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
-            <div className="text-5xl mb-3 animate-bounce">🎉</div>
-            <h3 className="text-lg sm:text-xl font-black text-emerald-950 mb-2 leading-snug break-words">
-              invoice email : <span className="text-emerald-700 underline">{paidModalData.email}</span> sudah lunas
-            </h3>
-            
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              Alhamdulillah! Pembayaran resmi Anda telah terkonfirmasi lunas. Lisensi resmi si kecil siap digunakan.
-            </p>
-
-            <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3">
-              <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Kode Lisensi Resmi Anda:</div>
-              <div className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1">
-                {paidModalData.license}
-              </div>
-              {paidModalData.orderId && (
-                <div className="text-[11px] text-slate-500 font-semibold">
-                  Order ID: {paidModalData.orderId}
-                </div>
-              )}
-            </div>
-
-            {/* KOTAK PENGINGAT CEK EMAIL DARI admin@walipintar.my.id */}
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 text-left mb-3.5 shadow-2xs">
-              <div className="flex items-start gap-2.5">
-                <span className="text-2xl flex-shrink-0 mt-0.5 animate-pulse">📧</span>
-                <div className="space-y-1">
-                  <div className="text-xs font-black text-amber-950 flex items-center justify-between">
-                    <span>Pengingat Cek Email Lisensi</span>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider">
-                      {paidModalData.emailSentNow ? 'Baru Terkirim' : 'Terkirim'}
-                    </span>
-                  </div>
-
-                  <p className="text-[11.5px] text-slate-700 leading-relaxed">
-                    Lisensi resmi juga telah dikirimkan ke email <strong className="text-slate-900 underline">{paidModalData.email}</strong> dari pengirim resmi <span className="font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">admin@walipintar.my.id</span>.
-                  </p>
-
-                  <div className="text-[11px] font-semibold text-amber-900 bg-amber-100/70 p-1.5 rounded-lg border border-amber-200/80 flex items-start gap-1.5 mt-1">
-                    <span className="shrink-0">⚠️</span>
-                    <span>Pastikan periksa juga folder <strong>Spam</strong> atau <strong>Promosi</strong> jika tidak ada di Kotak Masuk.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* TOMBOL MULAI MAIN GAME SEKARANG */}
             <button
               type="button"
-              onClick={() => handlePlayNow(paidModalData.license)}
-              className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 cursor-pointer transition-all active:scale-98 mb-2"
+              onClick={() => setPaidModalData(null)}
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Tutup"
             >
-              <span>🚀 Mulai Main Game Sekarang (/play)</span>
-              <span>➔</span>
+              <X className="w-5 h-5" />
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleCopyCode(paidModalData.license)}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-            >
-              {copied ? '✅ Berhasil Disalin!' : '📋 Salin Kode Lisensi'}
-            </button>
+            {paidModalData.cooldownActive && !paidModalData.emailSentNow ? (
+              <>
+                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shadow-2xs">
+                  {copied ? <Check className="w-7 h-7 stroke-[2.75]" /> : <Copy className="w-7 h-7" />}
+                </div>
+
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-1.5 leading-snug">
+                  Salin Kode Lisensi Anda
+                </h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed mb-3.5 break-words">
+                  Lisensi atas email <strong className="text-slate-900 underline">{paidModalData.email}</strong> aktif! Silakan langsung <strong>Copy-Paste</strong> kode di bawah ini untuk masuk game.
+                </p>
+
+                <div
+                  onClick={() => handleCopyCode(paidModalData.license)}
+                  className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3.5 mb-3 cursor-pointer hover:bg-emerald-100/60 transition-colors"
+                  title="Klik untuk menyalin kode lisensi"
+                >
+                  <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1">
+                    Kode Lisensi Resmi Anda:
+                  </div>
+                  <div className="font-mono text-2xl sm:text-3xl font-black text-emerald-950 tracking-widest bg-white py-2 px-3 rounded-xl border border-emerald-200 inline-block select-all">
+                    {paidModalData.license}
+                  </div>
+                  {paidModalData.orderId && (
+                    <div className="text-[11px] text-slate-500 font-semibold mt-1.5">
+                      Order ID: {paidModalData.orderId}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(paidModalData.license)}
+                  className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-98 mb-2.5 ${
+                    copied
+                      ? 'bg-emerald-700 text-white shadow-emerald-500/25'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25'
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 stroke-[2.75]" />
+                      <span>Kode Lisensi Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      <span>📋 Salin Kode Lisensi (Copy)</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePlayNow(paidModalData.license)}
+                  className="w-full py-3 px-4 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all mb-3"
+                >
+                  <span>🚀 Mulai Main Game Sekarang (/play)</span>
+                </button>
+
+                <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 text-left text-[11px] text-amber-950 leading-relaxed">
+                  <strong>⏳ Kirim Ulang Email Dijadwalkan Tiap 3 Bulan:</strong> Email sudah pernah dikirim{paidModalData.lastEmailDate ? ` pada ${paidModalData.lastEmailDate}` : ''}. Pengiriman ulang via email tersedia kembali{paidModalData.nextEligibleDate ? ` pada ${paidModalData.nextEligibleDate}` : ''}{paidModalData.remainingDays ? ` (${paidModalData.remainingDays} hari lagi)` : ''} agar layanan email tetap lancar.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-5xl mb-3 animate-bounce">🎉</div>
+                <h3 className="text-lg sm:text-xl font-black text-emerald-950 mb-2 leading-snug break-words">
+                  invoice email : <span className="text-emerald-700 underline">{paidModalData.email}</span> sudah lunas
+                </h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                  Alhamdulillah! Pembayaran resmi Anda telah terkonfirmasi lunas. Lisensi resmi si kecil siap digunakan.
+                </p>
+
+                <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3">
+                  <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Kode Lisensi Resmi Anda:</div>
+                  <div
+                    onClick={() => handleCopyCode(paidModalData.license)}
+                    className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1 select-all cursor-pointer"
+                    title="Klik untuk menyalin kode lisensi"
+                  >
+                    {paidModalData.license}
+                  </div>
+                  {paidModalData.orderId && (
+                    <div className="text-[11px] text-slate-500 font-semibold">
+                      Order ID: {paidModalData.orderId}
+                    </div>
+                  )}
+                </div>
+
+                {/* KOTAK PENGINGAT CEK EMAIL DARI admin@walipintar.my.id */}
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-3 text-left mb-3.5 shadow-2xs">
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-2xl flex-shrink-0 mt-0.5 animate-pulse">📧</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-black text-amber-950 flex items-center justify-between">
+                        <span>Pengingat Cek Email Lisensi</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                          {paidModalData.emailSentNow ? 'Baru Terkirim' : 'Terkirim'}
+                        </span>
+                      </div>
+
+                      <p className="text-[11.5px] text-slate-700 leading-relaxed">
+                        Lisensi resmi juga telah dikirimkan ke email <strong className="text-slate-900 underline">{paidModalData.email}</strong> dari pengirim resmi <span className="font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300">admin@walipintar.my.id</span>.
+                      </p>
+
+                      <div className="text-[11px] font-semibold text-amber-900 bg-amber-100/70 p-1.5 rounded-lg border border-amber-200/80 flex items-start gap-1.5 mt-1">
+                        <span className="shrink-0">⚠️</span>
+                        <span>Pastikan periksa juga folder <strong>Spam</strong> atau <strong>Promosi</strong> jika tidak ada di Kotak Masuk.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TOMBOL MULAI MAIN GAME SEKARANG */}
+                <button
+                  type="button"
+                  onClick={() => handlePlayNow(paidModalData.license)}
+                  className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 cursor-pointer transition-all active:scale-98 mb-2"
+                >
+                  <span>🚀 Mulai Main Game Sekarang (/play)</span>
+                  <span>➔</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCopyCode(paidModalData.license)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  {copied ? '✅ Berhasil Disalin!' : '📋 Salin Kode Lisensi'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -530,9 +624,9 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 text-[11.5px] text-slate-500 hover:text-emerald-700 underline transition-colors pt-1"
+                    className="inline-block max-w-full text-center text-[11.5px] text-slate-500 hover:text-emerald-700 underline transition-colors pt-1 leading-snug"
                   >
-                    <WhatsAppIcon className="w-3.5 h-3.5 shadow-2xs rounded-full" />
+                    <WhatsAppIcon className="w-3.5 h-3.5 shadow-2xs rounded-full inline-block align-text-bottom mr-1.5" />
                     <span>Sudah bayar dengan email lain? Chat WhatsApp Admin</span>
                   </a>
                 </div>

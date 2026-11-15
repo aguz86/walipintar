@@ -54,6 +54,7 @@ const SCALEV_URL  = 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi
 const LYNK_LP_URL = 'https://javapedia.lynk.id/p/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia'; // LP Lynk (Affiliate & Organik)
 const ADMIN_WA    = '6285704808186';
 const DEFAULT_AFFILIATE_COMMISSION_RATE = 20; // Default komisi affiliate 20%
+const EMAIL_RESEND_COOLDOWN_DAYS = 90;       // Kirim ulang email Brevo maksimal 1x per 3 bulan (90 hari)
 
 // ======================= [ HELPER CONFIG AMAN (SCRIPT PROPERTIES) ] =======================
 function getScriptProp(key, fallbackVal) {
@@ -151,16 +152,20 @@ function ensureSheetHeaders(ss, sheetName, headers, headerBg) {
 
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
-    const headerRange = sheet.getRange(1, 1, 1, headers.length);
-    headerRange
-      .setFontWeight('bold')
-      .setBackground(headerBg || '#065f46')
-      .setFontColor('#ffffff')
-      .setHorizontalAlignment('center')
-      .setVerticalAlignment('middle');
     sheet.setRowHeight(1, 32);
     sheet.setFrozenRows(1);
   }
+
+  const headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange
+    .setFontWeight('bold')
+    .setBackground(headerBg || '#0369a1')
+    .setFontColor('#ffffff')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 32);
+  sheet.setFrozenRows(1);
+
   return sheet;
 }
 
@@ -174,7 +179,7 @@ function initAllSheets(ss) {
     ss.deleteSheet(oldReportLynk);
   }
 
-  // 2. Pastikan tab utama tersedia terlebih dahulu
+  // 2. Pastikan tab utama tersedia terlebih dahulu (Scalev: Biru Laut #0369a1, Lynk: Hijau Botol #065f46)
   const scalevSheet = ensureSheetHeaders(ss, TAB_SCALEV_ORDERS, [
     'Waktu Pembayaran',
     'Order ID Scalev',
@@ -185,7 +190,7 @@ function initAllSheets(ss) {
     'Gross Revenue',
     'Nama Pelanggan',
     'Catatan'
-  ], '#065f46');
+  ], '#0369a1');
 
   const lynkSheet = ensureSheetHeaders(ss, TAB_LYNK_ORDERS, [
     'Waktu Pembayaran',
@@ -199,13 +204,13 @@ function initAllSheets(ss) {
     'Affiliate ID',
     'Nama Affiliate',
     'Catatan'
-  ], '#1e3a8a');
+  ], '#065f46');
 
   ensureSheetHeaders(ss, TAB_REPORT_SCALEV, [
     'Total Omzet',
     'Total Transaksi',
     'Lisensi Aktif'
-  ], '#065f46');
+  ], '#0369a1');
 
   ensureSheetHeaders(ss, TAB_REPORT_LYNK, [
     'Nama Affiliate',
@@ -213,7 +218,7 @@ function initAllSheets(ss) {
     'Total Omzet',
     'Rate Komisi (%)',
     'Total Komisi'
-  ], '#1e3a8a');
+  ], '#065f46');
 
   // 3. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
   const legacyLicensesSheet = ss.getSheetByName('Licenses');
@@ -382,12 +387,13 @@ function handleScalevOrder(params) {
     const existingScalev = findExistingOrder(scalevSheet, orderId, email);
     if (existingScalev) {
       let emailSentNow = false;
-      const needsEmail = !existingScalev.catatan.toUpperCase().includes('TERKIRIM');
-      if (needsEmail && existingScalev.email && existingScalev.email.includes('@')) {
-        const resendRes = sendEmailBrevo(existingScalev.email, existingScalev.licenseKey, existingScalev.customerName, existingScalev.orderId);
+      const elig = evaluateEmailResendEligibility(existingScalev.paymentTime, existingScalev.catatan);
+      if (elig.allowed && existingScalev.email && existingScalev.email.includes('@')) {
+        const resendRes = sendEmailBrevo(existingScalev.email, existingScalev.licenseKey, existingScalev.customerName, existingScalev.orderId, elig.isResend);
         if (resendRes.success) {
           emailSentNow = true;
-          scalevSheet.getRange(existingScalev.rowIndex, 9).setValue('Email Brevo: TERKIRIM (Auto-Retry)');
+          const noteLabel = elig.isResend ? 'TERKIRIM ULANG (Brevo 3-Bulanan)' : 'Email Brevo: TERKIRIM (Auto-Retry)';
+          scalevSheet.getRange(existingScalev.rowIndex, 9).setValue(stampEmailSentDate(noteLabel));
           SpreadsheetApp.flush();
         }
       }
@@ -403,10 +409,20 @@ function handleScalevOrder(params) {
         orderId: existingScalev.orderId,
         email: existingScalev.email,
         name: existingScalev.customerName,
-        emailSent: true,
+        emailSent: emailSentNow || !elig.cooldownActive,
         emailSentNow: emailSentNow,
-        wasBrevoPending: needsEmail,
-        message: 'Alhamdulillah! Pembayaran Anda telah terkonfirmasi. Lisensi siap digunakan!'
+        wasBrevoPending: !elig.isResend && elig.allowed,
+        cooldownActive: !emailSentNow && elig.cooldownActive,
+        copyOnlyPopup: !emailSentNow && elig.cooldownActive,
+        resendAllowed: elig.allowed,
+        daysSinceLastEmail: elig.daysSince,
+        remainingDays: elig.remainingDays,
+        cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
+        lastEmailDate: elig.lastEmailDate,
+        nextEligibleDate: elig.nextEligibleDate,
+        message: (!emailSentNow && elig.cooldownActive)
+          ? 'Lisensi aktif ditemukan! Kirim ulang email tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung Copy-Paste kode lisensi Anda.'
+          : 'Alhamdulillah! Pembayaran Anda telah terkonfirmasi. Lisensi siap digunakan!'
       });
     }
 
@@ -420,13 +436,14 @@ function handleScalevOrder(params) {
         const foundAlt = findExistingOrder(altSheets[a].sh, orderId, email);
         if (foundAlt) {
           let emailSentNow = false;
-          const needsEmail = !foundAlt.catatan.toUpperCase().includes('TERKIRIM');
-          if (needsEmail && foundAlt.email && foundAlt.email.includes('@')) {
-            const resendRes = sendEmailBrevo(foundAlt.email, foundAlt.licenseKey, foundAlt.customerName, foundAlt.orderId);
+          const elig = evaluateEmailResendEligibility(foundAlt.paymentTime, foundAlt.catatan);
+          if (elig.allowed && foundAlt.email && foundAlt.email.includes('@')) {
+            const resendRes = sendEmailBrevo(foundAlt.email, foundAlt.licenseKey, foundAlt.customerName, foundAlt.orderId, elig.isResend);
             if (resendRes.success) {
               emailSentNow = true;
               if (altSheets[a].noteCol > 0) {
-                altSheets[a].sh.getRange(foundAlt.rowIndex, altSheets[a].noteCol).setValue('Webhook Lynk.id | Email Brevo: TERKIRIM (Auto-Retry)');
+                const noteLabel = elig.isResend ? 'Webhook Lynk.id | TERKIRIM ULANG (Brevo 3-Bulanan)' : 'Webhook Lynk.id | Email Brevo: TERKIRIM (Auto-Retry)';
+                altSheets[a].sh.getRange(foundAlt.rowIndex, altSheets[a].noteCol).setValue(stampEmailSentDate(noteLabel));
                 SpreadsheetApp.flush();
               }
             }
@@ -443,10 +460,20 @@ function handleScalevOrder(params) {
             orderId: foundAlt.orderId,
             email: foundAlt.email,
             name: foundAlt.customerName,
-            emailSent: true,
+            emailSent: emailSentNow || !elig.cooldownActive,
             emailSentNow: emailSentNow,
-            wasBrevoPending: needsEmail,
-            message: 'Alhamdulillah! Pembayaran Anda dari ' + altSheets[a].src + ' telah terkonfirmasi. Lisensi siap digunakan!'
+            wasBrevoPending: !elig.isResend && elig.allowed,
+            cooldownActive: !emailSentNow && elig.cooldownActive,
+            copyOnlyPopup: !emailSentNow && elig.cooldownActive,
+            resendAllowed: elig.allowed,
+            daysSinceLastEmail: elig.daysSince,
+            remainingDays: elig.remainingDays,
+            cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
+            lastEmailDate: elig.lastEmailDate,
+            nextEligibleDate: elig.nextEligibleDate,
+            message: (!emailSentNow && elig.cooldownActive)
+              ? 'Lisensi aktif ditemukan! Kirim ulang email tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung Copy-Paste kode lisensi Anda.'
+              : 'Alhamdulillah! Pembayaran Anda dari ' + altSheets[a].src + ' telah terkonfirmasi. Lisensi siap digunakan!'
           });
         }
       }
@@ -516,8 +543,9 @@ function handleScalevOrder(params) {
       });
     }
 
-    // Generate kode lisensi unik WALI-XXXX (anti-duplikat lintas semua sheet + cache)
-    const licenseKey = generateUniqueLicenseKey(ss);
+    // Pastikan 1 email selalu memiliki 1 kode lisensi WALI-XXXX yang fix & paten di sheet
+    const fixedExisting = findFixedLicenseForEmail(ss, email);
+    const licenseKey = fixedExisting ? fixedExisting.licenseKey : generateUniqueLicenseKey(ss);
 
     // Simpan lebih dulu ke tab Scalev_Orders & flush sebelum mengirim email
     scalevSheet.appendRow([
@@ -542,7 +570,7 @@ function handleScalevOrder(params) {
 
     const catatanParts = [];
     if (produk) catatanParts.push('Produk: ' + produk);
-    catatanParts.push(brevoRes.success ? 'Email Brevo: TERKIRIM' : 'Email Brevo: GAGAL (' + brevoRes.error + ')');
+    catatanParts.push(brevoRes.success ? stampEmailSentDate('Email Brevo: TERKIRIM') : 'Email Brevo: GAGAL (' + brevoRes.error + ')');
     scalevSheet.getRange(lastRow, 9).setValue(catatanParts.join(' | '));
     autoFitSheetColumns(scalevSheet, 9, 110, 22);
     generateDashboard(true);
@@ -772,8 +800,9 @@ function doPost(e) {
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
 
-    // 4. GENERATE LISENSI UNIK, SIMPAN KE `Lynk_Orders`, FLUSH, DAN KIRIM BREVO
-    const licenseKey = generateUniqueLicenseKey(ss);
+    // 4. GUNAKAN LISENSI PATEN EMAIL (JIKA SUDAH ADA) ATAU GENERATE BARU, LALU FLUSH KE SHEET
+    const existingEmailLic = findFixedLicenseForEmail(ss, customerEmail);
+    const licenseKey = existingEmailLic ? existingEmailLic.licenseKey : generateUniqueLicenseKey(ss);
     const now = new Date();
     const baseTag = 'Webhook Lynk.id' + (signatureHeader ? ' (HMAC Verified)' : ' (Direct GAS)');
 
@@ -797,7 +826,8 @@ function doPost(e) {
     SpreadsheetApp.flush();
 
     const brevoRes = sendEmailBrevo(customerEmail, licenseKey, customerName, orderIdToSave);
-    const catatan = baseTag + ' | Email Brevo: ' + (brevoRes.success ? 'TERKIRIM' : 'GAGAL (' + brevoRes.error + ')');
+    const rawCatatan = baseTag + ' | Email Brevo: ' + (brevoRes.success ? 'TERKIRIM' : 'GAGAL (' + brevoRes.error + ')');
+    const catatan = brevoRes.success ? stampEmailSentDate(rawCatatan) : rawCatatan;
     lynkSheet.getRange(lastRow, 11).setValue(catatan);
     autoFitSheetColumns(lynkSheet, 11, 110, 22);
     generateDashboard(true);
@@ -979,8 +1009,8 @@ function autoFitAllSheets(ss) {
   if (s4) autoFitSheetColumns(s4, 5, 130, 26);
   const s5 = targetSs.getSheetByName(TAB_DASHBOARD);
   if (s5) {
-    autoFitSheetColumns(s5, 4, 140, 28);
-    if (s5.getColumnWidth(4) < 200) s5.setColumnWidth(4, 200);
+    autoFitSheetColumns(s5, 4, 145, 28);
+    if (s5.getColumnWidth(4) < 220) s5.setColumnWidth(4, 220);
   }
 }
 
@@ -1020,6 +1050,49 @@ function generateAllReports() {
   } catch (e) {}
 }
 
+function writeDashboardTable(dashSheet, startRow, title, headerBg, rows) {
+  dashSheet.getRange(startRow, 1, 1, 4).merge()
+    .setValue(title)
+    .setBackground(headerBg)
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(10.5)
+    .setVerticalAlignment('middle');
+  dashSheet.setRowHeight(startRow, 28);
+
+  for (let r = 0; r < rows.length; r++) {
+    const rowIdx = startRow + 1 + r;
+    const item = rows[r];
+    dashSheet.getRange(rowIdx, 1, 1, 3).merge()
+      .setValue(item.label)
+      .setBackground(item.bg)
+      .setFontColor(item.color)
+      .setFontWeight(item.bold ? 'bold' : 'normal')
+      .setHorizontalAlignment('left')
+      .setVerticalAlignment('middle');
+
+    const valCell = dashSheet.getRange(rowIdx, 4);
+    if (item.formula) {
+      valCell.setFormula(item.formula);
+    } else {
+      valCell.setValue(item.val);
+    }
+    valCell
+      .setNumberFormat(item.fmt)
+      .setBackground(item.bg)
+      .setFontColor(item.color)
+      .setFontWeight(item.bold ? 'bold' : 'normal')
+      .setHorizontalAlignment('right')
+      .setVerticalAlignment('middle');
+    dashSheet.setRowHeight(rowIdx, 24);
+  }
+
+  const endRow = startRow + rows.length;
+  dashSheet.getRange(startRow, 1, rows.length + 1, 4)
+    .setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
+  return endRow;
+}
+
 function generateDashboard(silent) {
   try {
     const ss = getTargetSpreadsheet();
@@ -1033,9 +1106,13 @@ function generateDashboard(silent) {
     const todayDisplay = getJakartaDateDisplay(new Date());
 
     let scalevRevenue = 0;
+    let scalevPaidTx = 0;
+    let scalevTodayRev = 0;
+
     let lynkRevenue = 0;
-    let totalPaidTx = 0;
-    let revenueToday = 0;
+    let lynkPaidTx = 0;
+    let lynkTodayRev = 0;
+
     let totalLicenses = 0;
     let activeLicenses = 0;
     let licensesToday = 0;
@@ -1073,10 +1150,15 @@ function generateDashboard(silent) {
 
         const isPaid = isOrderTrulyPaidWithLicense(license, statusLisensi, paymentStatus);
         if (isPaid) {
-          totalPaidTx++;
-          if (src.type === 'SCALEV') scalevRevenue += rev;
-          else if (src.type === 'LYNK') lynkRevenue += rev;
-          if (isToday) revenueToday += rev;
+          if (src.type === 'SCALEV') {
+            scalevPaidTx++;
+            scalevRevenue += rev;
+            if (isToday) scalevTodayRev += rev;
+          } else if (src.type === 'LYNK') {
+            lynkPaidTx++;
+            lynkRevenue += rev;
+            if (isToday) lynkTodayRev += rev;
+          }
         }
 
         if (catatan.includes('TERKIRIM')) {
@@ -1086,163 +1168,181 @@ function generateDashboard(silent) {
       }
     });
 
+    const scalevAvg = scalevPaidTx > 0 ? Math.round(scalevRevenue / scalevPaidTx) : 0;
+    const lynkAvg = lynkPaidTx > 0 ? Math.round(lynkRevenue / lynkPaidTx) : 0;
+
     const totalRevenue = scalevRevenue + lynkRevenue;
+    const totalPaidTx = scalevPaidTx + lynkPaidTx;
     const avgRevenue = totalPaidTx > 0 ? Math.round(totalRevenue / totalPaidTx) : 0;
+    const revenueToday = scalevTodayRev + lynkTodayRev;
+    const scalevSharePct = totalRevenue > 0 ? Math.round((scalevRevenue / totalRevenue) * 100) : 0;
+    const lynkSharePct = totalRevenue > 0 ? (100 - scalevSharePct) : 0;
+
     const emailsTodayTotal = getDailyEmailSentCount(emailsTodayFromSheet);
     const updatedAt = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy, HH.mm.ss');
 
     dashSheet.clear();
     dashSheet.clearFormats();
 
-    // Header Banner (Row 1)
+    // Banner Utama (Row 1)
     dashSheet.getRange('A1:D1').merge()
-      .setValue('📊 DASHBOARD MONITORING LISENSI & GROSS REVENUE WALI PINTAR')
-      .setBackground('#065f46')
+      .setValue('📊 DASHBOARD MONITORING PENJUALAN, LISENSI & BREVO WALI PINTAR')
+      .setBackground('#0f172a')
       .setFontColor('#ffffff')
       .setFontWeight('bold')
       .setFontSize(13)
       .setHorizontalAlignment('center')
       .setVerticalAlignment('middle');
     dashSheet.setRowHeight(1, 38);
+    dashSheet.setRowHeight(2, 14);
 
-    // Section 1: Summary Gross Revenue (Row 3)
-    dashSheet.getRange('A3:D3').merge()
-      .setValue('💰 SUMMARY GROSS REVENUE (SCALEV + LYNK.ID • STATUS PAID / LUNAS + BERLISENSI)')
-      .setBackground('#047857')
-      .setFontColor('#ffffff')
-      .setFontWeight('bold')
-      .setFontSize(10.5)
-      .setVerticalAlignment('middle');
-    dashSheet.setRowHeight(3, 28);
+    // ========================================================================
+    // TABEL 1: SALES SCALEV (META ADS • BIRU LAUT) — Row 3..8
+    // ========================================================================
+    const scalevSumifsFormula =
+      '=SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "PAID") + ' +
+      'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "COMPLETED") + ' +
+      'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "SETTLED")';
 
-    const revRows = [
-      { label: 'Total Gross Revenue (Semua Jalur Paid)', val: totalRevenue, fmt: '"Rp"#,##0', color: '#065f46', bg: '#ecfdf5', bold: true },
-      { label: 'Total Gross Revenue Scalev (Meta Ads)', val: scalevRevenue, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#ffffff', bold: false },
-      { label: 'Total Gross Revenue Lynk.id (Affiliate)', val: lynkRevenue, fmt: '"Rp"#,##0', color: '#1e3a8a', bg: '#f8fafc', bold: false },
-      { label: 'Total Transaksi Paid (Lunas)', val: totalPaidTx + ' Transaksi', fmt: '@', color: '#0f172a', bg: '#ffffff', bold: true },
-      { label: 'Rata-Rata Gross Revenue per Transaksi Paid', val: avgRevenue, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#f8fafc', bold: false },
-      { label: 'Gross Revenue Paid Hari Ini (' + todayDisplay + ')', val: revenueToday, fmt: '"Rp"#,##0', color: '#047857', bg: '#ecfdf5', bold: true },
-      { label: 'Formula Otomatis Sheet (=SUMIFS Paid + Lisensi)', val: null, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, isFormula: true }
-    ];
+    const t1End = writeDashboardTable(
+      dashSheet,
+      3,
+      '🔵 TABEL 1: SALES SCALEV (META ADS • LUNAS + BERLISENSI)',
+      '#0369a1',
+      [
+        { label: 'Gross Revenue Scalev (Paid)', val: scalevRevenue, fmt: '"Rp"#,##0', color: '#0c4a6e', bg: '#f0f9ff', bold: true },
+        { label: 'Transaksi Scalev Paid (Lunas & Berlisensi)', val: scalevPaidTx + ' Transaksi', fmt: '@', color: '#0f172a', bg: '#ffffff', bold: true },
+        { label: 'Rata-Rata Omzet per Transaksi Scalev', val: scalevAvg, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#f8fafc', bold: false },
+        { label: 'Gross Revenue Scalev Hari Ini (' + todayDisplay + ')', val: scalevTodayRev, fmt: '"Rp"#,##0', color: '#0369a1', bg: '#f0f9ff', bold: true },
+        { label: 'Formula Otomatis Scalev (=SUMIFS Paid)', val: scalevRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: scalevSumifsFormula }
+      ]
+    );
+    dashSheet.setRowHeight(t1End + 1, 14);
 
-    for (let r = 0; r < revRows.length; r++) {
-      const rowIdx = 4 + r;
-      const item = revRows[r];
-      dashSheet.getRange(rowIdx, 1, 1, 3).merge()
-        .setValue(item.label)
-        .setBackground(item.bg)
-        .setFontColor(item.color)
-        .setFontWeight(item.bold ? 'bold' : 'normal')
-        .setVerticalAlignment('middle');
-      const valCell = dashSheet.getRange(rowIdx, 4);
-      if (item.isFormula) {
-        valCell.setFormula(
-          '=SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "PAID") + ' +
-          'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "COMPLETED") + ' +
-          'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "SETTLED") + ' +
-          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "PAID") + ' +
-          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "COMPLETED") + ' +
-          'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "SETTLED")'
-        );
-      } else {
-        valCell.setValue(item.val);
-      }
-      valCell
-        .setNumberFormat(item.fmt)
-        .setBackground(item.bg)
-        .setFontColor(item.color)
-        .setFontWeight(item.bold ? 'bold' : 'normal')
-        .setHorizontalAlignment('right')
-        .setVerticalAlignment('middle');
-      dashSheet.setRowHeight(rowIdx, 24);
-    }
+    // ========================================================================
+    // TABEL 2: SALES LYNK.ID (AFFILIATE & ORGANIK • HIJAU BOTOL) — Row 10..15
+    // ========================================================================
+    const lynkStartRow = t1End + 2;
+    const lynkSumifsFormula =
+      '=SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "PAID") + ' +
+      'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "COMPLETED") + ' +
+      'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "SETTLED")';
 
-    dashSheet.getRange('A3:D10').setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
+    const t2End = writeDashboardTable(
+      dashSheet,
+      lynkStartRow,
+      '🟢 TABEL 2: SALES LYNK.ID (AFFILIATE & ORGANIK • LUNAS + BERLISENSI)',
+      '#065f46',
+      [
+        { label: 'Gross Revenue Lynk.id (Paid)', val: lynkRevenue, fmt: '"Rp"#,##0', color: '#065f46', bg: '#ecfdf5', bold: true },
+        { label: 'Transaksi Lynk.id Paid (Lunas & Berlisensi)', val: lynkPaidTx + ' Transaksi', fmt: '@', color: '#0f172a', bg: '#ffffff', bold: true },
+        { label: 'Rata-Rata Omzet per Transaksi Lynk.id', val: lynkAvg, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#f8fafc', bold: false },
+        { label: 'Gross Revenue Lynk.id Hari Ini (' + todayDisplay + ')', val: lynkTodayRev, fmt: '"Rp"#,##0', color: '#047857', bg: '#ecfdf5', bold: true },
+        { label: 'Formula Otomatis Lynk.id (=SUMIFS Paid)', val: lynkRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: lynkSumifsFormula }
+      ]
+    );
+    dashSheet.setRowHeight(t2End + 1, 14);
 
-    // Anti-#ERROR! Guard pada Formula SUMIFS (Row 10)
+    // ========================================================================
+    // TABEL 3: REKAP TOTAL / SUMMARY PENJUALAN (SCALEV + LYNK.ID) — Row 17..23
+    // ========================================================================
+    const summaryStartRow = t2End + 2;
+    const scalevTotalCellRef = 'D4';
+    const lynkTotalCellRef = 'D' + (lynkStartRow + 1);
+    const scalevFormulaCellRef = 'D' + t1End;
+    const lynkFormulaCellRef = 'D' + t2End;
+
+    const t3End = writeDashboardTable(
+      dashSheet,
+      summaryStartRow,
+      '💰 TABEL 3: REKAP TOTAL / SUMMARY PENJUALAN (SCALEV + LYNK.ID)',
+      '#0f766e',
+      [
+        { label: 'Total Gross Revenue (Semua Jalur Paid)', val: totalRevenue, fmt: '"Rp"#,##0', color: '#065f46', bg: '#ecfdf5', bold: true, formula: '=' + scalevTotalCellRef + '+' + lynkTotalCellRef },
+        { label: 'Kontribusi Omzet (Scalev vs Lynk.id)', val: 'Scalev ' + scalevSharePct + '%  |  Lynk.id ' + lynkSharePct + '%', fmt: '@', color: '#334155', bg: '#ffffff', bold: false },
+        { label: 'Total Transaksi Paid (Lunas)', val: totalPaidTx + ' Transaksi', fmt: '@', color: '#0f172a', bg: '#f8fafc', bold: true },
+        { label: 'Rata-Rata Gross Revenue per Transaksi Paid', val: avgRevenue, fmt: '"Rp"#,##0', color: '#0f172a', bg: '#ffffff', bold: false },
+        { label: 'Total Gross Revenue Paid Hari Ini (' + todayDisplay + ')', val: revenueToday, fmt: '"Rp"#,##0', color: '#047857', bg: '#ecfdf5', bold: true },
+        { label: 'Formula Otomatis Gabungan (=SUMIFS Paid + Lisensi)', val: totalRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: '=' + scalevFormulaCellRef + '+' + lynkFormulaCellRef }
+      ]
+    );
+    dashSheet.setRowHeight(t3End + 1, 14);
+
+    // Anti-#ERROR! Guard pada seluruh cell formula
     SpreadsheetApp.flush();
-    const formulaCell = dashSheet.getRange('D10');
-    const formulaDisp = String(formulaCell.getDisplayValue() || '');
-    if (formulaDisp.startsWith('#')) {
-      formulaCell.setValue(scalevRevenue + lynkRevenue).setNumberFormat('"Rp"#,##0');
-    }
+    [
+      { cell: scalevFormulaCellRef, fallback: scalevRevenue },
+      { cell: lynkFormulaCellRef, fallback: lynkRevenue },
+      { cell: 'D' + (summaryStartRow + 1), fallback: totalRevenue },
+      { cell: 'D' + t3End, fallback: totalRevenue }
+    ].forEach(function(guard) {
+      const c = dashSheet.getRange(guard.cell);
+      const disp = String(c.getDisplayValue() || '');
+      if (disp.startsWith('#')) {
+        c.setValue(guard.fallback).setNumberFormat('"Rp"#,##0');
+      }
+    });
 
-    // Section 2: Metrik Operasional Lisensi & Brevo (Row 12)
-    dashSheet.getRange('A12:D12').merge()
-      .setValue('📈 METRIK OPERASIONAL LISENSI & BREVO')
-      .setBackground('#0f172a')
-      .setFontColor('#ffffff')
-      .setFontWeight('bold')
-      .setFontSize(10.5)
-      .setVerticalAlignment('middle');
-    dashSheet.setRowHeight(12, 28);
+    // ========================================================================
+    // TABEL 4: MATRIKS OPERASIONAL LISENSI & BREVO — Row 25..31
+    // ========================================================================
+    const opsStartRow = t3End + 2;
+    const t4End = writeDashboardTable(
+      dashSheet,
+      opsStartRow,
+      '📈 TABEL 4: MATRIKS OPERASIONAL LISENSI & BREVO',
+      '#0f172a',
+      [
+        { label: 'Total Lisensi Diterbitkan', val: totalLicenses, fmt: '#,##0', color: '#0f172a', bg: '#ffffff', bold: true },
+        { label: 'Lisensi Aktif (Siap Main)', val: activeLicenses, fmt: '#,##0', color: '#0f172a', bg: '#f8fafc', bold: true },
+        { label: 'Lisensi Terbit Hari Ini (' + todayDisplay + ')', val: licensesToday, fmt: '#,##0', color: '#0f172a', bg: '#ffffff', bold: true },
+        { label: 'Total Email Berhasil Terkirim (Brevo)', val: totalEmailsSent, fmt: '#,##0', color: '#0f172a', bg: '#f8fafc', bold: true },
+        { label: 'Total Email Terkirim Hari Ini (Brevo)', val: emailsTodayTotal, fmt: '#,##0', color: '#065f46', bg: '#ecfdf5', bold: true },
+        { label: 'Terakhir Diperbarui Otomatis', val: updatedAt, fmt: '@', color: '#475569', bg: '#ffffff', bold: true }
+      ]
+    );
+    dashSheet.setRowHeight(t4End + 1, 14);
 
-    const opsRows = [
-      { label: 'Total Lisensi Diterbitkan', val: totalLicenses, fmt: '#,##0', bg: '#ffffff', color: '#0f172a', bold: true },
-      { label: 'Lisensi Aktif (Siap Main)', val: activeLicenses, fmt: '#,##0', bg: '#f8fafc', color: '#0f172a', bold: true },
-      { label: 'Lisensi Terbit Hari Ini (' + todayDisplay + ')', val: licensesToday, fmt: '#,##0', bg: '#ffffff', color: '#0f172a', bold: true },
-      { label: 'Total Email Berhasil Terkirim (Brevo)', val: totalEmailsSent, fmt: '#,##0', bg: '#f8fafc', color: '#0f172a', bold: true },
-      { label: 'Total Email Terkirim Hari Ini (Brevo)', val: emailsTodayTotal, fmt: '#,##0', bg: '#ecfdf5', color: '#065f46', bold: true },
-      { label: 'Terakhir Diperbarui Otomatis', val: updatedAt, fmt: '@', bg: '#ffffff', color: '#475569', bold: true }
-    ];
-
-    for (let m = 0; m < opsRows.length; m++) {
-      const rowIdx = 13 + m;
-      const item = opsRows[m];
-      dashSheet.getRange(rowIdx, 1, 1, 3).merge()
-        .setValue(item.label)
-        .setBackground(item.bg)
-        .setFontColor(item.color)
-        .setFontWeight(item.bold ? 'bold' : 'normal')
-        .setVerticalAlignment('middle');
-      dashSheet.getRange(rowIdx, 4)
-        .setValue(item.val)
-        .setNumberFormat(item.fmt)
-        .setBackground(item.bg)
-        .setFontColor(item.color)
-        .setFontWeight(item.bold ? 'bold' : 'normal')
-        .setHorizontalAlignment('right')
-        .setVerticalAlignment('middle');
-      dashSheet.setRowHeight(rowIdx, 24);
-    }
-
-    dashSheet.getRange('A12:D18').setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
-
-    // Section 3: Panduan Singkat (Merged A:D agar tidak merusak auto-width Kolom A)
-    dashSheet.getRange('A20:D20').merge()
+    // ========================================================================
+    // PANDUAN SINGKAT (Merged A:D agar tidak merusak auto-width Kolom A)
+    // ========================================================================
+    const guideStartRow = t4End + 2;
+    dashSheet.getRange(guideStartRow, 1, 1, 4).merge()
       .setValue('💡 PANDUAN PENGELOLAAN SCALEV, LYNK.ID & LISENSI:')
       .setFontWeight('bold')
       .setFontColor('#0f172a');
     const guides = [
-      '1. Kolom "Gross Revenue" otomatis merekam nilai rupiah dari Scalev & Webhook Lynk.id.',
-      '2. Summary di atas menghitung gabungan omzet Scalev + Lynk.id berstatus PAID/LUNAS beserta counter email Brevo hari ini.',
-      '3. Menu Laporan: Gunakan "📊 Menu Laporan" untuk rincian Scalev, komisi Affiliate Lynk.id, & rapikan lebar kolom otomatis.',
-      '4. Menu Admin: Gunakan "🎮 WaliPintar Admin" untuk uji koneksi Brevo/Lynk/Scalev, sinkronisasi order, atau broadcast update.'
+      '1. Tabel 1 (Sales Scalev) & Tabel 2 (Sales Lynk.id) dipisah untuk memantau performa Meta Ads dan Affiliate secara mandiri.',
+      '2. Tabel 3 (Rekap Total) menggabungkan seluruh transaksi yang benar-benar LUNAS (PAID/COMPLETED) dan sudah terbit lisensi ACTIVE.',
+      '3. Tabel 4 (Matriks Operasional) memantau total lisensi aktif dan kuota email harian Brevo secara real-time.',
+      '4. Gunakan menu "📊 Menu Laporan" untuk rincian komisi `lynk_affiliate` atau "🎮 WaliPintar Admin" untuk sinkronisasi Scalev API.'
     ];
     for (let g = 0; g < guides.length; g++) {
-      dashSheet.getRange(21 + g, 1, 1, 4).merge()
+      dashSheet.getRange(guideStartRow + 1 + g, 1, 1, 4).merge()
         .setValue(guides[g])
         .setWrap(true)
         .setFontColor('#334155')
         .setFontSize(10);
+      dashSheet.setRowHeight(guideStartRow + 1 + g, 22);
     }
 
-    // Auto-width proporsional agar semua isi & label terlihat utuh
+    // Auto-width proporsional agar seluruh 4 tabel terlihat rapi & utuh
     SpreadsheetApp.flush();
     dashSheet.autoResizeColumns(1, 4);
-    if (dashSheet.getColumnWidth(1) < 140) dashSheet.setColumnWidth(1, 140);
-    if (dashSheet.getColumnWidth(2) < 130) dashSheet.setColumnWidth(2, 130);
-    if (dashSheet.getColumnWidth(3) < 130) dashSheet.setColumnWidth(3, 130);
-    dashSheet.setColumnWidth(4, Math.max(210, dashSheet.getColumnWidth(4) + 32));
+    if (dashSheet.getColumnWidth(1) < 155) dashSheet.setColumnWidth(1, 155);
+    if (dashSheet.getColumnWidth(2) < 135) dashSheet.setColumnWidth(2, 135);
+    if (dashSheet.getColumnWidth(3) < 135) dashSheet.setColumnWidth(3, 135);
+    dashSheet.setColumnWidth(4, Math.max(220, dashSheet.getColumnWidth(4) + 32));
 
     if (!silent) {
       try {
         SpreadsheetApp.getUi().alert(
-          '📊 Dashboard Monitoring Diperbarui',
-          '• Total Gross Revenue (Paid): Rp ' + formatNumberId(totalRevenue) + '\n' +
-          '• Total Transaksi Paid: ' + totalPaidTx + '\n' +
+          '📊 Dashboard 4 Tabel Diperbarui',
+          '• Sales Scalev: Rp ' + formatNumberId(scalevRevenue) + ' (' + scalevPaidTx + ' transaksi)\n' +
+          '• Sales Lynk.id: Rp ' + formatNumberId(lynkRevenue) + ' (' + lynkPaidTx + ' transaksi)\n' +
+          '• Rekap Total Paid: Rp ' + formatNumberId(totalRevenue) + ' (' + totalPaidTx + ' transaksi)\n' +
           '• Email Terkirim Hari Ini (Brevo): ' + emailsTodayTotal + ' email\n' +
-          '• Seluruh lebar kolom sudah disesuaikan otomatis.',
+          '• Seluruh 4 tabel & lebar kolom sudah dirapikan otomatis.',
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       } catch (uiErr) {}
@@ -1302,7 +1402,7 @@ function generateScalevReport(silent) {
     reportSheet.getRange(1, 1, 1, 3)
       .setValues([headers])
       .setFontWeight('bold')
-      .setBackground('#065f46')
+      .setBackground('#0369a1')
       .setFontColor('#ffffff')
       .setHorizontalAlignment('center');
 
@@ -1310,7 +1410,7 @@ function generateScalevReport(silent) {
       .setValues([[totalOmzet, totalTransaksi, lisensiAktif]])
       .setFontWeight('bold')
       .setFontSize(12)
-      .setBackground('#ecfdf5');
+      .setBackground('#f0f9ff');
 
     reportSheet.getRange(2, 1).setNumberFormat('"Rp"#,##0').setHorizontalAlignment('right');
     reportSheet.getRange(2, 2).setNumberFormat('#,##0').setHorizontalAlignment('center');
@@ -1322,13 +1422,13 @@ function generateScalevReport(silent) {
       .setValue('Total Email Terkirim Hari Ini (Brevo)')
       .setFontWeight('bold')
       .setBackground('#f8fafc')
-      .setFontColor('#065f46');
+      .setFontColor('#0c4a6e');
     reportSheet.getRange('C4')
       .setValue(totalEmailsTodayAll)
       .setNumberFormat('#,##0')
       .setFontWeight('bold')
-      .setBackground('#ecfdf5')
-      .setFontColor('#065f46')
+      .setBackground('#f0f9ff')
+      .setFontColor('#0c4a6e')
       .setHorizontalAlignment('center');
     reportSheet.getRange('A4:C4').setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
 
@@ -1459,7 +1559,7 @@ function generateLynkReport(silent) {
     reportSheet.getRange(1, 1, 1, 5)
       .setValues([headers])
       .setFontWeight('bold')
-      .setBackground('#1e3a8a')
+      .setBackground('#065f46')
       .setFontColor('#ffffff')
       .setHorizontalAlignment('center');
 
@@ -1475,7 +1575,7 @@ function generateLynkReport(silent) {
       reportSheet.getRange(totalRowIdx, 1, 1, 5)
         .setValues([['TOTAL KESELURUHAN', grandTotalTx, grandTotalOmzet, '-', grandTotalKomisi]])
         .setFontWeight('bold')
-        .setBackground('#eff6ff');
+        .setBackground('#ecfdf5');
       reportSheet.getRange(totalRowIdx, 2).setNumberFormat('#,##0').setHorizontalAlignment('center');
       reportSheet.getRange(totalRowIdx, 3).setNumberFormat('"Rp"#,##0').setHorizontalAlignment('right');
       reportSheet.getRange(totalRowIdx, 4).setHorizontalAlignment('center');
@@ -1521,8 +1621,11 @@ function menuCheckDuplicateLicenses() {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
 
-  const seenMap = {};
-  const duplicates = [];
+  const codeToEmailMap = {};
+  const emailToCodeMap = {};
+  const keyCollisions = [];
+  const emailSplits = [];
+  let totalChecked = 0;
 
   [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
     const sh = ss.getSheetByName(tabName);
@@ -1531,29 +1634,42 @@ function menuCheckDuplicateLicenses() {
     const rows = sh.getDataRange().getValues();
     const licCol = findLicenseColumnIndex(rows[0]);
     for (let i = 1; i < rows.length; i++) {
+      const email = String(rows[i][2] || '').trim().toLowerCase();
       const code = String(rows[i][licCol] || '').trim().toUpperCase();
-      if (!code) continue;
-      const loc = tabName + ' (Baris ' + (i + 1) + ')';
-      if (seenMap[code]) {
-        duplicates.push(code + ': ' + seenMap[code] + ' vs ' + loc);
+      if (!code || !code.startsWith('WALI-')) continue;
+
+      totalChecked++;
+      const loc = tabName + ' (Baris ' + (i + 1) + (email ? ', ' + email : '') + ')';
+
+      if (codeToEmailMap[code]) {
+        if (codeToEmailMap[code].email && email && codeToEmailMap[code].email !== email) {
+          keyCollisions.push(code + ': ' + codeToEmailMap[code].loc + ' vs ' + loc);
+        }
       } else {
-        seenMap[code] = loc;
+        codeToEmailMap[code] = { email: email, loc: loc };
+      }
+
+      if (email) {
+        if (emailToCodeMap[email] && emailToCodeMap[email].code !== code) {
+          emailSplits.push(email + ': ' + emailToCodeMap[email].code + ' vs ' + code);
+        } else if (!emailToCodeMap[email]) {
+          emailToCodeMap[email] = { code: code, loc: loc };
+        }
       }
     }
   });
 
-  if (duplicates.length === 0) {
+  if (keyCollisions.length === 0 && emailSplits.length === 0) {
     ui.alert(
-      '🛡️ 100% Bebas Duplikat!',
-      'Total ' + Object.keys(seenMap).length + ' lisensi diperiksa di Scalev_Orders & Lynk_Orders.\nTidak ditemukan satu pun kode lisensi yang kembar/bentrok.',
+      '🛡️ 100% Paten & Bebas Bentrok!',
+      'Total ' + totalChecked + ' baris lisensi diperiksa (' + Object.keys(emailToCodeMap).length + ' email unik).\nSemua email terikat paten pada masing-masing 1 kode lisensi WALI-XXXX tanpa bentrok.',
       ui.ButtonSet.OK
     );
   } else {
-    ui.alert(
-      '⚠️ Ditemukan ' + duplicates.length + ' Duplikat Lisensi',
-      duplicates.slice(0, 10).join('\n'),
-      ui.ButtonSet.OK
-    );
+    const msgs = [];
+    if (keyCollisions.length > 0) msgs.push('Bentrok kode antar email:\n' + keyCollisions.slice(0, 5).join('\n'));
+    if (emailSplits.length > 0) msgs.push('Email punya >1 kode berbeda:\n' + emailSplits.slice(0, 5).join('\n'));
+    ui.alert('⚠️ Ditemukan Anomali Lisensi', msgs.join('\n\n'), ui.ButtonSet.OK);
   }
 }
 
@@ -1623,10 +1739,35 @@ function handleResendLicense(params) {
 
     const existing = findExistingOrder(sh, '', email);
     if (existing && existing.status === 'ACTIVE') {
-      const brevoRes = sendEmailBrevo(email, existing.licenseKey, existing.customerName, existing.orderId, true);
+      const elig = evaluateEmailResendEligibility(existing.paymentTime, existing.catatan);
+      if (!elig.allowed) {
+        return createJsonResponse({
+          status: 'success',
+          success: true,
+          found: true,
+          source: sheetsToCheck[s],
+          license: existing.licenseKey,
+          licenseKey: existing.licenseKey,
+          orderId: existing.orderId,
+          email: existing.email,
+          emailSent: false,
+          emailSentNow: false,
+          cooldownActive: true,
+          copyOnlyPopup: true,
+          resendAllowed: false,
+          daysSinceLastEmail: elig.daysSince,
+          remainingDays: elig.remainingDays,
+          cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
+          lastEmailDate: elig.lastEmailDate,
+          nextEligibleDate: elig.nextEligibleDate,
+          message: 'Kirim ulang email hanya tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung salin (copy-paste) kode lisensi Anda di popup.'
+        });
+      }
+
+      const brevoRes = sendEmailBrevo(email, existing.licenseKey, existing.customerName, existing.orderId, elig.isResend);
       const statusCol = sheetsToCheck[s] === TAB_LYNK_ORDERS ? 11 : 9;
       sh.getRange(existing.rowIndex, statusCol).setValue(
-        brevoRes.success ? 'TERKIRIM ULANG (Brevo)' : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
+        brevoRes.success ? stampEmailSentDate('TERKIRIM ULANG (Brevo)') : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
       );
       return createJsonResponse({
         status: brevoRes.success ? 'success' : 'error',
@@ -1635,7 +1776,13 @@ function handleResendLicense(params) {
         source: sheetsToCheck[s],
         license: existing.licenseKey,
         licenseKey: existing.licenseKey,
+        orderId: existing.orderId,
+        email: existing.email,
         emailSent: brevoRes.success,
+        emailSentNow: brevoRes.success,
+        cooldownActive: false,
+        copyOnlyPopup: false,
+        resendAllowed: true,
         brevoMessageId: brevoRes.messageId,
         message: brevoRes.success
           ? 'Lisensi berhasil dikirim ulang via Brevo ke ' + email + '!'
@@ -2084,6 +2231,19 @@ function menuGenerateManual() {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    const fixedExisting = findFixedLicenseForEmail(ss, email);
+    if (fixedExisting) {
+      ui.alert(
+        '📌 Email Sudah Memiliki Lisensi Paten',
+        'Email "' + email + '" sudah terdaftar permanen di sheet "' + fixedExisting.tabName + '" (Baris ' + fixedExisting.rowIndex + ').\n\n' +
+        'Kode Lisensi Paten: ' + fixedExisting.licenseKey + '\n' +
+        'Status: ' + (fixedExisting.status || 'ACTIVE') + '\n\n' +
+        'Sistem menjaga 1 email tetap 1 lisensi fix agar tidak berubah saat sheet di-refresh.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+
     const licenseKey = generateUniqueLicenseKey(ss);
     const orderId = (isLynk ? 'LYNK-MANUAL-' : 'SCLV-MANUAL-') + Date.now();
     const now = new Date();
@@ -2107,7 +2267,7 @@ function menuGenerateManual() {
     const brevoRes = sendEmailBrevo(email, licenseKey, customerName, orderId);
     const noteCol = isLynk ? 11 : 9;
     targetSheet.getRange(lastRow, noteCol).setValue(
-      'Manual Admin | Email Brevo: ' + (brevoRes.success ? 'TERKIRIM' : 'GAGAL (' + brevoRes.error + ')')
+      brevoRes.success ? stampEmailSentDate('Manual Admin | Email Brevo: TERKIRIM') : 'Manual Admin | Email Brevo: GAGAL (' + brevoRes.error + ')'
     );
     autoFitSheetColumns(targetSheet, isLynk ? 11 : 9, 110, 22);
     SpreadsheetApp.flush();
@@ -2151,16 +2311,30 @@ function menuResendManual() {
       const key = String(data[i][3] || '').trim().toUpperCase();
       const orderId = String(data[i][1] || '').trim();
       const custName = String(data[i][7] || '').trim();
+      const noteCol = tabs[t] === TAB_LYNK_ORDERS ? 11 : 9;
+      const noteVal = String(data[i][noteCol - 1] || '').trim();
 
       if (email === query.toLowerCase() || key === query.toUpperCase()) {
-        const res = sendEmailBrevo(email, key, custName, orderId, true);
-        if (tabs[t] === TAB_LYNK_ORDERS) {
-          sh.getRange(i + 1, 11).setValue(res.success ? 'TERKIRIM ULANG (Brevo)' : 'GAGAL KIRIM ULANG');
-          autoFitSheetColumns(sh, 11, 110, 22);
-        } else if (tabs[t] === TAB_SCALEV_ORDERS) {
-          sh.getRange(i + 1, 9).setValue(res.success ? 'TERKIRIM ULANG (Brevo)' : 'GAGAL KIRIM ULANG');
-          autoFitSheetColumns(sh, 9, 110, 22);
+        const elig = evaluateEmailResendEligibility(data[i][0], noteVal);
+        if (!elig.allowed) {
+          ui.alert(
+            '📋 Salin Kode Lisensi (< 3 Bulan Belum Bisa Kirim Ulang)',
+            'Kode Lisensi: ' + key + '\n' +
+            'Email: ' + email + '\n\n' +
+            'Email terakhir terkirim pada: ' + elig.lastEmailDate + '.\n' +
+            'Kirim ulang via Brevo dibatasi tiap 3 bulan (90 hari) agar kuota tetap aman.\n' +
+            'Pengiriman ulang tersedia lagi pada: ' + elig.nextEligibleDate + ' (' + elig.remainingDays + ' hari lagi).\n\n' +
+            'Silakan copy-paste kode lisensi di atas langsung untuk pembeli.',
+            ui.ButtonSet.OK
+          );
+          return;
         }
+
+        const res = sendEmailBrevo(email, key, custName, orderId, elig.isResend);
+        sh.getRange(i + 1, noteCol).setValue(
+          res.success ? stampEmailSentDate('TERKIRIM ULANG (Brevo)') : 'GAGAL KIRIM ULANG (' + res.error + ')'
+        );
+        autoFitSheetColumns(sh, noteCol, 110, 22);
         generateDashboard(true);
         ui.alert(res.success ? '✅ Email Terkirim Ulang ke ' + email : '❌ Gagal Kirim: ' + res.error);
         return;
@@ -2341,6 +2515,94 @@ function sendEmailBrevo(toEmail, licenseKey, customerName, orderId, isResend) {
     Logger.log('Error sendEmailBrevo: ' + err.toString());
     return { success: false, messageId: null, error: err.toString() };
   }
+}
+
+function parseOrderOrEmailDate(val) {
+  if (!val) return null;
+  try {
+    if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
+      return val;
+    }
+    const str = String(val).trim();
+    if (!str) return null;
+
+    const idMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[\s,]+(\d{2})[:.](\d{2})(?:[:.](\d{2}))?)?/);
+    if (idMatch) {
+      const isoStr = idMatch[3] + '-' + idMatch[2] + '-' + idMatch[1] + 'T' +
+        (idMatch[4] || '00') + ':' + (idMatch[5] || '00') + ':' + (idMatch[6] || '00') + '+07:00';
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) return d;
+    }
+
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed;
+  } catch (e) {}
+  return null;
+}
+
+function stampEmailSentDate(noteText) {
+  const cleanNote = String(noteText || '').replace(/\s*\|\s*LastEmail:\d{4}-\d{2}-\d{2}/gi, '').trim();
+  const todayIso = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd');
+  return cleanNote ? cleanNote + ' | LastEmail:' + todayIso : 'Email Brevo: TERKIRIM | LastEmail:' + todayIso;
+}
+
+function evaluateEmailResendEligibility(paymentTime, catatanStr) {
+  const note = String(catatanStr || '');
+  const upperNote = note.toUpperCase();
+  const hasSentBefore = upperNote.includes('TERKIRIM');
+
+  if (!hasSentBefore) {
+    return {
+      allowed: true,
+      isResend: false,
+      cooldownActive: false,
+      daysSince: 0,
+      remainingDays: 0,
+      lastEmailDate: '',
+      nextEligibleDate: ''
+    };
+  }
+
+  let lastSentDate = null;
+  const tagMatch = note.match(/LastEmail:(\d{4}-\d{2}-\d{2})/i);
+  if (tagMatch) {
+    const parsedTag = new Date(tagMatch[1] + 'T00:00:00+07:00');
+    if (!isNaN(parsedTag.getTime())) {
+      lastSentDate = parsedTag;
+    }
+  }
+
+  if (!lastSentDate) {
+    lastSentDate = parseOrderOrEmailDate(paymentTime) || new Date();
+  }
+
+  const diffMs = Math.max(0, Date.now() - lastSentDate.getTime());
+  const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const eligibleDate = new Date(lastSentDate.getTime() + EMAIL_RESEND_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+  const lastEmailDate = Utilities.formatDate(lastSentDate, 'Asia/Jakarta', 'dd/MM/yyyy');
+  const nextEligibleDate = Utilities.formatDate(eligibleDate, 'Asia/Jakarta', 'dd/MM/yyyy');
+
+  if (daysSince >= EMAIL_RESEND_COOLDOWN_DAYS) {
+    return {
+      allowed: true,
+      isResend: true,
+      cooldownActive: false,
+      daysSince: daysSince,
+      remainingDays: 0,
+      lastEmailDate: lastEmailDate,
+      nextEligibleDate: nextEligibleDate
+    };
+  }
+
+  return {
+    allowed: false,
+    isResend: false,
+    cooldownActive: true,
+    daysSince: daysSince,
+    remainingDays: Math.max(1, EMAIL_RESEND_COOLDOWN_DAYS - daysSince),
+    lastEmailDate: lastEmailDate,
+    nextEligibleDate: nextEligibleDate
+  };
 }
 
 function menuTestBrevoConnection() {
@@ -2678,11 +2940,29 @@ function syncOrdersFromScalev(ss) {
     const existingData = scalevSheet.getDataRange().getValues();
     const orderRowMap = {};
     const syntheticEmailRows = {};
+    const fixedEmailLicenseMap = {};
+
+    // Kumpulkan peta paten email -> lisensi dari BOTH sheets (Scalev_Orders & Lynk_Orders)
+    // Prioritaskan baris ACTIVE paling awal agar kode lisensi tiap email selalu tetap selamanya.
+    [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
+      const sh = ss.getSheetByName(tabName);
+      if (!sh || sh.getLastRow() <= 1) return;
+      const rows = sh.getDataRange().getValues();
+      for (let r = 1; r < rows.length; r++) {
+        const em = String(rows[r][2] || '').trim().toLowerCase();
+        const lic = String(rows[r][3] || '').trim().toUpperCase();
+        const st = String(rows[r][4] || '').trim().toUpperCase();
+        if (!em || !lic || !lic.startsWith('WALI-')) continue;
+        if (!fixedEmailLicenseMap[em] || (fixedEmailLicenseMap[em].status !== 'ACTIVE' && st === 'ACTIVE')) {
+          fixedEmailLicenseMap[em] = { licenseKey: lic, status: st };
+        }
+      }
+    });
 
     for (let i = 1; i < existingData.length; i++) {
       const oid = String(existingData[i][1] || '').trim();
       const em = String(existingData[i][2] || '').trim().toLowerCase();
-      const lic = String(existingData[i][3] || '').trim();
+      const lic = String(existingData[i][3] || '').trim().toUpperCase();
       if (oid) {
         orderRowMap[oid] = { row: i + 1, licenseKey: lic };
       }
@@ -2741,14 +3021,16 @@ function syncOrdersFromScalev(ss) {
 
         if (isPaid) {
           if (!matchedMeta.licenseKey || !matchedMeta.licenseKey.toUpperCase().startsWith('WALI-')) {
-            const newLic = generateUniqueLicenseKey(ss);
-            scalevSheet.getRange(existingRow, 4).setValue(newLic);
-            matchedMeta.licenseKey = newLic;
-            newLicensesCreated++;
+            const pinned = customerEmail && fixedEmailLicenseMap[customerEmail] ? fixedEmailLicenseMap[customerEmail].licenseKey : '';
+            const finalLic = pinned || generateUniqueLicenseKey(ss);
+            scalevSheet.getRange(existingRow, 4).setValue(finalLic);
+            matchedMeta.licenseKey = finalLic;
+            if (!pinned) newLicensesCreated++;
+            if (customerEmail) fixedEmailLicenseMap[customerEmail] = { licenseKey: finalLic, status: 'ACTIVE' };
           }
           scalevSheet.getRange(existingRow, 5).setValue('ACTIVE');
         } else {
-          // Order belum lunas / dibatalkan / refund: nonaktifkan agar tidak dihitung di Total Paid
+          // Order belum lunas / dibatalkan / refund: nonaktifkan agar tidak dihitung di Total Paid, namun tetap pertahankan kolom lisensi paten jika sudah ada
           scalevSheet.getRange(existingRow, 5).setValue('INACTIVE');
         }
 
@@ -2758,7 +3040,12 @@ function syncOrdersFromScalev(ss) {
         orderRowMap[officialOrderId] = matchedMeta;
         updatedCount++;
       } else if (isPaid && customerEmail) {
-        const licenseKey = generateUniqueLicenseKey(ss);
+        // Selalu pakai kode lisensi paten milik email ini jika sudah tercatat di sheet
+        const pinned = fixedEmailLicenseMap[customerEmail] ? fixedEmailLicenseMap[customerEmail].licenseKey : '';
+        const licenseKey = pinned || generateUniqueLicenseKey(ss);
+        if (!pinned) newLicensesCreated++;
+        fixedEmailLicenseMap[customerEmail] = { licenseKey: licenseKey, status: 'ACTIVE' };
+
         const orderPaidTime = extractPaymentTime(order);
         scalevSheet.appendRow([
           orderPaidTime,
@@ -2777,10 +3064,10 @@ function syncOrdersFromScalev(ss) {
         SpreadsheetApp.flush();
 
         orderRowMap[officialOrderId] = { row: lastRow, licenseKey: licenseKey };
-        newLicensesCreated++;
       }
     }
 
+    SpreadsheetApp.flush();
     autoFitSheetColumns(scalevSheet, 9, 110, 22);
     generateScalevReport(true);
     generateLynkReport(true);
@@ -2956,36 +3243,102 @@ function menuTestLynkWebhook() {
 // ============================================================================
 // 🛠️ HELPER UMUM: IDEMPOTENCY, ANTI-DUPLIKAT LINTAS SHEET, PARSER & FORMATTER
 // ============================================================================
+/**
+ * Mencari lisensi paten milik sebuah email di seluruh tab order (`Scalev_Orders` & `Lynk_Orders`).
+ * Selalu memprioritaskan baris `ACTIVE` paling awal agar kode lisensi tiap email tetap fix selamanya.
+ */
+function findFixedLicenseForEmail(ss, email) {
+  const targetEmail = String(email || '').trim().toLowerCase();
+  if (!ss || !targetEmail) return null;
+
+  let fallbackMatch = null;
+  const tabs = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
+
+  for (let t = 0; t < tabs.length; t++) {
+    const sh = ss.getSheetByName(tabs[t]);
+    if (!sh || sh.getLastRow() <= 1) continue;
+
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      const rowEmail = String(data[i][2] || '').trim().toLowerCase();
+      const rowLicense = String(data[i][3] || '').trim().toUpperCase();
+      const rowStatus = String(data[i][4] || '').trim().toUpperCase();
+
+      if (rowEmail === targetEmail && rowLicense && rowLicense.startsWith('WALI-')) {
+        const matchObj = {
+          tabName: tabs[t],
+          rowIndex: i + 1,
+          paymentTime: data[i][0],
+          orderId: String(data[i][1] || '').trim(),
+          email: rowEmail,
+          licenseKey: rowLicense,
+          status: rowStatus,
+          customerName: String(data[i][7] || '').trim(),
+          catatan: String(data[i][data[i].length - 1] || '').trim()
+        };
+        if (rowStatus === 'ACTIVE') {
+          return matchObj;
+        }
+        if (!fallbackMatch) {
+          fallbackMatch = matchObj;
+        }
+      }
+    }
+  }
+
+  return fallbackMatch;
+}
+
 function findExistingOrder(sheet, orderId, email) {
   if (!sheet) return null;
   const data = sheet.getDataRange().getValues();
   const targetOrder = String(orderId || '').trim();
   const targetEmail = String(email || '').trim().toLowerCase();
 
-  for (let i = data.length - 1; i >= 1; i--) {
+  let activeEmailMatch = null;
+  let anyOrderMatch = null;
+  let anyEmailMatch = null;
+
+  for (let i = 1; i < data.length; i++) {
     const rowOrder = String(data[i][1] || '').trim();
     const rowEmail = String(data[i][2] || '').trim().toLowerCase();
-    const rowLicense = String(data[i][3] || '').trim();
+    const rowLicense = String(data[i][3] || '').trim().toUpperCase();
     const rowStatus = String(data[i][4] || '').trim().toUpperCase();
     const rowName = String(data[i][7] || '').trim();
     const rowCatatan = String(data[i][data[i].length - 1] || '').trim();
 
-    const orderMatched = targetOrder && rowOrder === targetOrder;
-    const emailMatched = targetEmail && rowEmail === targetEmail;
+    if (!rowLicense) continue;
 
-    if ((orderMatched || emailMatched) && rowLicense) {
-      return {
-        rowIndex: i + 1,
-        orderId: rowOrder,
-        email: rowEmail,
-        licenseKey: rowLicense,
-        status: rowStatus,
-        customerName: rowName,
-        catatan: rowCatatan
-      };
+    const orderMatched = Boolean(targetOrder && rowOrder === targetOrder);
+    const emailMatched = Boolean(targetEmail && rowEmail === targetEmail);
+    if (!orderMatched && !emailMatched) continue;
+
+    const matchObj = {
+      rowIndex: i + 1,
+      paymentTime: data[i][0],
+      orderId: rowOrder,
+      email: rowEmail,
+      licenseKey: rowLicense,
+      status: rowStatus,
+      customerName: rowName,
+      catatan: rowCatatan
+    };
+
+    if (orderMatched && rowStatus === 'ACTIVE') {
+      return matchObj;
+    }
+    if (emailMatched && rowStatus === 'ACTIVE' && !activeEmailMatch) {
+      activeEmailMatch = matchObj;
+    }
+    if (orderMatched && !anyOrderMatch) {
+      anyOrderMatch = matchObj;
+    }
+    if (emailMatched && !anyEmailMatch) {
+      anyEmailMatch = matchObj;
     }
   }
-  return null;
+
+  return activeEmailMatch || anyOrderMatch || anyEmailMatch;
 }
 
 function findLicenseColumnIndex(headerRow) {

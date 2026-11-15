@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Loader2, X, ClipboardPaste, Check } from 'lucide-react';
 import { SFX } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
@@ -12,7 +12,9 @@ const GAS_API_URL = (import.meta as any).env?.VITE_GAS_API_URL || 'https://scrip
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate }) => {
   const [inputKey, setInputKey] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pasteFeedback, setPasteFeedback] = useState<'pasted' | 'blocked' | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState('');
 
@@ -149,6 +151,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
     }
   };
 
+  const normalizePastedLicense = (rawText: string): string => {
+    const match = rawText.toUpperCase().match(/WALI-[A-Z0-9]{4}/);
+    if (match) return match[0];
+
+    let cleaned = rawText.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 9);
+    if (!cleaned.startsWith('WALI-') && cleaned.length === 4 && !cleaned.includes('-')) {
+      cleaned = `WALI-${cleaned}`;
+    }
+    return cleaned;
+  };
+
+  const handlePasteClick = async () => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      const clipText = await navigator.clipboard.readText();
+      const formatted = normalizePastedLicense(clipText || '');
+      if (formatted) {
+        setInputKey(formatted);
+        setPasteFeedback('pasted');
+        SFX.pop();
+        inputRef.current?.focus();
+        setTimeout(() => setPasteFeedback(null), 1600);
+      } else {
+        setPasteFeedback('blocked');
+        inputRef.current?.focus();
+        setTimeout(() => setPasteFeedback(null), 3500);
+      }
+    } catch {
+      setPasteFeedback('blocked');
+      inputRef.current?.focus();
+      setTimeout(() => setPasteFeedback(null), 3500);
+    }
+  };
+
+  const handleClearClick = () => {
+    setInputKey('');
+    setPasteFeedback(null);
+    inputRef.current?.focus();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     validateAndUnlock(inputKey);
@@ -196,15 +240,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
           Masukkan kode lisensi resmi untuk membuka 17 game edukasi offline anak
         </p>
 
-        {/* Petunjuk Ringkas */}
-        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 text-left text-xs text-amber-950 font-medium space-y-1.5 mb-5 leading-snug">
-          <div className="font-black text-amber-900 flex items-center gap-1.5 text-xs pb-1 border-b border-amber-200/70">
+        {/* Petunjuk Ringkas & Cek Email Pembelian */}
+        <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3.5 text-left text-xs text-amber-950 font-medium space-y-2 mb-5 leading-snug">
+          <div className="font-black text-amber-900 flex items-center gap-1.5 text-xs pb-1.5 border-b border-amber-200/70">
             <span>📌</span>
-            <span>Format Lisensi Resmi:</span>
+            <span>Format &amp; Cek Lisensi Resmi:</span>
           </div>
           <p className="text-[11.5px] text-slate-700 leading-relaxed">
             Lisensi terdiri dari 9 karakter dengan format <strong className="font-mono text-emerald-800 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200">WALI-XXXX</strong> (Contoh: WALI-7K9P).
           </p>
+          <div className="flex items-start gap-2 bg-white/85 rounded-xl p-2.5 border border-amber-200/80 text-[11.5px] text-slate-700 leading-relaxed">
+            <span className="shrink-0 text-sm">📧</span>
+            <span>
+              <strong>Cek email pembelian Anda</strong> (Kotak Masuk, Spam, atau Promosi dari{' '}
+              <strong className="text-emerald-800">admin@walipintar.my.id</strong>) untuk menyalin kode lisensi, lalu tempel di kolom bawah.
+            </span>
+          </div>
         </div>
 
         {/* Form Login Lisensi (HANYA DENGAN LISENSI) */}
@@ -213,8 +264,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
             <label className="block text-xs font-bold text-slate-800">
               Kode Lisensi Anda
             </label>
-            <div className="relative">
+            <div className="relative flex items-center">
               <input
+                ref={inputRef}
                 type="text"
                 value={inputKey}
                 onChange={(e) => {
@@ -223,11 +275,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                     cleaned = `WALI-${cleaned}`;
                   }
                   setInputKey(cleaned);
+                  setPasteFeedback(null);
                 }}
                 maxLength={9}
                 minLength={9}
-                placeholder="CONTOH:  WALI-7K9P"
-                className={`w-full h-14 sm:h-15 px-4 text-center font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
+                placeholder="CONTOH: WALI-7K9P"
+                className={`w-full h-14 sm:h-15 pl-4 pr-32 text-left font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:text-sm sm:placeholder:text-base placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
                   /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
                     ? 'border-emerald-500 bg-emerald-50/30 text-emerald-950'
                     : inputKey.length === 9 && /[0O1I]/.test(inputKey.slice(5))
@@ -239,7 +292,56 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                 spellCheck="false"
                 required
               />
+
+              {/* Tombol Paste & Hapus (X) di dalam kolom */}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handlePasteClick}
+                  disabled={isLoading}
+                  className={`h-9 px-2.5 rounded-xl font-extrabold text-xs flex items-center gap-1 transition-all cursor-pointer active:scale-95 border ${
+                    pasteFeedback === 'pasted'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border-teal-200'
+                  } disabled:opacity-50`}
+                  title="Tempel kode lisensi dari clipboard"
+                  aria-label="Paste kode lisensi"
+                >
+                  {pasteFeedback === 'pasted' ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Tempel</span>
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardPaste className="w-3.5 h-3.5" />
+                      <span>Paste</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearClick}
+                  disabled={!inputKey || isLoading}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border ${
+                    inputKey
+                      ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-200 hover:border-rose-200 cursor-pointer active:scale-95'
+                      : 'bg-slate-50 text-slate-300 border-slate-100 cursor-default'
+                  }`}
+                  title="Hapus kode lisensi"
+                  aria-label="Hapus kode lisensi"
+                >
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
             </div>
+
+            {pasteFeedback === 'blocked' && (
+              <p className="text-[11px] font-bold text-amber-700 px-1.5">
+                💡 Tekan &amp; tahan di dalam kolom lalu pilih <strong>Tempel / Paste</strong> (atau Ctrl+V).
+              </p>
+            )}
 
             {/* Indikator Karakter */}
             <div className="flex items-center justify-between px-1.5 text-[11px] font-semibold text-slate-500">
@@ -298,14 +400,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
         </form>
 
         {/* Tautan Navigasi & Bantuan */}
-        <div className="mt-5 space-y-2.5 text-xs font-bold text-slate-600">
+        <div className="mt-5 space-y-2.5 text-xs font-bold text-slate-600 text-center">
           <div>
             <button
               type="button"
               onClick={() => onNavigate('/claim')}
-              className="inline-flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 hover:underline transition-colors py-1 px-2 rounded-lg cursor-pointer bg-emerald-50/80 border border-emerald-200/80"
+              className="inline-block max-w-full text-center text-emerald-700 hover:text-emerald-800 hover:underline transition-colors py-1.5 px-3 rounded-lg cursor-pointer bg-emerald-50/80 border border-emerald-200/80 leading-snug"
             >
-              <span>⚡</span>
+              <span className="inline mr-1">⚡</span>
               <span>Sudah Beli Tapi Belum Punya Kode? Klaim di Sini (/claim)</span>
             </button>
           </div>
@@ -315,9 +417,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
               href="https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
+              className="inline-block max-w-full text-center text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg leading-snug"
             >
-              <span>🛒</span>
+              <span className="inline mr-1">🛒</span>
               <span>Belum Punya Lisensi? Beli Lisensi Sekarang</span>
             </a>
           </div>
@@ -327,9 +429,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
               href="https://wa.me/6285704808186?text=Halo%20Admin%20Wali%20Pintar%2C%20saya%20butuh%20bantuan%20login%20lisensi"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg"
+              className="inline-block max-w-full text-center text-slate-700 hover:text-emerald-700 hover:underline transition-colors py-1 px-2 rounded-lg leading-snug"
             >
-              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+              <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full inline-block align-text-bottom mr-1.5" />
               <span>Butuh Bantuan? WhatsApp Admin (085704808186)</span>
             </a>
           </div>
