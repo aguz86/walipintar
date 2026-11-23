@@ -2,6 +2,10 @@ interface AssetFetcher {
   fetch(request: Request | string): Promise<Response>;
 }
 
+interface WorkerExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 export interface Env {
   ASSETS: AssetFetcher;
   GAS_API_URL?: string;
@@ -33,6 +37,30 @@ function constantTimeEqual(a: string, b: string): boolean {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
+}
+
+function extractLynkContext(rawBody: string): { refId: string; email: string } {
+  try {
+    const payload = JSON.parse(rawBody);
+    const dataObj = payload?.data || payload || {};
+    const msgData = dataObj?.message_data || dataObj || {};
+    const refId = String(
+      msgData?.refId ?? msgData?.ref_id ?? dataObj?.refId ?? dataObj?.ref_id ?? payload?.refId ?? '',
+    ).trim();
+    const email = String(
+      msgData?.customer?.email ||
+        dataObj?.customer?.email ||
+        payload?.customer?.email ||
+        msgData?.email ||
+        payload?.email ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
+    return { refId, email };
+  } catch {
+    return { refId: '', email: '' };
+  }
 }
 
 function isHarmlessTestPing(rawBody: string): boolean {
@@ -138,17 +166,154 @@ async function verifyLynkEdgeSignature(
   return false;
 }
 
-async function handleLynkWebhook(request: Request, env: Env): Promise<Response> {
+async function reportWorkerErrorToGas(
+  gasBaseUrl: string,
+  errData: {
+    incidentKey: string;
+    source: string;
+    orderId?: string;
+    email?: string;
+    message: string;
+    detail?: string;
+  },
+): Promise<void> {
+  try {
+    const logUrl = new URL(gasBaseUrl);
+    logUrl.searchParams.set('action', 'log_error');
+    await fetch(logUrl.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'log_error',
+        incidentKey: errData.incidentKey,
+        source: errData.source,
+        orderId: errData.orderId || '',
+        email: errData.email || '',
+        message: errData.message,
+        detail: errData.detail || '',
+      }),
+      redirect: 'follow',
+    });
+  } catch (err) {
+    console.error('Gagal mengirim log error Worker ke GAS:', err);
+  }
+}
+
+async function sendToGasOnce(targetUrl: string, rawBody: string): Promise<{
+  ok: boolean;
+  httpStatus: number;
+  responseText: string;
+  errorMessage?: string;
+}> {
+  try {
+    const gasResponse = await fetch(targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: rawBody,
+      redirect: 'follow',
+    });
+
+    const responseText = await gasResponse.text();
+
+    try {
+      const parsed = JSON.parse(responseText);
+      if (parsed && parsed.status === 'error') {
+        const code = Number(parsed.httpStatus || parsed.code || 400);
+        const httpCode = code >= 400 && code < 600 ? code : 400;
+        return {
+          ok: false,
+          httpStatus: httpCode,
+          responseText,
+          errorMessage: String(parsed.message || 'GAS error ' + httpCode),
+        };
+      }
+    } catch {
+      // Non-JSON (misal teks "OK") -> cek gasResponse.ok
+    }
+
+    if (!gasResponse.ok) {
+      return {
+        ok: false,
+        httpStatus: gasResponse.status,
+        responseText: responseText || 'Upstream GAS Error',
+        errorMessage: 'HTTP ' + gasResponse.status + ': ' + (responseText || 'Upstream GAS Error').slice(0, 180),
+      };
+    }
+
+    return {
+      ok: true,
+      httpStatus: 200,
+      responseText: responseText || 'OK',
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      httpStatus: 502,
+      responseText: '',
+      errorMessage: 'Gagal menghubungi upstream GAS: ' + (err instanceof Error ? err.message : String(err)),
+    };
+  }
+}
+
+async function forwardToGasInBackground(
+  targetUrl: string,
+  rawBody: string,
+  gasBaseUrl: string,
+): Promise<void> {
+  const ctxInfo = extractLynkContext(rawBody);
+  const firstAttempt = await sendToGasOnce(targetUrl, rawBody);
+  if (firstAttempt.ok) return;
+
+  // Retry 1x jika upstream GAS timeout / 5xx / sibuk
+  const shouldRetry = firstAttempt.httpStatus >= 500 || firstAttempt.httpStatus === 429;
+  let finalResult = firstAttempt;
+
+  if (shouldRetry) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const retryAttempt = await sendToGasOnce(targetUrl, rawBody);
+    if (retryAttempt.ok) return;
+    finalResult = retryAttempt;
+  }
+
+  const incidentTarget = ctxInfo.refId || ctxInfo.email || 'GLOBAL';
+  const msg = finalResult.errorMessage || 'Upstream GAS gagal memproses webhook Lynk';
+  console.error('Worker Background GAS Error:', {
+    httpStatus: finalResult.httpStatus,
+    refId: ctxInfo.refId,
+    email: ctxInfo.email,
+    message: msg,
+  });
+
+  await reportWorkerErrorToGas(gasBaseUrl, {
+    incidentKey: 'WORKER_LYNK|' + incidentTarget,
+    source: 'WORKER_LYNK_BRIDGE',
+    orderId: ctxInfo.refId,
+    email: ctxInfo.email,
+    message: msg,
+    detail: 'HTTP ' + finalResult.httpStatus + ' | Body: ' + rawBody.slice(0, 220),
+  });
+}
+
+async function handleLynkWebhook(
+  request: Request,
+  env: Env,
+  ctx?: WorkerExecutionContext,
+): Promise<Response> {
   const gasBaseUrl = (env.GAS_API_URL || env.VITE_GAS_API_URL || '').trim();
   const merchantKey = (env.MERCHANT_KEY || env.LYNK_MERCHANT_KEY || '').trim();
+  const reqUrl = new URL(request.url);
+  const isSyncTest = reqUrl.searchParams.get('sync_test') === '1';
 
   if (request.method === 'GET' || request.method === 'HEAD') {
     return new Response(
       JSON.stringify({
         status: 'online',
-        service: 'Wali Pintar Lynk.id Webhook Proxy (Anti-302)',
+        service: 'Wali Pintar Lynk.id Webhook Proxy (Anti-302 & Anti-Timeout)',
         gasConfigured: Boolean(gasBaseUrl),
         edgeHmacConfigured: Boolean(merchantKey),
+        asyncFastAck: Boolean(ctx && typeof ctx.waitUntil === 'function'),
       }),
       {
         status: 200,
@@ -186,8 +351,9 @@ async function handleLynkWebhook(request: Request, env: Env): Promise<Response> 
     request.headers.get('X-Webhook-Signature') ||
     '';
 
-  // Izinkan ping uji koneksi ("Test URL") tanpa membuat order apa pun
-  if (isHarmlessTestPing(rawBody)) {
+  // Izinkan ping uji koneksi ringan ("Test URL" dari Lynk) tanpa membuat order apa pun
+  // Kecuali ?sync_test=1 dari tombol admin Sheet yang ingin menguji jalur sampai ke GAS
+  if (!isSyncTest && isHarmlessTestPing(rawBody)) {
     console.log('Lynk Test Ping diterima:', {
       hasSignature: Boolean(signatureHeader),
       bodyLength: rawBody.length,
@@ -202,6 +368,7 @@ async function handleLynkWebhook(request: Request, env: Env): Promise<Response> 
   if (merchantKey) {
     const valid = await verifyLynkEdgeSignature(rawBody, signatureHeader, merchantKey);
     if (!valid) {
+      const ctxInfo = extractLynkContext(rawBody);
       const headerNames = Array.from(request.headers.keys()).filter((h) =>
         h.toLowerCase().includes('sig') || h.toLowerCase().includes('lynk'),
       );
@@ -211,13 +378,29 @@ async function handleLynkWebhook(request: Request, env: Env): Promise<Response> 
         matchedHeaders: headerNames,
         bodyPreview: rawBody.slice(0, 200),
       });
+
+      const errMsg = signatureHeader
+        ? 'Invalid X-Lynk-Signature (periksa kecocokan MERCHANT_KEY di Cloudflare & Lynk.id)'
+        : 'Missing X-Lynk-Signature header';
+
+      if (ctx && typeof ctx.waitUntil === 'function') {
+        ctx.waitUntil(
+          reportWorkerErrorToGas(gasBaseUrl, {
+            incidentKey: 'LYNK_SIGNATURE_INVALID',
+            source: 'WORKER_LYNK_BRIDGE',
+            orderId: ctxInfo.refId,
+            email: ctxInfo.email,
+            message: errMsg,
+            detail: 'Headers: ' + headerNames.join(',') + ' | Preview: ' + rawBody.slice(0, 160),
+          }),
+        );
+      }
+
       return new Response(
         JSON.stringify({
           status: 'error',
           code: 401,
-          message: signatureHeader
-            ? 'Invalid X-Lynk-Signature (periksa kecocokan MERCHANT_KEY di Cloudflare & Lynk.id)'
-            : 'Missing X-Lynk-Signature header',
+          message: errMsg,
         }),
         {
           status: 401,
@@ -227,8 +410,6 @@ async function handleLynkWebhook(request: Request, env: Env): Promise<Response> 
     }
   }
 
-  // Teruskan ke Google Apps Script dengan redirect: 'follow' dan bawa signature di query param
-  // karena GAS native doPost(e) tidak mengekspos HTTP headers.
   let targetUrl: URL;
   try {
     targetUrl = new URL(gasBaseUrl);
@@ -249,64 +430,40 @@ async function handleLynkWebhook(request: Request, env: Env): Promise<Response> 
     targetUrl.searchParams.set('signature', signatureHeader);
   }
 
-  try {
-    const gasResponse = await fetch(targetUrl.toString(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: rawBody,
-      redirect: 'follow',
-    });
-
-    const responseText = await gasResponse.text();
-
-    // Cek apakah GAS mengembalikan error JSON terstruktur (401/403/400/500)
-    try {
-      const parsed = JSON.parse(responseText);
-      if (parsed && parsed.status === 'error') {
-        const code = Number(parsed.httpStatus || parsed.code || 400);
-        const httpCode = code >= 400 && code < 600 ? code : 400;
-        return new Response(responseText, {
-          status: httpCode,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-    } catch {
-      // Jika bukan JSON (misal teks "OK" dari GAS), lanjutkan ke HTTP 200 OK
-    }
-
-    if (!gasResponse.ok) {
-      return new Response(responseText || 'Upstream GAS Error', {
-        status: gasResponse.status,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      });
-    }
-
-    return new Response(responseText || 'OK', {
+  // Mode cepat Anti-Timeout 5s: balas 200 OK instan ke Lynk, proses GAS + retry di background
+  if (!isSyncTest && ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(forwardToGasInBackground(targetUrl.toString(), rawBody, gasBaseUrl));
+    return new Response('OK', {
       status: 200,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
-  } catch (err) {
-    return new Response(
-      JSON.stringify({
-        status: 'error',
-        message: 'Gagal menghubungi upstream GAS: ' + (err instanceof Error ? err.message : String(err)),
-      }),
-      {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
   }
+
+  // Mode sinkron (dipakai saat ?sync_test=1 dari tombol admin Sheet atau runtime tanpa waitUntil)
+  const syncResult = await sendToGasOnce(targetUrl.toString(), rawBody);
+  if (!syncResult.ok) {
+    return new Response(syncResult.responseText || syncResult.errorMessage || 'Upstream GAS Error', {
+      status: syncResult.httpStatus,
+      headers: {
+        'Content-Type': syncResult.responseText.trim().startsWith('{')
+          ? 'application/json'
+          : 'text/plain; charset=utf-8',
+      },
+    });
+  }
+
+  return new Response(syncResult.responseText || 'OK', {
+    status: 200,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: WorkerExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/api/lynk-webhook' || url.pathname === '/api/lynk-webhook/') {
-      return handleLynkWebhook(request, env);
+      return handleLynkWebhook(request, env, ctx);
     }
 
     return env.ASSETS.fetch(request);

@@ -32,29 +32,14 @@
  *                              untuk anti-bypass klaim email & menu Sync Order Scalev API.
  * 5. `ADMIN_SECRET_KEY`      : (Opsional, wajib jika pakai API ?action=delete / broadcast_update)
  *                              Kunci rahasia admin buatan Anda sendiri.
- * 6. `BREVO_SENDER_EMAIL`    : (Opsional) Default: admin@walipintar.my.id
- * 7. `BREVO_SENDER_NAME`     : (Opsional) Default: Admin Wali Pintar
- * 8. `STRICT_LYNK_SIGNATURE` : (Opsional) Set "true" jika memakai reverse proxy
+ * 6. `BREVO_SENDER_EMAIL`    : (Wajib jika beda) Email pengirim terverifikasi Brevo (default: admin@walipintar.my.id)
+ * 7. `BREVO_SENDER_NAME`     : (Opsional) Nama pengirim email Brevo (default: Admin Wali Pintar)
+ * 8. `DEVELOPER_EMAIL`       : (Wajib untuk alert error) Gmail developer penerima laporan Error_Log 18:01 WIB
+ * 9. `STRICT_LYNK_SIGNATURE` : (Opsional) Set "true" jika memakai reverse proxy
  *                              (misal Cloudflare Worker) yang meneruskan header X-Lynk-Signature.
+ * 10. Opsional Brand/URL     : `BRAND_NAME`, `APP_URL`, `SCALEV_URL`, `LYNK_LP_URL`, `ADMIN_WA`
  * ============================================================================
  */
-
-// ======================= [ KONFIGURASI SPREADSHEET & TAB ] =======================
-// Nama Tab Google Sheets (Sesuai Arsitektur Terpadu)
-const TAB_SCALEV_ORDERS = 'Scalev_Orders';
-const TAB_LYNK_ORDERS   = 'Lynk_Orders';
-const TAB_REPORT_SCALEV = 'Report_Scalev';
-const TAB_REPORT_LYNK   = 'lynk_affiliate';
-const TAB_DASHBOARD     = 'Dashboard';
-
-// Konfigurasi Brand & URL Resmi
-const BRAND_NAME  = 'Wali Pintar';
-const APP_URL     = 'https://walipintar.my.id';
-const SCALEV_URL  = 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia'; // Khusus Meta Ads
-const LYNK_LP_URL = 'https://javapedia.lynk.id/p/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia'; // LP Lynk (Affiliate & Organik)
-const ADMIN_WA    = '6285704808186';
-const DEFAULT_AFFILIATE_COMMISSION_RATE = 20; // Default komisi affiliate 20%
-const EMAIL_RESEND_COOLDOWN_DAYS = 90;       // Kirim ulang email Brevo maksimal 1x per 3 bulan (90 hari)
 
 // ======================= [ HELPER CONFIG AMAN (SCRIPT PROPERTIES) ] =======================
 function getScriptProp(key, fallbackVal) {
@@ -67,13 +52,45 @@ function getScriptProp(key, fallbackVal) {
   return fallbackVal;
 }
 
-// Semua kredensial dibaca eksklusif dari GAS Script Properties (tanpa fallback key di source code)
+// ======================= [ KONFIGURASI SPREADSHEET & TAB ] =======================
+const TAB_SCALEV_ORDERS = 'Scalev_Orders';
+const TAB_LYNK_ORDERS   = 'Lynk_Orders';
+const TAB_REPORT_SCALEV = 'Report_Scalev';
+const TAB_REPORT_LYNK   = 'lynk_affiliate';
+const TAB_DASHBOARD     = 'Dashboard';
+const TAB_ERROR_LOG     = 'Error_Log';
+
+const DEFAULT_AFFILIATE_COMMISSION_RATE = 20; // Default komisi affiliate 20%
+const EMAIL_RESEND_COOLDOWN_DAYS = 90;       // Kirim ulang email Brevo maksimal 1x per 3 bulan (90 hari)
+const ERROR_LOG_TTL_HOURS = 24;              // Error satu-kali yang tidak terulang > 24 jam otomatis dibersihkan
+
+// Konfigurasi Brand & URL (bisa dioverride langsung lewat Properti Skrip GAS tanpa edit kode)
+const BRAND_NAME  = getScriptProp('BRAND_NAME', 'Wali Pintar');
+const APP_URL     = getScriptProp('APP_URL', 'https://walipintar.my.id');
+const SCALEV_URL  = getScriptProp('SCALEV_URL', 'https://walipintar.myscalev.com/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia');
+const LYNK_LP_URL = getScriptProp('LYNK_LP_URL', 'https://javapedia.lynk.id/p/wali-pintar-17-game-edukasi-offline-mewarnai-560-ensiklopedia');
+const ADMIN_WA    = getScriptProp('ADMIN_WA', '6285704808186');
+
+// Semua kredensial & email dibaca eksklusif dari GAS Script Properties (tanpa edit kode manual)
 const SPREADSHEET_ID     = getScriptProp('SPREADSHEET_ID', '');
 const ADMIN_SECRET_KEY   = getScriptProp('ADMIN_SECRET_KEY', '');
 const BREVO_API_KEY      = getScriptProp('BREVO_API_KEY', '');
 const BREVO_SENDER_NAME  = getScriptProp('BREVO_SENDER_NAME', 'Admin Wali Pintar');
 const BREVO_SENDER_EMAIL = getScriptProp('BREVO_SENDER_EMAIL', 'admin@walipintar.my.id');
 const SCALEV_API_KEY     = getScriptProp('SCALEV_API_KEY', '');
+
+function getBrevoSenderName() {
+  return getScriptProp('BREVO_SENDER_NAME', BREVO_SENDER_NAME);
+}
+
+function getBrevoSenderEmail() {
+  return getScriptProp('BREVO_SENDER_EMAIL', BREVO_SENDER_EMAIL);
+}
+
+function getDeveloperEmail() {
+  const fromProp = getScriptProp('DEVELOPER_EMAIL', '');
+  return (fromProp && fromProp.includes('@')) ? fromProp : '';
+}
 
 /**
  * Mengambil objek Spreadsheet utama berdasarkan Script Property `SPREADSHEET_ID` atau spreadsheet aktif.
@@ -103,37 +120,48 @@ function ujiCobaSistem_KlikDiSini() {
 
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
-  Logger.log('✅ 1. Tab "' + TAB_SCALEV_ORDERS + '" & "' + TAB_LYNK_ORDERS + '" siap.');
+  Logger.log('✅ 1. Tab "' + TAB_SCALEV_ORDERS + '", "' + TAB_LYNK_ORDERS + '", & "' + TAB_ERROR_LOG + '" siap.');
 
   generateScalevReport(true);
   generateLynkReport(true);
   generateDashboard(true);
-  autoFitAllSheets(ss);
-  Logger.log('✅ 2. Tab "' + TAB_REPORT_SCALEV + '", "' + TAB_REPORT_LYNK + '", & "' + TAB_DASHBOARD + '" berhasil disegarkan + Auto-Width.');
+  try {
+    setupErrorMonitorTrigger(true);
+    Logger.log('✅ 2. Tab laporan & Dashboard disegarkan + trigger digest Error_Log 18:01 WIB aktif (Auto-Width manual lewat menu).');
+  } catch (trigErr) {
+    Logger.log('ℹ️ 2. Tab laporan & Dashboard disegarkan (Auto-Width manual lewat menu). Trigger 18:01 WIB: ' + trigErr.toString());
+  }
 
-  if (!BREVO_API_KEY) {
-    Logger.log('⚠️ 3. BREVO_API_KEY belum diisi di GAS Script Properties.');
+  if (!getScriptProp('BREVO_API_KEY', BREVO_API_KEY)) {
+    Logger.log('⚠️ 3. BREVO_API_KEY belum diisi di Properti Skrip GAS.');
   } else {
-    Logger.log('✅ 3. BREVO_API_KEY terpasang di GAS Script Properties.');
+    Logger.log('✅ 3. BREVO_API_KEY terpasang | Pengirim: ' + getBrevoSenderName() + ' <' + getBrevoSenderEmail() + '>');
   }
 
   const merchantKey = getScriptProp('MERCHANT_KEY', '');
   if (!merchantKey) {
-    Logger.log('⚠️ 4. MERCHANT_KEY (Lynk.id Webhook) belum diisi di GAS Script Properties.');
+    Logger.log('⚠️ 4. MERCHANT_KEY (Lynk.id Webhook) belum diisi di Properti Skrip GAS.');
   } else {
-    Logger.log('✅ 4. MERCHANT_KEY terpasang di GAS Script Properties (Lynk.id HMAC Verification siap).');
+    Logger.log('✅ 4. MERCHANT_KEY terpasang di Properti Skrip GAS (Lynk.id HMAC Verification siap).');
   }
 
-  if (!SCALEV_API_KEY) {
-    Logger.log('ℹ️ 5. SCALEV_API_KEY belum diisi di GAS Script Properties (opsional untuk sync & anti-bypass klaim).');
+  const devEmail = getDeveloperEmail();
+  if (!devEmail) {
+    Logger.log('⚠️ 5. DEVELOPER_EMAIL belum diisi di Properti Skrip GAS (wajib untuk kirim digest Error_Log 18:01 WIB).');
   } else {
-    Logger.log('✅ 5. SCALEV_API_KEY terpasang di GAS Script Properties.');
+    Logger.log('✅ 5. DEVELOPER_EMAIL terpasang di Properti Skrip GAS: ' + devEmail);
   }
 
-  if (!ADMIN_SECRET_KEY) {
-    Logger.log('ℹ️ 6. ADMIN_SECRET_KEY belum diisi di GAS Script Properties (opsional untuk API delete/broadcast).');
+  if (!getScriptProp('SCALEV_API_KEY', SCALEV_API_KEY)) {
+    Logger.log('ℹ️ 6. SCALEV_API_KEY belum diisi di Properti Skrip GAS (opsional untuk sync & anti-bypass klaim).');
   } else {
-    Logger.log('✅ 6. ADMIN_SECRET_KEY terpasang di GAS Script Properties.');
+    Logger.log('✅ 6. SCALEV_API_KEY terpasang di Properti Skrip GAS.');
+  }
+
+  if (!getScriptProp('ADMIN_SECRET_KEY', ADMIN_SECRET_KEY)) {
+    Logger.log('ℹ️ 7. ADMIN_SECRET_KEY belum diisi di Properti Skrip GAS (opsional untuk API delete/broadcast).');
+  } else {
+    Logger.log('✅ 7. ADMIN_SECRET_KEY terpasang di Properti Skrip GAS.');
   }
 
   Logger.log('========================================================');
@@ -220,6 +248,19 @@ function initAllSheets(ss) {
     'Total Komisi'
   ], '#065f46');
 
+  ensureSheetHeaders(ss, TAB_ERROR_LOG, [
+    'Jam Mulai Error',
+    'Terakhir Terjadi',
+    'Progress',
+    'Sumber',
+    'Order / Ref ID',
+    'Email Terkait',
+    'Kejadian',
+    'Nama / Pesan Error',
+    'Detail',
+    'Incident Key'
+  ], '#991b1b');
+
   // 3. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
   const legacyLicensesSheet = ss.getSheetByName('Licenses');
   if (legacyLicensesSheet && ss.getSheets().length > 1) {
@@ -263,6 +304,12 @@ function onOpen() {
     .addItem('🛠️ Uji Koneksi Akun Brevo API', 'menuTestBrevoConnection')
     .addItem('🤝 Uji Koneksi Lynk.id (Webhook & HMAC)', 'menuTestLynkWebhook')
     .addItem('🛡️ Uji Koneksi Scalev API (Anti-Bypass)', 'menuTestScalevConnection')
+    .addSeparator()
+    .addItem('⚙️ Cek Status Properti Skrip GAS', 'menuCheckScriptProperties')
+    .addItem('⏰ Aktifkan Task Otomatis Error Log (18:01 WIB)', 'menuSetupErrorMonitorTrigger')
+    .addItem('🧪 Test Simulasi Error Log & Kirim ke Gmail', 'menuSimulateErrorLogAndNotify')
+    .addItem('🚨 Cek & Kirim Digest Error Log ke Gmail', 'menuRunErrorDigestManual')
+    .addItem('🧹 Bersihkan Tab Error_Log Manual', 'menuClearErrorLog')
     .addToUi();
 }
 
@@ -272,10 +319,14 @@ function menuInitializeTabs() {
   generateScalevReport(true);
   generateLynkReport(true);
   generateDashboard(true);
-  autoFitAllSheets(ss);
+  let trigNote = '';
+  try {
+    setupErrorMonitorTrigger(true);
+    trigNote = '\nTask otomatis Error_Log (18:01 WIB) juga diaktifkan.';
+  } catch (e) {}
   SpreadsheetApp.getUi().alert(
     '✅ Berhasil',
-    'Semua tab (Scalev_Orders, Lynk_Orders, Report_Scalev, lynk_affiliate, Dashboard) siap & lebar kolom otomatis. Tab lama "Licenses" (jika ada) sudah dibersihkan.',
+    'Semua tab (Scalev_Orders, Lynk_Orders, Report_Scalev, lynk_affiliate, Dashboard, Error_Log) siap.\nGunakan menu "📐 Rapikan Lebar Kolom Semua Sheet (Auto-Width)" bila ingin merapikan lebar kolom manual.' + trigNote,
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -331,6 +382,16 @@ function doGet(e) {
 
   } catch (err) {
     Logger.log('Error doGet: ' + err.toString());
+    try {
+      recordErrorLog(null, {
+        incidentKey: 'SYSTEM_DOGET_ERROR',
+        source: 'SYSTEM',
+        orderId: String(params.order_id || params.orderId || ''),
+        email: String(params.email || ''),
+        message: 'Error server doGet: ' + err.toString(),
+        detail: 'Action: ' + action
+      });
+    } catch (logErr) {}
     return createJsonResponse({
       status: 'error',
       success: false,
@@ -572,9 +633,21 @@ function handleScalevOrder(params) {
     if (produk) catatanParts.push('Produk: ' + produk);
     catatanParts.push(brevoRes.success ? stampEmailSentDate('Email Brevo: TERKIRIM') : 'Email Brevo: GAGAL (' + brevoRes.error + ')');
     scalevSheet.getRange(lastRow, 9).setValue(catatanParts.join(' | '));
-    autoFitSheetColumns(scalevSheet, 9, 110, 22);
     generateDashboard(true);
     SpreadsheetApp.flush();
+
+    if (brevoRes.success) {
+      resolveErrorLog(ss, ['BREVO_API_GLOBAL', 'BREVO_TX|' + email + '|' + orderId, 'SCALEV_ORDER|' + orderId, 'SCALEV_ORDER|' + email]);
+    } else {
+      recordErrorLog(ss, {
+        incidentKey: 'BREVO_TX|' + email + '|' + orderId,
+        source: 'BREVO_EMAIL',
+        orderId: orderId,
+        email: email,
+        message: 'Gagal kirim email Brevo (Scalev): ' + brevoRes.error,
+        detail: 'Lisensi: ' + licenseKey
+      });
+    }
 
     return createJsonResponse({
       status: 'success',
@@ -630,6 +703,14 @@ function doPost(e) {
     try {
       payload = JSON.parse(rawBody);
     } catch (parseErr) {
+      try {
+        recordErrorLog(null, {
+          incidentKey: 'LYNK_JSON_INVALID',
+          source: 'LYNK_WEBHOOK',
+          message: 'Payload JSON Lynk tidak valid',
+          detail: parseErr.toString() + ' | Preview: ' + rawBody.slice(0, 160)
+        });
+      } catch (logErr) {}
       return createJsonResponse({
         status: 'error',
         code: 400,
@@ -646,11 +727,20 @@ function doPost(e) {
   if (action === 'delete_all')       return handleApiDeleteAll(Object.assign({}, params, payload));
   if (action === 'broadcast_update') return handleApiBroadcastUpdate(Object.assign({}, params, payload));
   if (action === 'sync_scalev' || action === 'sync') return handleApiSyncScalev();
+  if (action === 'log_error')        return handleApiLogError(payload);
 
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(30000);
   } catch (lockErr) {
+    try {
+      recordErrorLog(null, {
+        incidentKey: 'LYNK_LOCK_BUSY',
+        source: 'LYNK_WEBHOOK',
+        message: 'Antrean LockService penuh (>30s) saat webhook Lynk masuk',
+        detail: lockErr.toString()
+      });
+    } catch (logErr) {}
     return createJsonResponse({
       status: 'error',
       code: 503,
@@ -679,6 +769,14 @@ function doPost(e) {
       const sigCheck = verifyLynkSignature(rawBody, signatureHeader, payload);
       if (!sigCheck.valid) {
         Logger.log('REJECTED LYNK WEBHOOK (401/403): ' + sigCheck.reason);
+        try {
+          recordErrorLog(null, {
+            incidentKey: 'LYNK_SIGNATURE_INVALID',
+            source: 'LYNK_WEBHOOK',
+            message: 'Signature X-Lynk-Signature ditolak (' + sigCheck.reason + ')',
+            detail: 'Preview: ' + rawBody.slice(0, 160)
+          });
+        } catch (logErr) {}
         return createJsonResponse({
           status: 'error',
           code: 401,
@@ -709,6 +807,7 @@ function doPost(e) {
       eventName === 'TEST_WEBHOOK'
     ) {
       Logger.log('Lynk.id Test Webhook / Ping diterima & diverifikasi.');
+      resolveErrorLog(null, ['LYNK_SIGNATURE_INVALID', 'LYNK_JSON_INVALID', 'LYNK_DOPOST_ERROR', 'LYNK_LOCK_BUSY', 'WORKER_LYNK_BRIDGE', 'WORKER_LYNK|GLOBAL']);
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
 
@@ -780,6 +879,15 @@ function doPost(e) {
     ).trim();
 
     if (!customerEmail || !customerEmail.includes('@')) {
+      try {
+        recordErrorLog(null, {
+          incidentKey: 'LYNK_EMAIL_MISSING|' + (refId || 'GLOBAL'),
+          source: 'LYNK_WEBHOOK',
+          orderId: refId,
+          message: 'Email pelanggan tidak ditemukan pada payload Lynk.id',
+          detail: 'Nama: ' + customerName + ' | Preview: ' + rawBody.slice(0, 140)
+        });
+      } catch (logErr) {}
       return createJsonResponse({
         status: 'error',
         code: 400,
@@ -797,6 +905,7 @@ function doPost(e) {
     const duplicate = findExistingOrder(lynkSheet, orderIdToSave, '');
     if (duplicate) {
       Logger.log('Idempotency hit untuk Lynk refId: ' + orderIdToSave);
+      resolveErrorLog(ss, ['LYNK_SIGNATURE_INVALID', 'LYNK_JSON_INVALID', 'LYNK_DOPOST_ERROR', 'LYNK_LOCK_BUSY', 'WORKER_LYNK|' + orderIdToSave, 'WORKER_LYNK|' + customerEmail]);
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
 
@@ -829,14 +938,48 @@ function doPost(e) {
     const rawCatatan = baseTag + ' | Email Brevo: ' + (brevoRes.success ? 'TERKIRIM' : 'GAGAL (' + brevoRes.error + ')');
     const catatan = brevoRes.success ? stampEmailSentDate(rawCatatan) : rawCatatan;
     lynkSheet.getRange(lastRow, 11).setValue(catatan);
-    autoFitSheetColumns(lynkSheet, 11, 110, 22);
     generateDashboard(true);
     SpreadsheetApp.flush();
+
+    // Auto-resolve error webhook Lynk (dan Brevo jika sukses)
+    const keysToResolve = [
+      'LYNK_SIGNATURE_INVALID',
+      'LYNK_JSON_INVALID',
+      'LYNK_DOPOST_ERROR',
+      'LYNK_LOCK_BUSY',
+      'WORKER_LYNK_BRIDGE',
+      'WORKER_LYNK|GLOBAL',
+      'WORKER_LYNK|' + orderIdToSave,
+      'WORKER_LYNK|' + customerEmail,
+      'LYNK_EMAIL_MISSING|' + orderIdToSave,
+      'LYNK_EMAIL_MISSING|GLOBAL'
+    ];
+    if (brevoRes.success) {
+      keysToResolve.push('BREVO_API_GLOBAL', 'BREVO_TX|' + customerEmail + '|' + orderIdToSave);
+    } else {
+      recordErrorLog(ss, {
+        incidentKey: 'BREVO_TX|' + customerEmail + '|' + orderIdToSave,
+        source: 'BREVO_EMAIL',
+        orderId: orderIdToSave,
+        email: customerEmail,
+        message: 'Gagal kirim email Brevo (Lynk): ' + brevoRes.error,
+        detail: 'Lisensi: ' + licenseKey
+      });
+    }
+    resolveErrorLog(ss, keysToResolve);
 
     return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
 
   } catch (err) {
     Logger.log('Error doPost (Lynk Webhook): ' + err.toString());
+    try {
+      recordErrorLog(null, {
+        incidentKey: 'LYNK_DOPOST_ERROR',
+        source: 'LYNK_WEBHOOK',
+        message: 'Error internal doPost Lynk: ' + err.toString(),
+        detail: 'Preview: ' + rawBody.slice(0, 140)
+      });
+    } catch (logErr) {}
     return createJsonResponse({
       status: 'error',
       code: 500,
@@ -1012,13 +1155,15 @@ function autoFitAllSheets(ss) {
     autoFitSheetColumns(s5, 4, 145, 28);
     if (s5.getColumnWidth(4) < 220) s5.setColumnWidth(4, 220);
   }
+  const s6 = targetSs.getSheetByName(TAB_ERROR_LOG);
+  if (s6) autoFitSheetColumns(s6, 10, 110, 22);
 }
 
 function menuAutoFitAllSheets() {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
   autoFitAllSheets(ss);
-  SpreadsheetApp.getUi().alert('✅ Selesai', 'Lebar seluruh kolom di semua tab telah dirapikan otomatis sesuai isinya.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('✅ Selesai', 'Lebar seluruh kolom di semua tab telah dirapikan secara manual sesuai isinya.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 function isSameJakartaDay(val, todayKey) {
@@ -1326,13 +1471,8 @@ function generateDashboard(silent) {
       dashSheet.setRowHeight(guideStartRow + 1 + g, 22);
     }
 
-    // Auto-width proporsional agar seluruh 4 tabel terlihat rapi & utuh
+    // Auto-width dinonaktifkan dari mode otomatis agar hanya dijalankan saat trigger manual menu
     SpreadsheetApp.flush();
-    dashSheet.autoResizeColumns(1, 4);
-    if (dashSheet.getColumnWidth(1) < 155) dashSheet.setColumnWidth(1, 155);
-    if (dashSheet.getColumnWidth(2) < 135) dashSheet.setColumnWidth(2, 135);
-    if (dashSheet.getColumnWidth(3) < 135) dashSheet.setColumnWidth(3, 135);
-    dashSheet.setColumnWidth(4, Math.max(220, dashSheet.getColumnWidth(4) + 32));
 
     if (!silent) {
       try {
@@ -1437,7 +1577,6 @@ function generateScalevReport(silent) {
       .setFontColor('#64748b')
       .setFontSize(10);
 
-    autoFitSheetColumns(reportSheet, 3, 150, 26);
     if (!silent) {
       generateDashboard(true);
       try {
@@ -1591,7 +1730,6 @@ function generateLynkReport(silent) {
       .setFontColor('#64748b')
       .setFontSize(10);
 
-    autoFitSheetColumns(reportSheet, 5, 130, 26);
     if (!silent) {
       generateDashboard(true);
     }
@@ -1769,6 +1907,18 @@ function handleResendLicense(params) {
       sh.getRange(existing.rowIndex, statusCol).setValue(
         brevoRes.success ? stampEmailSentDate('TERKIRIM ULANG (Brevo)') : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
       );
+      if (brevoRes.success) {
+        resolveErrorLog(ss, ['BREVO_API_GLOBAL', 'BREVO_TX|' + email + '|' + existing.orderId]);
+      } else {
+        recordErrorLog(ss, {
+          incidentKey: 'BREVO_TX|' + email + '|' + existing.orderId,
+          source: 'BREVO_EMAIL',
+          orderId: existing.orderId,
+          email: email,
+          message: 'Gagal kirim ulang email Brevo (/claim): ' + brevoRes.error,
+          detail: 'Lisensi: ' + existing.licenseKey
+        });
+      }
       return createJsonResponse({
         status: brevoRes.success ? 'success' : 'error',
         success: true,
@@ -2145,8 +2295,9 @@ function collectBroadcastRecipients(ss, targetSource, rangeInput) {
 }
 
 function sendBrevoBroadcastUpdateEmail(toEmail, customerName, licenseKey, updateData) {
-  if (!BREVO_API_KEY) {
-    return { success: false, error: 'BREVO_API_KEY belum diisi di Script Properties GAS.' };
+  const apiKey = getScriptProp('BREVO_API_KEY', BREVO_API_KEY);
+  if (!apiKey) {
+    return { success: false, error: 'BREVO_API_KEY belum diisi di Properti Skrip GAS.' };
   }
 
   const subject = '🎉 Update Aplikasi ' + BRAND_NAME + ' (' + updateData.versi + '): Pembaruan Tampilan & Fitur (100% Gratis)';
@@ -2154,7 +2305,7 @@ function sendBrevoBroadcastUpdateEmail(toEmail, customerName, licenseKey, update
   const recipientName = customerName && customerName.trim() && customerName.trim() !== '-' ? customerName.trim() : 'Ayah & Bunda Hebat';
 
   const payload = {
-    sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+    sender: { name: getBrevoSenderName(), email: getBrevoSenderEmail() },
     to: [{ email: toEmail, name: recipientName }],
     subject: subject,
     htmlContent: htmlContent
@@ -2163,7 +2314,7 @@ function sendBrevoBroadcastUpdateEmail(toEmail, customerName, licenseKey, update
   const options = {
     method: 'post',
     contentType: 'application/json',
-    headers: { 'api-key': BREVO_API_KEY, 'Accept': 'application/json' },
+    headers: { 'api-key': apiKey, 'Accept': 'application/json' },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
@@ -2269,8 +2420,20 @@ function menuGenerateManual() {
     targetSheet.getRange(lastRow, noteCol).setValue(
       brevoRes.success ? stampEmailSentDate('Manual Admin | Email Brevo: TERKIRIM') : 'Manual Admin | Email Brevo: GAGAL (' + brevoRes.error + ')'
     );
-    autoFitSheetColumns(targetSheet, isLynk ? 11 : 9, 110, 22);
     SpreadsheetApp.flush();
+
+    if (brevoRes.success) {
+      resolveErrorLog(ss, ['BREVO_API_GLOBAL', 'BREVO_TX|' + email + '|' + orderId]);
+    } else {
+      recordErrorLog(ss, {
+        incidentKey: 'BREVO_TX|' + email + '|' + orderId,
+        source: 'BREVO_EMAIL',
+        orderId: orderId,
+        email: email,
+        message: 'Gagal kirim email Brevo (Manual): ' + brevoRes.error,
+        detail: 'Lisensi: ' + licenseKey
+      });
+    }
 
     if (isLynk) generateLynkReport(true);
     else generateScalevReport(true);
@@ -2334,7 +2497,18 @@ function menuResendManual() {
         sh.getRange(i + 1, noteCol).setValue(
           res.success ? stampEmailSentDate('TERKIRIM ULANG (Brevo)') : 'GAGAL KIRIM ULANG (' + res.error + ')'
         );
-        autoFitSheetColumns(sh, noteCol, 110, 22);
+        if (res.success) {
+          resolveErrorLog(ss, ['BREVO_API_GLOBAL', 'BREVO_TX|' + email + '|' + orderId]);
+        } else {
+          recordErrorLog(ss, {
+            incidentKey: 'BREVO_TX|' + email + '|' + orderId,
+            source: 'BREVO_EMAIL',
+            orderId: orderId,
+            email: email,
+            message: 'Gagal kirim ulang email Brevo (Manual Admin): ' + res.error,
+            detail: 'Lisensi: ' + key
+          });
+        }
         generateDashboard(true);
         ui.alert(res.success ? '✅ Email Terkirim Ulang ke ' + email : '❌ Gagal Kirim: ' + res.error);
         return;
@@ -2470,22 +2644,20 @@ function menuDeleteAllOrders() {
 // ============================================================================
 // ✉️ 4. BREVO REST API v3 EMAIL DELIVERY & KONEKSI
 // ============================================================================
-function sendEmailBrevo(toEmail, licenseKey, customerName, orderId, isResend) {
+function sendBrevoHtmlDirect(toEmail, toName, subject, htmlContent) {
   const apiKey = getScriptProp('BREVO_API_KEY', BREVO_API_KEY);
   if (!apiKey) {
-    return { success: false, messageId: null, error: 'BREVO_API_KEY belum diisi di Script Properties GAS.' };
+    return { success: false, httpCode: 0, messageId: null, error: 'BREVO_API_KEY belum diisi di Properti Skrip GAS.' };
   }
 
-  const cleanName = (customerName && String(customerName).trim() && String(customerName).trim() !== '-')
-    ? String(customerName).trim()
-    : 'Ayah & Bunda Hebat';
-
-  const subject = (isResend ? '[Kirim Ulang] ' : '🎉 ') + 'Lisensi Resmi Game Edukasi ' + BRAND_NAME + ': ' + licenseKey;
-  const htmlContent = generateLicenseHtmlEmail(licenseKey, orderId || '-', cleanName);
+  const senderEmail = getBrevoSenderEmail();
+  if (!senderEmail || !senderEmail.includes('@')) {
+    return { success: false, httpCode: 0, messageId: null, error: 'BREVO_SENDER_EMAIL belum diisi valid di Properti Skrip GAS.' };
+  }
 
   const payload = {
-    sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
-    to: [{ email: toEmail, name: cleanName }],
+    sender: { name: getBrevoSenderName(), email: senderEmail },
+    to: [{ email: toEmail, name: toName || toEmail }],
     subject: subject,
     htmlContent: htmlContent
   };
@@ -2507,14 +2679,41 @@ function sendEmailBrevo(toEmail, licenseKey, customerName, orderId, isResend) {
       incrementDailyEmailSentCounter();
       let json = {};
       try { json = JSON.parse(text); } catch (e) {}
-      return { success: true, messageId: json.messageId || 'OK', error: null };
-    } else {
-      return { success: false, messageId: null, error: 'HTTP ' + code + ' - ' + text };
+      return { success: true, httpCode: code, messageId: json.messageId || 'OK', error: null };
     }
+    return { success: false, httpCode: code, messageId: null, error: 'HTTP ' + code + ' - ' + text };
   } catch (err) {
-    Logger.log('Error sendEmailBrevo: ' + err.toString());
-    return { success: false, messageId: null, error: err.toString() };
+    Logger.log('Error sendBrevoHtmlDirect: ' + err.toString());
+    return { success: false, httpCode: 0, messageId: null, error: err.toString() };
   }
+}
+
+function sendEmailBrevo(toEmail, licenseKey, customerName, orderId, isResend) {
+  const cleanName = (customerName && String(customerName).trim() && String(customerName).trim() !== '-')
+    ? String(customerName).trim()
+    : 'Ayah & Bunda Hebat';
+
+  const subject = (isResend ? '[Kirim Ulang] ' : '🎉 ') + 'Lisensi Resmi Game Edukasi ' + BRAND_NAME + ': ' + licenseKey;
+  const htmlContent = generateLicenseHtmlEmail(licenseKey, orderId || '-', cleanName);
+  const res = sendBrevoHtmlDirect(toEmail, cleanName, subject, htmlContent);
+
+  if (res.success) {
+    resolveErrorLog(null, [
+      'BREVO_API_GLOBAL',
+      'BREVO_TX|' + String(toEmail || '').trim().toLowerCase() + '|' + String(orderId || '').trim()
+    ]);
+  } else if (res.httpCode === 0 || res.httpCode === 401 || res.httpCode === 402 || res.httpCode === 403 || res.httpCode >= 500) {
+    recordErrorLog(null, {
+      incidentKey: 'BREVO_API_GLOBAL',
+      source: 'BREVO_EMAIL',
+      orderId: String(orderId || ''),
+      email: String(toEmail || ''),
+      message: 'Brevo API Error: ' + res.error,
+      detail: 'Subjek: ' + subject
+    });
+  }
+
+  return res;
 }
 
 function parseOrderOrEmailDate(val) {
@@ -2622,15 +2821,27 @@ function menuTestBrevoConnection() {
     const code = res.getResponseCode();
     if (code === 200) {
       const info = JSON.parse(res.getContentText());
+      resolveErrorLog(null, ['BREVO_API_GLOBAL']);
       ui.alert(
         '✅ Koneksi Brevo API Sukses!',
         'Akun Brevo: ' + (info.email || 'OK') + '\nPerusahaan: ' + (info.companyName || BRAND_NAME),
         ui.ButtonSet.OK
       );
     } else {
+      recordErrorLog(null, {
+        incidentKey: 'BREVO_API_GLOBAL',
+        source: 'BREVO_EMAIL',
+        message: 'Uji Koneksi Brevo Gagal (HTTP ' + code + ')',
+        detail: res.getContentText().slice(0, 180)
+      });
       ui.alert('❌ Gagal Terhubung ke Brevo', 'HTTP ' + code + ': ' + res.getContentText(), ui.ButtonSet.OK);
     }
   } catch (err) {
+    recordErrorLog(null, {
+      incidentKey: 'BREVO_API_GLOBAL',
+      source: 'BREVO_EMAIL',
+      message: 'Error Uji Brevo: ' + err.toString()
+    });
     ui.alert('❌ Error Uji Brevo', err.toString(), ui.ButtonSet.OK);
   }
 }
@@ -2754,6 +2965,19 @@ function verifyScalevPayment(orderIdOrEmail) {
       }
     }
 
+    if (statusCode >= 200 && statusCode < 300) {
+      resolveErrorLog(null, ['SCALEV_API_GLOBAL']);
+    } else if (statusCode === 401 || statusCode === 403 || statusCode >= 500) {
+      recordErrorLog(null, {
+        incidentKey: 'SCALEV_API_GLOBAL',
+        source: 'SCALEV_ORDER',
+        orderId: cleanTarget.includes('@') ? '' : cleanTarget,
+        email: cleanTarget.includes('@') ? cleanTarget.toLowerCase() : '',
+        message: 'Scalev API Error HTTP ' + statusCode,
+        detail: 'Target: ' + cleanTarget
+      });
+    }
+
     if (orderObj && (orderObj.id || orderObj.order_id || orderObj.order_number || orderObj.code)) {
       const isPaid = isScalevOrderPaidAndValid(orderObj);
       const paymentStatus = String(orderObj.payment_status || orderObj.status || '').toLowerCase();
@@ -2791,6 +3015,13 @@ function verifyScalevPayment(orderIdOrEmail) {
     }
   } catch (err) {
     Logger.log('Error verifyScalevPayment: ' + err.toString());
+    recordErrorLog(null, {
+      incidentKey: 'SCALEV_API_GLOBAL',
+      source: 'SCALEV_ORDER',
+      orderId: cleanTarget.includes('@') ? '' : cleanTarget,
+      email: cleanTarget.includes('@') ? cleanTarget.toLowerCase() : '',
+      message: 'Gagal menghubungi Scalev API: ' + err.toString()
+    });
     return {
       configured: true,
       verified: false,
@@ -3068,10 +3299,10 @@ function syncOrdersFromScalev(ss) {
     }
 
     SpreadsheetApp.flush();
-    autoFitSheetColumns(scalevSheet, 9, 110, 22);
     generateScalevReport(true);
     generateLynkReport(true);
     generateDashboard(true);
+    resolveErrorLog(ss, ['SCALEV_API_GLOBAL', 'SCALEV_SYNC_ERROR']);
 
     return {
       success: true,
@@ -3085,6 +3316,11 @@ function syncOrdersFromScalev(ss) {
     };
   } catch (err) {
     Logger.log('Error syncOrdersFromScalev: ' + err.toString());
+    recordErrorLog(ss, {
+      incidentKey: 'SCALEV_SYNC_ERROR',
+      source: 'SCALEV_SYNC',
+      message: 'Gagal sinkronisasi Scalev API: ' + err.toString()
+    });
     return { success: false, message: err.toString() };
   }
 }
@@ -3130,11 +3366,23 @@ function menuTestScalevConnection() {
     });
     const code = response.getResponseCode();
     if (code >= 200 && code < 300) {
+      resolveErrorLog(null, ['SCALEV_API_GLOBAL', 'SCALEV_SYNC_ERROR']);
       ui.alert('🛡️ Koneksi Scalev API Aktif!', 'HTTP ' + code + ' (Terhubung). Verifikasi Anti-Bypass siap digunakan.', ui.ButtonSet.OK);
     } else {
+      recordErrorLog(null, {
+        incidentKey: 'SCALEV_API_GLOBAL',
+        source: 'SCALEV_ORDER',
+        message: 'Uji Koneksi Scalev API Gagal (HTTP ' + code + ')',
+        detail: response.getContentText().slice(0, 180)
+      });
       ui.alert('❌ Gagal Terhubung ke Scalev API', 'HTTP ' + code + ': ' + response.getContentText(), ui.ButtonSet.OK);
     }
   } catch (err) {
+    recordErrorLog(null, {
+      incidentKey: 'SCALEV_API_GLOBAL',
+      source: 'SCALEV_ORDER',
+      message: 'Error Uji Scalev API: ' + err.toString()
+    });
     ui.alert('❌ Error Uji Scalev', err.toString(), ui.ButtonSet.OK);
   }
 }
@@ -3203,7 +3451,7 @@ function menuTestLynkWebhook() {
           : '⚠️ Online HTTP 200, tapi GAS_API_URL belum diset di Cloudflare!';
 
         if (getJson.gasConfigured) {
-          const postRes = UrlFetchApp.fetch(proxyUrl, {
+          const postRes = UrlFetchApp.fetch(proxyUrl + '?sync_test=1', {
             method: 'post',
             contentType: 'application/json',
             headers: { 'X-Lynk-Signature': validHmac },
@@ -3213,8 +3461,18 @@ function menuTestLynkWebhook() {
           const postCode = postRes.getResponseCode();
           const postBody = postRes.getContentText();
           postPingStatus = postCode === 200
-            ? '✅ Sukses HTTP 200 ("' + postBody.substring(0, 30) + '") — Anti-302 Aktif!'
+            ? '✅ Sukses HTTP 200 ("' + postBody.substring(0, 30) + '") — Anti-302 + End-to-End GAS Aktif!'
             : '❌ HTTP ' + postCode + ': ' + postBody.substring(0, 120);
+          if (postCode === 200) {
+            resolveErrorLog(ss, ['LYNK_SIGNATURE_INVALID', 'LYNK_JSON_INVALID', 'LYNK_DOPOST_ERROR', 'WORKER_LYNK_BRIDGE', 'WORKER_LYNK|GLOBAL']);
+          } else {
+            recordErrorLog(ss, {
+              incidentKey: 'WORKER_LYNK_BRIDGE',
+              source: 'WORKER_LYNK_BRIDGE',
+              message: 'Uji Bridge Lynk -> GAS Gagal (HTTP ' + postCode + ')',
+              detail: postBody.substring(0, 160)
+            });
+          }
         }
       } else {
         proxyStatus = '⚠️ HTTP 200 tapi bukan respons Worker (pastikan worker/index.ts sudah ter-deploy).';
@@ -3233,9 +3491,9 @@ function menuTestLynkWebhook() {
     '3. STRICT_LYNK_SIGNATURE: ' + strictMode + '\n' +
     '4. Self-Test HMAC-SHA256 GAS: ' + hmacSelfTestStatus + '\n' +
     '5. Bridge Cloudflare (' + proxyUrl + '):\n   ' + proxyStatus +
-    (postPingStatus ? '\n6. End-to-End Signed POST Test:\n   ' + postPingStatus : '') +
+    (postPingStatus ? '\n6. End-to-End Sync POST Test (Worker -> GAS):\n   ' + postPingStatus : '') +
     '\n\n📌 Pastikan URL Webhook di dashboard Lynk.id diisi:\n' + proxyUrl +
-    '\n(Jangan langsung ke URL script.google.com/exec agar tidak kena HTTP 302).',
+    '\n(Worker langsung balas 200 OK < 50ms ke Lynk anti-timeout 5s, lalu teruskan ke GAS di background).',
     ui.ButtonSet.OK
   );
 }
@@ -3756,4 +4014,564 @@ function generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData) 
       </div>
     </div>
   `;
+}
+
+// ============================================================================
+// 🚨 5. MODUL ERROR LOG ("MASIH ERROR" + AUTO-RESOLVE + DIGEST 18:01 WIB)
+// ============================================================================
+function hasActiveErrorsFlag() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('HAS_ACTIVE_ERRORS') === 'true';
+  } catch (e) {
+    return true;
+  }
+}
+
+function setActiveErrorsFlag(isActive) {
+  try {
+    PropertiesService.getScriptProperties().setProperty('HAS_ACTIVE_ERRORS', isActive ? 'true' : 'false');
+  } catch (e) {}
+}
+
+function ensureErrorLogSheet(ss) {
+  const targetSs = ss || getTargetSpreadsheet();
+  return ensureSheetHeaders(targetSs, TAB_ERROR_LOG, [
+    'Jam Mulai Error',
+    'Terakhir Terjadi',
+    'Progress',
+    'Sumber',
+    'Order / Ref ID',
+    'Email Terkait',
+    'Kejadian',
+    'Nama / Pesan Error',
+    'Detail',
+    'Incident Key'
+  ], '#991b1b');
+}
+
+function escapeHtmlBasic(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function recordErrorLog(ss, info) {
+  try {
+    const targetSs = ss || getTargetSpreadsheet();
+    const errSheet = ensureErrorLogSheet(targetSs);
+    const now = new Date();
+    const incidentKey = String(info && info.incidentKey ? info.incidentKey : ((info && info.source) || 'SYSTEM') + '|' + (info && info.message ? String(info.message).slice(0, 60) : 'ERR')).trim();
+    const source = String((info && info.source) || 'SYSTEM').trim();
+    const orderId = String((info && info.orderId) || '-').trim() || '-';
+    const email = String((info && info.email) || '-').trim().toLowerCase() || '-';
+    const message = String((info && info.message) || 'Unknown Error').trim().slice(0, 300);
+    const detail = String((info && info.detail) || '-').trim().slice(0, 350) || '-';
+
+    const lastRow = errSheet.getLastRow();
+    let matchedRow = -1;
+    let prevCount = 0;
+
+    if (lastRow > 1) {
+      const data = errSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+      for (let i = 0; i < data.length; i++) {
+        const rowKey = String(data[i][9] || '').trim();
+        if (rowKey && rowKey === incidentKey) {
+          matchedRow = i + 2;
+          prevCount = Number(data[i][6] || 1) || 1;
+          break;
+        }
+      }
+    }
+
+    if (matchedRow > 1) {
+      errSheet.getRange(matchedRow, 2).setValue(now).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+      errSheet.getRange(matchedRow, 3)
+        .setValue('MASIH ERROR')
+        .setBackground('#fee2e2')
+        .setFontColor('#991b1b')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center');
+      errSheet.getRange(matchedRow, 4).setValue(source);
+      if (orderId !== '-') errSheet.getRange(matchedRow, 5).setValue(orderId);
+      if (email !== '-') errSheet.getRange(matchedRow, 6).setValue(email);
+      errSheet.getRange(matchedRow, 7).setValue(prevCount + 1).setNumberFormat('#,##0').setHorizontalAlignment('center');
+      errSheet.getRange(matchedRow, 8).setValue(message);
+      errSheet.getRange(matchedRow, 9).setValue(detail);
+    } else {
+      errSheet.appendRow([
+        now,
+        now,
+        'MASIH ERROR',
+        source,
+        orderId,
+        email,
+        1,
+        message,
+        detail,
+        incidentKey
+      ]);
+      const newRow = errSheet.getLastRow();
+      errSheet.getRange(newRow, 1, 1, 2).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+      errSheet.getRange(newRow, 3)
+        .setBackground('#fee2e2')
+        .setFontColor('#991b1b')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center');
+      errSheet.getRange(newRow, 7).setNumberFormat('#,##0').setHorizontalAlignment('center');
+    }
+
+    setActiveErrorsFlag(true);
+    SpreadsheetApp.flush();
+  } catch (err) {
+    Logger.log('Warning recordErrorLog: ' + err.toString());
+  }
+}
+
+function resolveErrorLog(ss, keysOrMatchers) {
+  if (!hasActiveErrorsFlag()) return 0;
+
+  try {
+    const targetSs = ss || getTargetSpreadsheet();
+    const errSheet = targetSs.getSheetByName(TAB_ERROR_LOG);
+    if (!errSheet || errSheet.getLastRow() <= 1) {
+      setActiveErrorsFlag(false);
+      return 0;
+    }
+
+    const targets = (Array.isArray(keysOrMatchers) ? keysOrMatchers : [keysOrMatchers])
+      .map(function(k) { return String(k || '').trim(); })
+      .filter(Boolean);
+
+    const lastRow = errSheet.getLastRow();
+    const data = errSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+    const ttlCutoffMs = Date.now() - ERROR_LOG_TTL_HOURS * 60 * 60 * 1000;
+    let deletedCount = 0;
+
+    for (let i = data.length - 1; i >= 0; i--) {
+      const rowNum = i + 2;
+      const rowKey = String(data[i][9] || '').trim();
+      const lastSeenDate = parseOrderOrEmailDate(data[i][1] || data[i][0]);
+      const isMatched = targets.some(function(t) {
+        return rowKey === t || (t.endsWith('*') && rowKey.startsWith(t.slice(0, -1)));
+      });
+      const isStaleNonRecurring = Boolean(lastSeenDate && lastSeenDate.getTime() < ttlCutoffMs);
+
+      if (isMatched || isStaleNonRecurring) {
+        errSheet.deleteRow(rowNum);
+        deletedCount++;
+      }
+    }
+
+    const remaining = Math.max(0, errSheet.getLastRow() - 1);
+    setActiveErrorsFlag(remaining > 0);
+    if (deletedCount > 0) {
+      SpreadsheetApp.flush();
+    }
+    return deletedCount;
+  } catch (err) {
+    Logger.log('Warning resolveErrorLog: ' + err.toString());
+    return 0;
+  }
+}
+
+function pruneStaleErrorLogs(ss, maxAgeHours) {
+  if (!hasActiveErrorsFlag()) return 0;
+  try {
+    const targetSs = ss || getTargetSpreadsheet();
+    const errSheet = targetSs.getSheetByName(TAB_ERROR_LOG);
+    if (!errSheet || errSheet.getLastRow() <= 1) {
+      setActiveErrorsFlag(false);
+      return 0;
+    }
+
+    const hours = typeof maxAgeHours === 'number' && maxAgeHours > 0 ? maxAgeHours : ERROR_LOG_TTL_HOURS;
+    const cutoffMs = Date.now() - hours * 60 * 60 * 1000;
+    const lastRow = errSheet.getLastRow();
+    const data = errSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+    let removed = 0;
+
+    for (let i = data.length - 1; i >= 0; i--) {
+      const lastSeen = parseOrderOrEmailDate(data[i][1] || data[i][0]);
+      if (lastSeen && lastSeen.getTime() < cutoffMs) {
+        errSheet.deleteRow(i + 2);
+        removed++;
+      }
+    }
+
+    setActiveErrorsFlag(errSheet.getLastRow() > 1);
+    if (removed > 0) SpreadsheetApp.flush();
+    return removed;
+  } catch (err) {
+    Logger.log('Warning pruneStaleErrorLogs: ' + err.toString());
+    return 0;
+  }
+}
+
+function handleApiLogError(payload) {
+  try {
+    const ss = getTargetSpreadsheet();
+    recordErrorLog(ss, {
+      incidentKey: String(payload.incidentKey || payload.source || 'WORKER_ERROR'),
+      source: String(payload.source || 'WORKER_LYNK_BRIDGE'),
+      orderId: String(payload.orderId || ''),
+      email: String(payload.email || ''),
+      message: String(payload.message || 'Error dari Cloudflare Worker Bridge'),
+      detail: String(payload.detail || '')
+    });
+    return createJsonResponse({ status: 'success', success: true, logged: true });
+  } catch (err) {
+    return createJsonResponse({ status: 'error', success: false, message: err.toString() });
+  }
+}
+
+function getActiveErrorLogRows(ss) {
+  const targetSs = ss || getTargetSpreadsheet();
+  const errSheet = targetSs.getSheetByName(TAB_ERROR_LOG);
+  if (!errSheet || errSheet.getLastRow() <= 1) {
+    setActiveErrorsFlag(false);
+    return [];
+  }
+
+  const lastRow = errSheet.getLastRow();
+  const data = errSheet.getRange(2, 1, lastRow - 1, 10).getValues();
+  const activeRows = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const progress = String(data[i][2] || 'MASIH ERROR').trim().toUpperCase();
+    if (!progress || progress === 'MASIH ERROR') {
+      const startDate = parseOrderOrEmailDate(data[i][0]) || new Date();
+      const startTimeDisplay = Utilities.formatDate(startDate, 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss') + ' WIB';
+      activeRows.push({
+        startTime: startTimeDisplay,
+        progress: 'MASIH ERROR',
+        source: String(data[i][3] || 'SYSTEM').trim(),
+        count: Number(data[i][6] || 1) || 1,
+        message: String(data[i][7] || 'Unknown Error').trim()
+      });
+    }
+  }
+
+  setActiveErrorsFlag(activeRows.length > 0);
+  return activeRows;
+}
+
+function generateErrorDigestHtmlEmail(activeRows, checkedAtDisplay, sheetUrl) {
+  const rowsHtml = activeRows.map(function(row, idx) {
+    const bg = idx % 2 === 0 ? '#ffffff' : '#fff7f7';
+    return `
+      <tr style="background-color: ${bg};">
+        <td style="padding: 10px 12px; font-size: 12px; color: #64748b; border-bottom: 1px solid #fecaca; text-align: center; font-weight: 700;">${idx + 1}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fecaca; background-color: #fef2f2;">
+          <div style="font-size: 13.5px; font-weight: 800; color: #991b1b; line-height: 1.4;">${escapeHtmlBasic(row.message)}</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 3px;">Sumber: <strong>${escapeHtmlBasic(row.source)}</strong> &bull; Kejadian: <strong>${row.count}x</strong></div>
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fecaca; text-align: center; white-space: nowrap;">
+          <span style="display: inline-block; background-color: #fee2e2; color: #991b1b; font-family: monospace; font-size: 12px; font-weight: 800; padding: 5px 8px; border-radius: 6px; border: 1px solid #fca5a5;">
+            ${escapeHtmlBasic(row.startTime)}
+          </span>
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #fecaca; text-align: center; white-space: nowrap;">
+          <span style="display: inline-block; background-color: #991b1b; color: #ffffff; font-size: 10.5px; font-weight: 800; padding: 4px 8px; border-radius: 6px; letter-spacing: 0.4px;">
+            MASIH ERROR
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const sheetBtnHtml = sheetUrl
+    ? `<div style="text-align: center; margin-top: 18px;">
+         <a href="${sheetUrl}" target="_blank" style="display: inline-block; background-color: #991b1b; color: #ffffff; padding: 11px 20px; border-radius: 10px; font-size: 13px; font-weight: 800; text-decoration: none;">
+           📊 Buka Tab Error_Log di Google Sheet
+         </a>
+       </div>`
+    : '';
+
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 640px; margin: 0 auto; background-color: #f8fafc; padding: 20px; border-radius: 18px; border: 1px solid #e2e8f0; color: #0f172a;">
+      <div style="background-color: #991b1b; color: #ffffff; padding: 16px 20px; border-radius: 12px; margin-bottom: 16px;">
+        <div style="font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; opacity: 0.9;">🚨 Monitoring Otomatis 18 Jam (Sejak 00:01 WIB)</div>
+        <h2 style="margin: 4px 0 0 0; font-size: 18px; font-weight: 900;">${activeRows.length} Error Aktif Masih Terjadi di ${BRAND_NAME}</h2>
+        <div style="font-size: 12px; margin-top: 4px; opacity: 0.9;">Dicek pada: <strong>${escapeHtmlBasic(checkedAtDisplay)} WIB</strong></div>
+      </div>
+
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #ffffff; border: 1.5px solid #fca5a5; border-radius: 12px; overflow: hidden;">
+        <thead>
+          <tr style="background-color: #7f1d1d; color: #ffffff;">
+            <th align="center" style="padding: 10px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; width: 38px;">No</th>
+            <th align="left" style="padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Nama / Pesan Error</th>
+            <th align="center" style="padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Jam Mulai Error</th>
+            <th align="center" style="padding: 10px 12px; font-size: 11px; font-weight: 800; text-transform: uppercase;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      ${sheetBtnHtml}
+
+      <p style="font-size: 11.5px; color: #64748b; text-align: center; margin: 16px 0 0 0; line-height: 1.5;">
+        Jika seluruh masalah di atas sudah terselesaikan/tidak berulang, baris di tab <strong>Error_Log</strong> otomatis terhapus.<br>
+        &copy; ${BRAND_NAME} Error Monitor
+      </p>
+    </div>
+  `;
+}
+
+function cronCheckActiveErrorsAndNotify(forceSend) {
+  const isManualForce = forceSend === true;
+  try {
+    const ss = getTargetSpreadsheet();
+    ensureErrorLogSheet(ss);
+
+    // Bersihkan dulu error satu-kali yang sudah lewat > 24 jam tanpa pengulangan
+    pruneStaleErrorLogs(ss, ERROR_LOG_TTL_HOURS);
+
+    const activeRows = getActiveErrorLogRows(ss);
+    if (activeRows.length === 0) {
+      Logger.log('✅ Error_Log bersih pada evaluasi 18:01 WIB. Tidak ada email notifikasi dikirim.');
+      return { sent: false, activeCount: 0, reason: 'clean' };
+    }
+
+    const now = new Date();
+    const todayKey = getJakartaDateKey(now);
+    const props = PropertiesService.getScriptProperties();
+
+    // Saat trigger otomatis (bukan manual forceSend === true), cegah kirim ganda di tanggal WIB yang sama
+    // serta pastikan pengecekan sudah masuk jam >= 18 WIB (18 jam sejak 00:01 WIB)
+    if (!isManualForce) {
+      const hourWib = Number(Utilities.formatDate(now, 'Asia/Jakarta', 'H'));
+      if (hourWib < 18) {
+        Logger.log('Menunggu pukul 18:01 WIB (18 jam sejak 00:01 WIB).');
+        return { sent: false, activeCount: activeRows.length, reason: 'before_1800_wib' };
+      }
+      const lastDigestDate = String(props.getProperty('LAST_ERROR_DIGEST_DATE') || '');
+      if (lastDigestDate === todayKey) {
+        Logger.log('Digest Error_Log hari ini (' + todayKey + ') sudah terkirim.');
+        return { sent: false, activeCount: activeRows.length, reason: 'already_sent_today' };
+      }
+    }
+
+    const devEmail = getDeveloperEmail();
+    if (!devEmail) {
+      Logger.log('⚠️ DEVELOPER_EMAIL belum diisi di Properti Skrip GAS (Project Settings > Script Properties). Digest tidak dikirim.');
+      return { sent: false, activeCount: activeRows.length, error: 'DEVELOPER_EMAIL belum diisi di Properti Skrip GAS.' };
+    }
+
+    const checkedAtDisplay = Utilities.formatDate(now, 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    let sheetUrl = '';
+    try { sheetUrl = ss.getUrl(); } catch (e) {}
+
+    const subject = '🚨 [' + BRAND_NAME + '] ' + activeRows.length + ' Error Aktif Masih Terjadi (' + Utilities.formatDate(now, 'Asia/Jakarta', 'dd/MM HH:mm') + ' WIB)';
+    const htmlBody = generateErrorDigestHtmlEmail(activeRows, checkedAtDisplay, sheetUrl);
+    const res = sendBrevoHtmlDirect(devEmail, 'Developer ' + BRAND_NAME, subject, htmlBody);
+
+    if (res.success) {
+      if (!isManualForce) {
+        props.setProperty('LAST_ERROR_DIGEST_DATE', todayKey);
+      }
+      Logger.log('🚨 Digest Error_Log (' + activeRows.length + ' error aktif) terkirim ke ' + devEmail);
+      return { sent: true, activeCount: activeRows.length, email: devEmail };
+    }
+
+    Logger.log('⚠️ Gagal kirim digest Error_Log via Brevo: ' + res.error);
+    return { sent: false, activeCount: activeRows.length, error: res.error };
+  } catch (err) {
+    Logger.log('Error cronCheckActiveErrorsAndNotify: ' + err.toString());
+    return { sent: false, error: err.toString() };
+  }
+}
+
+function setupErrorMonitorTrigger(silent) {
+  const existing = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === 'cronCheckActiveErrorsAndNotify') {
+      ScriptApp.deleteTrigger(existing[i]);
+    }
+  }
+
+  // Jalankan harian pukul 18:05–18:35 WIB (tepat setelah 18 jam sejak pukul 00:01 WIB)
+  ScriptApp.newTrigger('cronCheckActiveErrorsAndNotify')
+    .timeBased()
+    .everyDays(1)
+    .atHour(18)
+    .nearMinute(20)
+    .inTimezone('Asia/Jakarta')
+    .create();
+
+  if (!silent) {
+    const devEmail = getDeveloperEmail();
+    SpreadsheetApp.getUi().alert(
+      '⏰ Task Otomatis Error_Log Aktif!',
+      'Sistem akan otomatis memeriksa tab "Error_Log" setiap hari sekitar pukul 18:05–18:35 WIB (18 jam sejak 00:01 WIB).\n\n' +
+      (devEmail
+        ? 'Jika masih ada error "MASIH ERROR", daftar tabel rapi akan dikirim via Brevo ke: ' + devEmail + '.'
+        : '⚠️ Catatan: Properti `DEVELOPER_EMAIL` belum diisi! Silakan isi `DEVELOPER_EMAIL` di Extensions > Apps Script > Project Settings (⚙️) > Properti Skrip.') +
+      '\nJika Error_Log bersih, tidak ada email yang dikirim.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+}
+
+function menuSetupErrorMonitorTrigger() {
+  setupErrorMonitorTrigger(false);
+}
+
+function menuRunErrorDigestManual() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = getTargetSpreadsheet();
+  ensureErrorLogSheet(ss);
+  const devEmail = getDeveloperEmail();
+  if (!devEmail) {
+    ui.alert(
+      '⚠️ DEVELOPER_EMAIL Belum Diisi',
+      'Silakan tambahkan properti `DEVELOPER_EMAIL` (isi dengan Gmail Anda) di:\n' +
+      'Extensions > Apps Script > Project Settings (⚙️) > Properti Skrip.\n\n' +
+      'Dengan begitu Anda tidak perlu edit kode manual.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  const activeRows = getActiveErrorLogRows(ss);
+  if (activeRows.length === 0) {
+    ui.alert('✅ Tidak Ada Error Aktif', 'Tab "Error_Log" bersih (0 baris MASIH ERROR). Tidak ada email yang perlu dikirim ke ' + devEmail + '.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const res = cronCheckActiveErrorsAndNotify(true);
+  if (res.sent) {
+    ui.alert('🚨 Digest Error Terkirim!', activeRows.length + ' error aktif telah dikirim ke ' + res.email + ' dalam format tabel HTML via Brevo.', ui.ButtonSet.OK);
+  } else {
+    ui.alert('❌ Gagal Mengirim Digest Error', 'Penyebab: ' + (res.error || res.reason || 'Tidak diketahui'), ui.ButtonSet.OK);
+  }
+}
+
+function menuClearErrorLog() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = getTargetSpreadsheet();
+  const errSheet = ensureErrorLogSheet(ss);
+  const lastRow = errSheet.getLastRow();
+  if (lastRow <= 1) {
+    setActiveErrorsFlag(false);
+    ui.alert('ℹ️ Info', 'Tab "Error_Log" sudah kosong.', ui.ButtonSet.OK);
+    return;
+  }
+  errSheet.deleteRows(2, lastRow - 1);
+  setActiveErrorsFlag(false);
+  ui.alert('✅ Error_Log Dibersihkan', (lastRow - 1) + ' baris error telah dihapus manual.', ui.ButtonSet.OK);
+}
+
+function maskSecretValue(val) {
+  const s = String(val || '').trim();
+  if (!s) return '❌ Belum diisi';
+  if (s.length <= 8) return '✅ Terpasang (****)';
+  return '✅ Terpasang (' + s.slice(0, 4) + '****' + s.slice(-4) + ')';
+}
+
+function menuCheckScriptProperties() {
+  const props = PropertiesService.getScriptProperties();
+  const rawSenderEmail = String(props.getProperty('BREVO_SENDER_EMAIL') || '').trim();
+  const rawSenderName = String(props.getProperty('BREVO_SENDER_NAME') || '').trim();
+  const rawDevEmail = String(props.getProperty('DEVELOPER_EMAIL') || '').trim();
+  const rawStrictSig = String(props.getProperty('STRICT_LYNK_SIGNATURE') || '').trim();
+
+  const summary =
+    '📋 STATUS PROPERTI SKRIP GAS (Project Settings ⚙️ > Properti Skrip)\n\n' +
+    '1. BREVO_API_KEY: ' + maskSecretValue(props.getProperty('BREVO_API_KEY')) + '\n' +
+    '2. BREVO_SENDER_NAME: ' + (rawSenderName ? '✅ ' + rawSenderName : 'ℹ️ Belum diset (pakai default: ' + BREVO_SENDER_NAME + ')') + '\n' +
+    '3. BREVO_SENDER_EMAIL: ' + (rawSenderEmail ? '✅ ' + rawSenderEmail : 'ℹ️ Belum diset (pakai default: ' + BREVO_SENDER_EMAIL + ')') + '\n' +
+    '4. DEVELOPER_EMAIL: ' + (rawDevEmail ? '✅ ' + rawDevEmail : '⚠️ Belum diisi (Wajib untuk terima email Error_Log!)') + '\n' +
+    '5. MERCHANT_KEY (Lynk): ' + maskSecretValue(props.getProperty('MERCHANT_KEY')) + '\n' +
+    '6. SCALEV_API_KEY: ' + maskSecretValue(props.getProperty('SCALEV_API_KEY')) + '\n' +
+    '7. ADMIN_SECRET_KEY: ' + maskSecretValue(props.getProperty('ADMIN_SECRET_KEY')) + '\n' +
+    '8. STRICT_LYNK_SIGNATURE: ' + (rawStrictSig || 'false (default)') + '\n\n' +
+    '💡 Semua nilai di atas cukup diatur dari menu Properti Skrip GAS — tanpa perlu edit kode manual.';
+
+  SpreadsheetApp.getUi().alert('⚙️ Status Properti Skrip GAS', summary, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function menuSimulateErrorLogAndNotify() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = getTargetSpreadsheet();
+  ensureErrorLogSheet(ss);
+
+  const devEmail = getDeveloperEmail();
+  const brevoKey = getScriptProp('BREVO_API_KEY', BREVO_API_KEY);
+
+  if (!devEmail) {
+    ui.alert(
+      '⚠️ DEVELOPER_EMAIL Belum Diisi',
+      'Tambahkan properti `DEVELOPER_EMAIL` (isi Gmail Anda) di:\n' +
+      'Extensions > Apps Script > Project Settings (⚙️) > Properti Skrip.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  if (!brevoKey) {
+    ui.alert(
+      '⚠️ BREVO_API_KEY Belum Diisi',
+      'Tambahkan properti `BREVO_API_KEY` di Project Settings (⚙️) > Properti Skrip agar test email dapat dikirim.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  // 1. Masukkan 2 baris simulasi MASIH ERROR ke tab Error_Log
+  recordErrorLog(ss, {
+    incidentKey: 'SIMULASI_LYNK_TEST',
+    source: 'LYNK_WEBHOOK',
+    orderId: 'TEST-SIM-' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'HHmmss'),
+    email: 'simulasi.pembeli@example.com',
+    message: '[SIMULASI TEST] Contoh Error Webhook Lynk.id (Timeout / Upstream GAS)',
+    detail: 'Simulasi manual dari menu admin untuk verifikasi tabel email Error_Log.'
+  });
+
+  recordErrorLog(ss, {
+    incidentKey: 'SIMULASI_BREVO_TEST',
+    source: 'BREVO_EMAIL',
+    orderId: 'TEST-EMAIL-01',
+    email: 'simulasi.brevo@example.com',
+    message: '[SIMULASI TEST] Contoh Error Gagal Kirim Email Lisensi Brevo',
+    detail: 'Simulasi manual untuk menguji highlight Pesan Error & Jam Mulai Error.'
+  });
+
+  // 2. Jalankan kirim digest tabel HTML ke Gmail developer via Brevo sekarang
+  const res = cronCheckActiveErrorsAndNotify(true);
+
+  if (!res.sent) {
+    ui.alert(
+      '❌ Simulasi Tercatat di Error_Log, Tapi Gagal Kirim Email',
+      'Baris simulasi sudah masuk ke tab "Error_Log", namun pengiriman ke ' + devEmail + ' gagal:\n' +
+      (res.error || res.reason || 'Error tidak diketahui') + '\n\n' +
+      'Cek kembali BREVO_API_KEY & BREVO_SENDER_EMAIL di Properti Skrip GAS.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  // 3. Tawarkan langsung uji Auto-Hapus (simulasi error sembuh)
+  const choice = ui.alert(
+    '✅ Test Simulasi Berhasil Terkirim!',
+    '• 2 contoh error [SIMULASI TEST] (status: MASIH ERROR) telah dicatat di tab "Error_Log".\n' +
+    '• Tabel HTML error aktif berhasil dikirim via Brevo ke: ' + res.email + '\n' +
+    '  (Pengirim: ' + getBrevoSenderName() + ' <' + getBrevoSenderEmail() + '>)\n\n' +
+    'Silakan cek kotak masuk / folder spam Gmail Anda sekarang.\n\n' +
+    'Klik YES untuk sekalian menguji fitur AUTO-HAPUS (simulasi error sembuh sekarang),\n' +
+    'atau klik NO jika ingin membiarkan 2 baris simulasi tersebut tampil dulu di tab "Error_Log".',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (choice === ui.Button.YES) {
+    const resolved = resolveErrorLog(ss, ['SIMULASI_LYNK_TEST', 'SIMULASI_BREVO_TEST']);
+    ui.alert(
+      '✅ Auto-Hapus Berhasil Diuji!',
+      resolved + ' baris simulasi telah otomatis terhapus dari tab "Error_Log" karena error dianggap sudah terselesaikan.',
+      ui.ButtonSet.OK
+    );
+  }
 }
