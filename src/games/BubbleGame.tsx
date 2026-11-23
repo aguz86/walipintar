@@ -34,6 +34,22 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const nextIdRef = useRef(1);
+  const scoreRef = useRef(0);
+  const timeLeftRef = useRef(25);
+  const finishedRef = useRef(false);
+  const onWinRef = useRef(onWin);
+
+  useEffect(() => {
+    onWinRef.current = onWin;
+  }, [onWin]);
+
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
 
   // Speed and bubble spawn rate by level
   const spawnInterval = level === 0 ? 800 : level === 1 ? 650 : 500;
@@ -54,48 +70,63 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // When timer reaches 0, finish game
+  // When timer reaches 0, finish game once with latest score
   useEffect(() => {
-    if (timeLeft === 0) {
+    if (timeLeft === 0 && !finishedRef.current) {
+      finishedRef.current = true;
+      const finalScore = scoreRef.current;
       const thresholds = level === 0 ? [10, 6] : level === 1 ? [16, 10] : [22, 14];
-      const stars = score >= thresholds[0] ? 3 : score >= thresholds[1] ? 2 : 1;
-      onWin(stars, `${score} ${lang === 'id' ? 'gelembung terpecahkan!' : 'bubbles popped!'}`);
+      const stars = finalScore >= thresholds[0] ? 3 : finalScore >= thresholds[1] ? 2 : 1;
+      onWinRef.current(
+        stars,
+        `${finalScore} ${lang === 'id' ? 'gelembung terpecahkan!' : 'bubbles popped!'}`
+      );
     }
-  }, [timeLeft]);
+  }, [timeLeft, level, lang]);
 
-  // Bubble spawner
+  // Bubble spawner (does not reset every second)
   useEffect(() => {
     const allPool = [...ANIMALS, ...FRUITS];
-    const spawner = setInterval(() => {
-      if (timeLeft <= 0) return;
+    const baseSpeed = level === 0 ? 0.55 : level === 1 ? 0.8 : 1.05;
 
+    const createBubble = (startY = 104): Bubble => {
       const randomItem = allPool[Math.floor(Math.random() * allPool.length)];
       const randomColor = BUBBLE_PALETTES[Math.floor(Math.random() * BUBBLE_PALETTES.length)];
-      const newBubble: Bubble = {
+      return {
         id: nextIdRef.current++,
-        x: Math.random() * 80 + 5, // 5% to 85%
-        y: 110, // start below bottom
-        speed: Math.random() * 0.8 + (level === 0 ? 0.7 : level === 1 ? 1.0 : 1.3),
+        x: Math.random() * 72 + 14, // 14% to 86% (centered with translateX(-50%))
+        y: startY,
+        speed: Math.random() * 0.55 + baseSpeed,
         size: bubbleSize,
         color: randomColor,
         item: randomItem,
       };
+    };
 
-      setBubbles((prev) => [...prev.slice(-20), newBubble]);
+    // Spawn starter bubbles immediately so the sky isn't empty on frame 1
+    setBubbles([createBubble(70), createBubble(86), createBubble(100)]);
+
+    const spawner = setInterval(() => {
+      if (timeLeftRef.current <= 0) return;
+      setBubbles((prev) => [...prev.slice(-20), createBubble(104)]);
     }, spawnInterval);
 
     return () => clearInterval(spawner);
-  }, [level, timeLeft]);
+  }, [level, spawnInterval, bubbleSize]);
 
-  // Bubble animation loop
+  // Frame-rate independent bubble animation loop
   useEffect(() => {
     let animId: number;
+    let lastTime = performance.now();
 
-    const animate = () => {
+    const animate = (now: number) => {
+      const dtFactor = Math.min(now - lastTime, 50) / 16.667;
+      lastTime = now;
+
       setBubbles((prev) =>
         prev
-          .map((b) => ({ ...b, y: b.y - b.speed }))
-          .filter((b) => b.y > -25) // remove when off top
+          .map((b) => ({ ...b, y: b.y - b.speed * dtFactor }))
+          .filter((b) => b.y > -22) // remove when off top
       );
       animId = requestAnimationFrame(animate);
     };
@@ -105,6 +136,7 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
   }, []);
 
   const handlePop = (bubble: Bubble) => {
+    if (timeLeftRef.current <= 0) return;
     SFX.pop();
     if (hasAnimalSound(bubble.item.emoji) && Math.random() < 0.4) {
       playAnimalSound(bubble.item.emoji);
@@ -114,10 +146,11 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full max-w-xl mx-auto px-4 py-2">
+    <div className="flex flex-col w-full flex-1 max-w-xl mx-auto px-4 py-2">
       {/* Top HUD */}
       <div className="flex items-center justify-between gap-2 py-2 mb-2 bg-white/90 backdrop-blur-md px-4 rounded-2xl shadow-sm border border-slate-100 shrink-0">
         <button
+          type="button"
           onClick={onBack}
           className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer"
           aria-label="Kembali"
@@ -139,7 +172,7 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
       {/* Bubble Sky Viewport */}
       <div
         ref={containerRef}
-        className="flex-1 w-full rounded-3xl bg-gradient-to-b from-sky-200 via-sky-100 to-emerald-100 relative overflow-hidden border-4 border-white shadow-inner select-none cursor-pointer"
+        className="flex-1 w-full min-h-[420px] sm:min-h-[500px] h-[calc(100dvh-170px)] max-h-[680px] rounded-3xl bg-gradient-to-b from-sky-200 via-sky-100 to-emerald-100 relative overflow-hidden border-4 border-white shadow-inner select-none"
       >
         {/* Soft background clouds */}
         <div className="absolute top-6 left-8 text-6xl opacity-40 pointer-events-none">☁️</div>
@@ -148,8 +181,10 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
         {bubbles.map((b) => (
           <button
             key={b.id}
+            type="button"
             onClick={() => handlePop(b)}
-            className="absolute rounded-full border-3 border-white/80 shadow-md flex items-center justify-center transition-transform hover:scale-110 active:scale-90 cursor-pointer animate-float"
+            aria-label={lang === 'id' ? b.item.nameId : b.item.nameEn}
+            className="absolute -translate-x-1/2 rounded-full border-3 border-white/80 shadow-md flex items-center justify-center transition-transform hover:scale-110 active:scale-90 cursor-pointer touch-manipulation"
             style={{
               left: `${b.x}%`,
               top: `${b.y}%`,
@@ -159,12 +194,14 @@ export const BubbleGame: React.FC<BubbleGameProps> = ({
               boxShadow: 'inset 0 4px 8px rgba(255,255,255,0.7), 0 6px 12px rgba(0,0,0,0.1)',
             }}
           >
-            <ItemIcon
-              name={b.item.nameId}
-              emoji={b.item.emoji}
-              category={b.item.category}
-              size={`${b.size * 0.55}px`}
-            />
+            <span className="pointer-events-none flex items-center justify-center">
+              <ItemIcon
+                name={b.item.nameId}
+                emoji={b.item.emoji}
+                category={b.item.category}
+                size={`${b.size * 0.55}px`}
+              />
+            </span>
           </button>
         ))}
       </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, MessageCircle, AlertTriangle, X, CheckCircle2, Loader2, KeyRound, Copy, Check } from 'lucide-react';
+import { ShoppingCart, MessageCircle, AlertTriangle, CheckCircle2, Loader2, KeyRound, Copy, Check } from 'lucide-react';
 import { SFX, unlockAudio } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { CloseButton3D } from './CloseButton3D';
 
 interface LicenseGatekeeperProps {
   onUnlock: (licenseKey: string) => void;
@@ -556,35 +557,21 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
           </div>
         </div>
 
-        {/* LOGO & LINK MEDIA SOSIAL RESMI WALI PINTAR (YT, FB, IG, TIKTOK) */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <div className="text-center mb-3">
+        {/* LOGO & LINK MEDIA SOSIAL RESMI WALI PINTAR (FB, IG, TIKTOK) */}
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <div className="text-center mb-2">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
               Media Sosial Resmi Wali Pintar
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {/* YouTube */}
-            <a
-              href="https://youtube.com/@walipintar"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100/90 text-red-600 border border-red-200 transition-all text-xs font-bold shadow-xs active:scale-95 group"
-              title="Kunjungi Channel YouTube Resmi @walipintar"
-            >
-              <svg className="w-4 h-4 fill-current shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-              </svg>
-              <span>YouTube</span>
-            </a>
-
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {/* Facebook */}
             <a
               href="https://facebook.com/walipintar"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100/90 text-[#1877F2] border border-blue-200 transition-all text-xs font-bold shadow-xs active:scale-95 group"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-3 rounded-xl bg-blue-50 hover:bg-blue-100/90 text-[#1877F2] border border-blue-200 transition-all text-[11px] sm:text-xs font-bold shadow-xs active:scale-95 group"
               title="Kunjungi Facebook Page Resmi Wali Pintar"
             >
               <svg className="w-4 h-4 fill-current shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" aria-hidden="true">
@@ -598,7 +585,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               href="https://instagram.com/walipintar"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-pink-50 hover:bg-pink-100/90 text-[#E4405F] border border-pink-200 transition-all text-xs font-bold shadow-xs active:scale-95 group"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-3 rounded-xl bg-pink-50 hover:bg-pink-100/90 text-[#E4405F] border border-pink-200 transition-all text-[11px] sm:text-xs font-bold shadow-xs active:scale-95 group"
               title="Ikuti Instagram Resmi @walipintar"
             >
               <svg className="w-4 h-4 fill-current shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" aria-hidden="true">
@@ -612,7 +599,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               href="https://tiktok.com/@walipintar"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition-all text-xs font-bold shadow-xs active:scale-95 group"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition-all text-[11px] sm:text-xs font-bold shadow-xs active:scale-95 group"
               title="Ikuti TikTok Resmi @walipintar"
             >
               <svg className="w-4 h-4 fill-current shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" aria-hidden="true">
@@ -624,6 +611,23 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         </div>
       </div>
 
+      {/* Red YouTube Guide Box di luar bawah box */}
+      <div className="w-full max-w-md mt-3.5 flex justify-center">
+        <a
+          href="https://www.youtube.com/@walipintar/playlists"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-auto min-w-[230px] sm:min-w-[250px] px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-98 text-white font-black text-sm sm:text-base shadow-md border-2 border-red-500 transition-all flex items-center justify-center gap-2.5 whitespace-nowrap"
+        >
+          <span className="w-7 h-5 bg-white rounded-md flex items-center justify-center shrink-0 shadow-2xs" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-red-600">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          <span>Panduan YouTube</span>
+        </a>
+      </div>
+
       {/* Footer Branding Kecil */}
       <div className="mt-4 text-center text-[11px] font-semibold text-slate-400">
         Wali Pintar &bull; Platform Edukasi Berlisensi Anak Usia 3–8 Tahun
@@ -633,14 +637,12 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
       {paidModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
-            <button
-              type="button"
+            <CloseButton3D
               onClick={() => setPaidModalData(null)}
-              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              size="sm"
+              ariaLabel="Tutup"
+              className="absolute top-3.5 right-3.5 z-10"
+            />
 
             {paidModalData.cooldownActive && !paidModalData.emailSentNow ? (
               <>
@@ -791,13 +793,12 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
               unpaidModalData.isNotOrdered ? 'border-amber-400' : 'border-amber-300'
             }`}
           >
-            <button
+            <CloseButton3D
               onClick={() => setUnpaidModalData(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              size="sm"
+              ariaLabel="Tutup"
+              className="absolute top-3.5 right-3.5 z-10"
+            />
 
             {unpaidModalData.isNotOrdered ? (
               /* SKENARIO: EMAIL BELUM PERNAH ORDER SCALEV */
@@ -897,13 +898,12 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-rose-300 relative animate-scale-in">
-            <button
+            <CloseButton3D
               onClick={() => setShowRejectModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              size="sm"
+              ariaLabel="Tutup"
+              className="absolute top-3.5 right-3.5 z-10"
+            />
 
             <div className="text-5xl mb-3 animate-bounce">🚫</div>
             <h3 className="text-xl font-black text-slate-900 mb-1.5">

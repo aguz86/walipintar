@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
-import { SFX, speakText } from '../utils/audio';
+import { SFX, speakText, stopSpeaking } from '../utils/audio';
 
 interface OrderGameProps {
   onBack: () => void;
@@ -11,6 +11,21 @@ interface OrderGameProps {
 }
 
 const PALETTE = ['#ffd1e3', '#cfe6ff', '#c8f2dc', '#fff3b0', '#e2d6ff', '#ffd9c7'];
+
+const NUMBER_WORDS_ID: Record<number, string> = {
+  1: 'Satu',
+  2: 'Dua',
+  3: 'Tiga',
+  4: 'Empat',
+  5: 'Lima',
+  6: 'Enam',
+  7: 'Tujuh',
+  8: 'Delapan',
+  9: 'Sembilan',
+  10: 'Sepuluh',
+  11: 'Sebelas',
+  12: 'Dua belas',
+};
 
 export const OrderGame: React.FC<OrderGameProps> = ({
   onBack,
@@ -26,11 +41,14 @@ export const OrderGame: React.FC<OrderGameProps> = ({
   const [numbers, setNumbers] = useState<{ val: number; tapped: boolean; color: string }[]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const roundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setupRound = () => {
     const count = rounds[currentRound];
     setNextExpected(1);
     setFeedback('');
+    setIsTransitioning(false);
 
     const rawNums = Array.from({ length: count }, (_, i) => i + 1);
     const shuffled = rawNums
@@ -48,8 +66,25 @@ export const OrderGame: React.FC<OrderGameProps> = ({
     setupRound();
   }, [currentRound, level]);
 
+  useEffect(() => {
+    return () => {
+      if (roundTimerRef.current) clearTimeout(roundTimerRef.current);
+      stopSpeaking();
+    };
+  }, []);
+
+  const getSpokenNumber = (num: number): string => {
+    if (lang === 'id') {
+      return NUMBER_WORDS_ID[num] || `${num}`;
+    }
+    return `${num}`;
+  };
+
   const handleTap = (val: number) => {
+    if (isTransitioning) return;
+
     const displayName = playerName?.trim() || (lang === 'id' ? 'Juara' : 'Champ');
+    const spokenNum = getSpokenNumber(val);
 
     if (val === nextExpected) {
       SFX.bloop();
@@ -60,31 +95,44 @@ export const OrderGame: React.FC<OrderGameProps> = ({
       setNextExpected(nextVal);
 
       if (nextVal > rounds[currentRound]) {
+        setIsTransitioning(true);
         SFX.ding();
-        const praise = lang === 'id' ? `🌟 Hebat sekali, ${displayName}! Urutan benar!` : `🌟 Awesome, ${displayName}! Perfect!`;
+        const praise =
+          lang === 'id'
+            ? `🌟 Hebat sekali, ${displayName}! Urutan benar!`
+            : `🌟 Awesome, ${displayName}! Perfect!`;
         setFeedback(praise);
-        speakText(lang === 'id' ? `Hebat sekali, ${displayName}!` : `Great job, ${displayName}!`, lang);
 
-        setTimeout(() => {
+        speakText(
+          lang === 'id'
+            ? `${spokenNum}! Hebat sekali, ${displayName}!`
+            : `${spokenNum}! Great job, ${displayName}!`,
+          lang
+        );
+
+        roundTimerRef.current = setTimeout(() => {
           if (currentRound + 1 >= rounds.length) {
             const stars = mistakes === 0 ? 3 : mistakes <= 2 ? 2 : 1;
             onWin(stars, lang === 'id' ? 'Selesai 3 putaran urutan angka!' : 'Completed all 3 rounds!');
           } else {
             setCurrentRound((r) => r + 1);
           }
-        }, 800);
+        }, 1400);
+      } else {
+        setFeedback('');
+        speakText(spokenNum, lang);
       }
     } else {
       SFX.no();
       setMistakes((m) => m + 1);
       const wrongText = lang === 'id' ? 'Coba lagi yaa!' : 'Try again!';
-      setFeedback(wrongText);
-      speakText(wrongText, lang);
+      setFeedback(`${val} — ${wrongText}`);
+      speakText(`${spokenNum}. ${wrongText}`, lang);
     }
   };
 
   return (
-    <div className="flex flex-col h-full max-w-xl mx-auto px-4 py-2">
+    <div className="flex flex-col flex-1 h-full w-full max-w-xl mx-auto px-4 py-2">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 py-2 mb-3 bg-white/90 backdrop-blur-md px-4 rounded-2xl shadow-sm border border-slate-100">
         <button
@@ -122,11 +170,13 @@ export const OrderGame: React.FC<OrderGameProps> = ({
           </p>
           <div className="min-h-[2rem] flex items-center justify-center mt-2">
             {feedback && (
-              <span className={`text-xs sm:text-sm font-black px-4 py-1 rounded-full shadow-xs ${
-                feedback.includes('Coba lagi') || feedback.includes('Try again')
-                  ? 'bg-rose-100 text-rose-700 border border-rose-300'
-                  : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-              }`}>
+              <span
+                className={`text-xs sm:text-sm font-black px-4 py-1 rounded-full shadow-xs ${
+                  feedback.includes('Coba lagi') || feedback.includes('Try again')
+                    ? 'bg-rose-100 text-rose-700 border border-rose-300'
+                    : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                }`}
+              >
                 {feedback}
               </span>
             )}
@@ -138,8 +188,9 @@ export const OrderGame: React.FC<OrderGameProps> = ({
           {numbers.map((item) => (
             <button
               key={item.val}
+              type="button"
               onClick={() => handleTap(item.val)}
-              disabled={item.tapped}
+              disabled={item.tapped || isTransitioning}
               className={`h-20 sm:h-24 rounded-3xl font-black text-3xl md:text-4xl border-3 flex items-center justify-center shadow-sm transition-all cursor-pointer ${
                 item.tapped
                   ? 'bg-slate-100 border-slate-200 text-slate-300 opacity-40 scale-90 cursor-default'

@@ -16,11 +16,11 @@ import {
   Volume2,
   Image as ImageIcon,
   Trash2,
-  X,
   Flame,
   Grid,
   Maximize2,
 } from 'lucide-react';
+import { CloseButton3D } from '../components/CloseButton3D';
 import {
   COLORING_PAGES,
   COLORING_CATEGORIES,
@@ -1166,12 +1166,12 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                   </p>
                 </div>
               </div>
-              <button
+              <CloseButton3D
                 onClick={() => setIsCatalogOpen(false)}
-                className="p-1 rounded-xl bg-black/20 hover:bg-black/30 text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                size="sm"
+                ariaLabel="Tutup Katalog"
+                className="shrink-0"
+              />
             </div>
 
             {/* Filter Categories inside Catalog */}
@@ -1271,12 +1271,12 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                   {lang === 'id' ? 'Galeri Karyaku' : 'My Art Gallery'}
                 </h3>
               </div>
-              <button
+              <CloseButton3D
                 onClick={() => setIsGalleryOpen(false)}
-                className="p-1 rounded-xl bg-black/20 hover:bg-black/30 text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                size="sm"
+                ariaLabel="Tutup Galeri"
+                className="shrink-0"
+              />
             </div>
 
             {/* Gallery Grid or Empty State */}
@@ -1359,13 +1359,12 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
               <span className="text-[11px] sm:text-xs font-black uppercase text-emerald-800 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full">
                 🎨 {lang === 'id' ? 'Contoh Desain Mewarnai' : 'Coloring Design Sample'}
               </span>
-              <button
-                type="button"
+              <CloseButton3D
                 onClick={() => setShowSampleModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                size="sm"
+                ariaLabel="Tutup Contoh"
+                className="shrink-0"
+              />
             </div>
 
             {/* Gambar Besar Contoh Desain yang Sudah Diwarnai */}

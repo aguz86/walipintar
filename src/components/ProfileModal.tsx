@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { AGE_LEVELS } from '../data/items';
 import { SFX } from '../utils/audio';
+import { CloseButton3D } from './CloseButton3D';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -53,13 +54,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
       <div className="w-full max-w-md rounded-3xl bg-white p-4 sm:p-6 shadow-2xl relative border-4 border-indigo-200 my-auto text-slate-800 max-h-[92vh] overflow-y-auto">
-        <button
+        <CloseButton3D
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Tutup"
-        >
-          <X className="w-6 h-6" />
-        </button>
+          ariaLabel="Tutup"
+          className="absolute top-3.5 right-3.5 z-10"
+        />
 
         <div className="text-center mb-5">
           <div className="text-5xl mb-2 inline-block p-3 rounded-full bg-indigo-50 border-2 border-indigo-100 shadow-sm">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, X, Copy, Check } from 'lucide-react';
 import { SFX } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { CloseButton3D } from './CloseButton3D';
 
 interface ClaimPageProps {
   onUnlockSuccess: (licenseKey: string) => void;
@@ -345,7 +346,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     try { localStorage.removeItem('walipintar_email'); } catch {}
                     emailInputRef.current?.focus();
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 active:scale-90 transition-all cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 active:scale-90 transition-all cursor-pointer"
                   aria-label="Hapus email"
                   title="Hapus email"
                 >
@@ -418,18 +419,33 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         </div>
       </div>
 
+      {/* Red YouTube Guide Box tepat di bawah box */}
+      <div className="w-full max-w-md mt-3.5 flex justify-center">
+        <a
+          href="https://www.youtube.com/@walipintar/playlists"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-auto min-w-[230px] sm:min-w-[250px] px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-98 text-white font-black text-sm sm:text-base shadow-md border-2 border-red-500 transition-all flex items-center justify-center gap-2.5 whitespace-nowrap"
+        >
+          <span className="w-7 h-5 bg-white rounded-md flex items-center justify-center shrink-0 shadow-2xs" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-red-600">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          <span>Panduan YouTube</span>
+        </a>
+      </div>
+
       {/* POPUP JIKA LUNAS: < 3 bulan -> Pop-up Copy-Paste; >= 3 bulan atau baru pertama -> Kirim Email Brevo + Main */}
       {paidModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
-            <button
-              type="button"
+            <CloseButton3D
               onClick={() => setPaidModalData(null)}
-              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              size="sm"
+              ariaLabel="Tutup"
+              className="absolute top-3.5 right-3.5 z-10"
+            />
 
             {paidModalData.cooldownActive && !paidModalData.emailSentNow ? (
               <>
@@ -579,13 +595,12 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
               unpaidModalData.isNotOrdered ? 'border-amber-400' : 'border-amber-300'
             }`}
           >
-            <button
+            <CloseButton3D
               onClick={() => setUnpaidModalData(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Tutup"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              size="sm"
+              ariaLabel="Tutup"
+              className="absolute top-3.5 right-3.5 z-10"
+            />
 
             {unpaidModalData.isNotOrdered ? (
               /* SKENARIO: EMAIL BELUM PERNAH ORDER SCALEV */

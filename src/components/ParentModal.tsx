@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check, Download, Loader2 } from 'lucide-react';
+import { Volume2, Shield, Clock, Heart, Award, RefreshCw, KeyRound, LogOut, QrCode, Copy, ExternalLink, Share2, Check, Download, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { SFX, playAnimalSound, speakText } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { CloseButton3D } from './CloseButton3D';
 
 interface ParentModalProps {
   isOpen: boolean;
@@ -258,13 +259,11 @@ export const ParentModal: React.FC<ParentModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
       <div className="w-full max-w-lg rounded-3xl bg-white p-4 sm:p-6 shadow-2xl relative border-4 border-amber-200 my-auto text-slate-800 max-h-[92vh] overflow-y-auto">
-        <button
+        <CloseButton3D
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Tutup"
-        >
-          <X className="w-6 h-6" />
-        </button>
+          ariaLabel="Tutup"
+          className="absolute top-3.5 right-3.5 z-10"
+        />
 
         {!unlocked ? (
           /* Math Gate Protection */
@@ -549,14 +548,12 @@ export const ParentModal: React.FC<ParentModalProps> = ({
         {showQrModal && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
             <div className="w-full max-w-xs rounded-3xl bg-white p-5 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in text-slate-800">
-              <button
-                type="button"
+              <CloseButton3D
                 onClick={() => setShowQrModal(false)}
-                className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Tutup QR"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                ariaLabel="Tutup QR"
+                size="sm"
+                className="absolute top-3 right-3 z-10"
+              />
 
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto mb-2 text-2xl shadow-xs">
                 🌱

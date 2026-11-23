@@ -4,6 +4,7 @@ import { ANIMALS, FRUITS, VEGGIES, PLANTS, VEHICLES, SHAPE_ITEMS, GameItem, ALL_
 import { ItemIcon } from './ItemIcon';
 import { SFX, playAnimalSound, speakText, hasAnimalSound } from '../utils/audio';
 import { SlideScrollContainer } from './SlideScrollContainer';
+import { CloseButton3D } from './CloseButton3D';
 
 interface LibraryModalProps {
   isOpen: boolean;
@@ -104,13 +105,11 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
               </p>
             </div>
           </div>
-          <button
+          <CloseButton3D
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            aria-label="Tutup"
-          >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
+            ariaLabel="Tutup"
+            className="shrink-0"
+          />
         </div>
 
         {/* Search Bar & Category Tabs */}
@@ -131,10 +130,12 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1 transition-colors cursor-pointer"
+                aria-label="Hapus pencarian"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
             )}
           </div>
@@ -212,13 +213,12 @@ export const LibraryModal: React.FC<LibraryModalProps> = ({ isOpen, onClose, lan
         {selectedItem && (
           <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4">
             <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl relative border-4 border-emerald-300 text-center animate-scale-up">
-              <button
+              <CloseButton3D
                 onClick={() => setSelectedItem(null)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full cursor-pointer"
-                aria-label="Tutup"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                size="sm"
+                ariaLabel="Tutup"
+                className="absolute top-3.5 right-3.5 z-10"
+              />
 
               <div className="w-24 h-24 mx-auto mb-3 flex items-center justify-center text-6xl bg-emerald-50 rounded-full border-2 border-emerald-200 shadow-inner">
                 <ItemIcon

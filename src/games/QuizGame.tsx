@@ -26,6 +26,8 @@ interface QuizGameProps {
 interface Question {
   promptText: string;
   questionVisual?: React.ReactNode;
+  wideVisual?: boolean;
+  emojiOptions?: boolean;
   soundEmoji?: string;
   spokenText?: string;
   options: { label: string; visual?: React.ReactNode; isCorrect: boolean }[];
@@ -342,12 +344,46 @@ export const QuizGame: React.FC<QuizGameProps> = ({
       const chosenDistractors = distractors.sort(() => Math.random() - 0.5).slice(0, numChoices - 1);
       const allNums = [count, ...chosenDistractors].sort(() => Math.random() - 0.5);
 
+      const gridColsClass =
+        count === 1
+          ? 'grid-cols-1'
+          : count === 2
+          ? 'grid-cols-2'
+          : count === 3
+          ? 'grid-cols-3'
+          : count === 4
+          ? 'grid-cols-2 sm:grid-cols-4 phone-landscape:grid-cols-4'
+          : count <= 6
+          ? 'grid-cols-3'
+          : count <= 8
+          ? 'grid-cols-4'
+          : count <= 10
+          ? 'grid-cols-5'
+          : count <= 12
+          ? 'grid-cols-4 sm:grid-cols-6 phone-landscape:grid-cols-6'
+          : 'grid-cols-5';
+
+      const fruitSizeClass =
+        count <= 3
+          ? 'text-4xl sm:text-5xl phone-landscape:text-3xl'
+          : count <= 6
+          ? 'text-3xl sm:text-4xl md:text-5xl phone-landscape:text-3xl'
+          : count <= 10
+          ? 'text-3xl sm:text-4xl phone-landscape:text-2xl'
+          : 'text-2xl sm:text-3xl md:text-4xl phone-landscape:text-2xl';
+
       return {
         promptText: lang === 'id' ? 'Ada berapa buah di layar?' : 'How many fruits are there?',
+        wideVisual: true,
         questionVisual: (
-          <div className="flex flex-wrap items-center justify-center gap-2 max-w-xs text-4xl">
+          <div className={`grid ${gridColsClass} place-items-center gap-2 sm:gap-3 phone-landscape:gap-1.5 w-fit mx-auto`}>
             {[...Array(count)].map((_, i) => (
-              <span key={i} className="animate-scale-up">{chosenEmoji}</span>
+              <span
+                key={i}
+                className={`animate-scale-up inline-flex items-center justify-center leading-none select-none ${fruitSizeClass}`}
+              >
+                {chosenEmoji}
+              </span>
             ))}
           </div>
         ),
@@ -414,12 +450,19 @@ export const QuizGame: React.FC<QuizGameProps> = ({
 
       return {
         promptText: lang === 'id' ? 'Apa gambar berikutnya?' : 'What comes next?',
+        wideVisual: true,
+        emojiOptions: true,
         questionVisual: (
-          <div className="flex items-center justify-center gap-2 text-4xl font-black">
+          <div className="grid grid-cols-6 place-items-center gap-1 sm:gap-2.5 phone-landscape:gap-1.5 w-full max-w-sm mx-auto font-black">
             {sequence.map((em, i) => (
-              <span key={i}>{em}</span>
+              <span
+                key={i}
+                className="inline-flex items-center justify-center leading-none select-none text-2xl sm:text-4xl phone-landscape:text-2xl"
+              >
+                {em}
+              </span>
             ))}
-            <span className="text-indigo-600 bg-indigo-50 w-12 h-12 rounded-2xl flex items-center justify-center border-2 border-dashed border-indigo-300">
+            <span className="text-indigo-600 bg-indigo-50 w-8 h-8 sm:w-12 sm:h-12 phone-landscape:w-9 phone-landscape:h-9 rounded-xl sm:rounded-2xl flex items-center justify-center border-2 border-dashed border-indigo-300 text-lg sm:text-2xl phone-landscape:text-lg leading-none">
               ?
             </span>
           </div>
@@ -433,16 +476,46 @@ export const QuizGame: React.FC<QuizGameProps> = ({
 
     // 10. ODD ONE OUT (Mana yang Berbeda)
     if (gameId === 'odd') {
-      const catA = ANIMALS.sort(() => Math.random() - 0.5).slice(0, 3);
-      const catB = VEHICLES[Math.floor(Math.random() * VEHICLES.length)];
-      const mixed = [...catA, catB].sort(() => Math.random() - 0.5);
+      const oddPairs = [
+        { mainPool: ANIMALS, oddPool: VEHICLES, mainBadge: '🐾', groupId: 'Hewan', groupEn: 'Animals' },
+        { mainPool: FRUITS, oddPool: VEHICLES, mainBadge: '🍎', groupId: 'Buah', groupEn: 'Fruits' },
+        { mainPool: VEHICLES, oddPool: ANIMALS, mainBadge: '🚗', groupId: 'Kendaraan', groupEn: 'Vehicles' },
+        { mainPool: PLANTS, oddPool: VEHICLES, mainBadge: '🌿', groupId: 'Tanaman', groupEn: 'Plants' },
+        { mainPool: VEGGIES, oddPool: ANIMALS, mainBadge: '🥕', groupId: 'Sayur', groupEn: 'Veggies' },
+      ];
+      const pair = oddPairs[Math.floor(Math.random() * oddPairs.length)];
+      const mainItems = [...pair.mainPool].sort(() => Math.random() - 0.5).slice(0, 3);
+      const oddItem = pair.oddPool[Math.floor(Math.random() * pair.oddPool.length)];
+      const mixed = [...mainItems, oddItem].sort(() => Math.random() - 0.5);
 
       return {
         promptText: lang === 'id' ? 'Mana yang BERBEDA jenisnya?' : 'Which one is the ODD one out?',
+        questionVisual: (
+          <div className="flex flex-col items-center justify-center gap-2 select-none">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center text-lg sm:text-xl">
+                {pair.mainBadge}
+              </span>
+              <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center text-lg sm:text-xl">
+                {pair.mainBadge}
+              </span>
+              <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center text-lg sm:text-xl">
+                {pair.mainBadge}
+              </span>
+              <span className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-100 border-2 border-dashed border-amber-400 flex items-center justify-center text-lg sm:text-xl font-black text-amber-700 animate-pulse">
+                ?
+              </span>
+            </div>
+            <span className="text-[10px] sm:text-xs font-black text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 whitespace-nowrap">
+              {lang === 'id' ? `3 ${pair.groupId} • 1 Beda` : `3 ${pair.groupEn} • 1 Odd`}
+            </span>
+          </div>
+        ),
+        spokenText: lang === 'id' ? oddItem.nameId : oddItem.nameEn,
         options: mixed.map((item) => ({
           label: lang === 'id' ? item.nameId : item.nameEn,
           visual: <ItemIcon name={item.nameId} emoji={item.emoji} category={item.category} size="3rem" />,
-          isCorrect: item.category === 'vehicles',
+          isCorrect: item === oddItem,
         })),
       };
     }
@@ -589,15 +662,15 @@ export const QuizGame: React.FC<QuizGameProps> = ({
   if (!currentQ) return null;
 
   return (
-    <div className="flex flex-col h-full max-w-xl mx-auto px-3 sm:px-4 py-2 w-full">
+    <div className="flex flex-col flex-1 h-full max-w-xl phone-landscape:max-w-4xl mx-auto px-3 sm:px-4 py-2 phone-landscape:py-1.5 w-full">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 py-2 mb-2 sm:mb-3 bg-white/90 backdrop-blur-md px-3.5 sm:px-4 rounded-2xl shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between gap-2 py-2 phone-landscape:py-1.5 mb-2 sm:mb-3 phone-landscape:mb-1.5 bg-white/90 backdrop-blur-md px-3.5 sm:px-4 rounded-2xl shadow-sm border border-slate-100 shrink-0">
         <button
           onClick={onBack}
-          className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-colors cursor-pointer shrink-0"
+          className="w-10 h-10 phone-landscape:w-8 phone-landscape:h-8 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700 transition-colors cursor-pointer shrink-0"
           aria-label="Kembali"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 phone-landscape:w-4 phone-landscape:h-4" />
         </button>
 
         <div className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5 truncate">
@@ -605,7 +678,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({
           <span className="truncate">{lang === 'id' ? gameDef?.nameId : gameDef?.nameEn}</span>
         </div>
 
-        <div className="flex items-center gap-1 text-xs font-black text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl tabular-nums shrink-0">
+        <div className="flex items-center gap-1 text-xs font-black text-slate-700 bg-slate-100 px-3 py-1.5 phone-landscape:py-1 rounded-xl tabular-nums shrink-0">
           <span>{currentIndex + 1}</span>
           <span className="opacity-50">/</span>
           <span>{totalQuestions}</span>
@@ -613,77 +686,105 @@ export const QuizGame: React.FC<QuizGameProps> = ({
       </div>
 
       {/* Main Question Container */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 sm:gap-5 py-2 w-full">
-        <h2 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 text-center leading-snug px-2">
-          {currentQ.promptText}
-        </h2>
+      <div className="flex-1 flex flex-col phone-landscape:flex-row items-center justify-center gap-3 sm:gap-5 phone-landscape:gap-5 py-2 phone-landscape:py-1 w-full">
+        {/* Left/Top: Prompt + Visual Card */}
+        <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 phone-landscape:gap-2 w-full phone-landscape:flex-1 min-w-0">
+          <h2 className="text-base sm:text-xl md:text-2xl phone-landscape:text-base font-black text-slate-900 text-center leading-snug px-2">
+            {currentQ.promptText}
+          </h2>
 
-        {/* Question Visual Container */}
-        <div className="w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48 rounded-3xl bg-white border-4 border-indigo-100 shadow-md flex items-center justify-center p-3 relative shrink-0">
-          {currentQ.questionVisual}
-
-          {currentQ.soundEmoji && (
-            <button
-              onClick={() => playAnimalSound(currentQ.soundEmoji!)}
-              className="absolute -bottom-2.5 -right-2.5 w-11 h-11 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 flex items-center justify-center shadow-md cursor-pointer active:scale-95 border-2 border-white"
-              aria-label="Dengarkan Suara"
-            >
-              <Volume2 className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-
-        {/* Feedback message (With Child Name Affirmation & High Contrast) */}
-        <div className="min-h-[2.5rem] flex items-center justify-center px-2 w-full">
-          {feedback ? (
+          {/* Question Visual Container */}
+          {(currentQ.questionVisual || currentQ.soundEmoji) && (
             <div
-              className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-black animate-scale-up shadow-xs text-center ${
-                feedback.includes('Coba lagi') || feedback.includes('Try again')
-                  ? 'bg-rose-100 text-rose-700 border-2 border-rose-300'
-                  : 'bg-emerald-100 text-emerald-800 border-2 border-emerald-300'
-              }`}
+              className={
+                currentQ.wideVisual
+                  ? 'w-full max-w-sm sm:max-w-md phone-landscape:max-w-sm min-h-[6rem] sm:min-h-[8.5rem] phone-landscape:min-h-[5.5rem] rounded-3xl bg-white border-4 border-indigo-100 shadow-md flex items-center justify-center px-3 py-3 sm:px-6 sm:py-4 phone-landscape:px-3 phone-landscape:py-2.5 relative shrink-0'
+                  : 'w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48 phone-landscape:w-32 phone-landscape:h-32 rounded-3xl bg-white border-4 border-indigo-100 shadow-md flex items-center justify-center p-3 relative shrink-0'
+              }
             >
-              {feedback}
+              {currentQ.questionVisual}
+
+              {currentQ.soundEmoji && (
+                <button
+                  onClick={() => playAnimalSound(currentQ.soundEmoji!)}
+                  className="absolute -bottom-2.5 -right-2.5 w-11 h-11 phone-landscape:w-9 phone-landscape:h-9 rounded-full bg-amber-400 hover:bg-amber-500 text-amber-950 flex items-center justify-center shadow-md cursor-pointer active:scale-95 border-2 border-white"
+                  aria-label="Dengarkan Suara"
+                >
+                  <Volume2 className="w-5 h-5 phone-landscape:w-4 phone-landscape:h-4" />
+                </button>
+              )}
             </div>
-          ) : (
-            <div className="h-6" />
           )}
         </div>
 
-        {/* Options (Touch-Friendly for Phones & Tablets) */}
-        <div
-          className={`w-full grid gap-2.5 sm:gap-3 max-w-md ${
-            currentQ.options.length === 2
-              ? 'grid-cols-2'
-              : currentQ.options.length === 3
-              ? 'grid-cols-1 sm:grid-cols-3'
-              : 'grid-cols-2'
-          }`}
-        >
-          {currentQ.options.map((opt, idx) => {
-            const isSelected = selectedIdx === idx;
-            let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm';
-
-            if (isSelected) {
-              if (opt.isCorrect) {
-                btnClass = 'bg-emerald-400 text-emerald-950 border-emerald-500 ring-4 ring-emerald-300 scale-102';
-              } else {
-                btnClass = 'bg-rose-200 text-rose-950 border-rose-400 animate-shake';
-              }
-            }
-
-            return (
-              <button
-                key={idx}
-                onClick={() => handleSelect(idx, opt.isCorrect)}
-                disabled={isLocked}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border-3 font-black text-sm sm:text-base md:text-lg transition-all cursor-pointer active:scale-95 min-h-[64px] sm:min-h-[72px] select-none ${btnClass}`}
+        {/* Right/Bottom: Feedback + Options */}
+        <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 phone-landscape:gap-2 w-full max-w-md phone-landscape:flex-1 phone-landscape:max-w-sm">
+          {/* Feedback message (With Child Name Affirmation & High Contrast) */}
+          <div className="min-h-[2.25rem] sm:min-h-[2.5rem] phone-landscape:min-h-[1.75rem] flex items-center justify-center px-2 w-full">
+            {feedback ? (
+              <div
+                className={`px-4 py-1.5 phone-landscape:py-1 rounded-full text-xs sm:text-sm font-black animate-scale-up shadow-xs text-center ${
+                  feedback.includes('Coba lagi') || feedback.includes('Try again')
+                    ? 'bg-rose-100 text-rose-700 border-2 border-rose-300'
+                    : 'bg-emerald-100 text-emerald-800 border-2 border-emerald-300'
+                }`}
               >
-                {opt.visual && <div className="mb-1">{opt.visual}</div>}
-                <span className="truncate w-full text-center px-1">{opt.label}</span>
-              </button>
-            );
-          })}
+                {feedback}
+              </div>
+            ) : (
+              <div className="h-5 phone-landscape:h-4" />
+            )}
+          </div>
+
+          {/* Options (Touch-Friendly for Phones & Tablets) */}
+          <div
+            className={`w-full grid gap-2.5 sm:gap-3 phone-landscape:gap-2 ${
+              currentQ.options.length === 2
+                ? 'grid-cols-2'
+                : currentQ.options.length === 3
+                ? currentQ.emojiOptions
+                  ? 'grid-cols-3'
+                  : 'grid-cols-1 sm:grid-cols-3 phone-landscape:grid-cols-3'
+                : 'grid-cols-2'
+            }`}
+          >
+            {currentQ.options.map((opt, idx) => {
+              const isSelected = selectedIdx === idx;
+              let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-sm';
+
+              if (isSelected) {
+                if (opt.isCorrect) {
+                  btnClass = 'bg-emerald-400 text-emerald-950 border-emerald-500 ring-4 ring-emerald-300 scale-102';
+                } else {
+                  btnClass = 'bg-rose-200 text-rose-950 border-rose-400 animate-shake';
+                }
+              }
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleSelect(idx, opt.isCorrect)}
+                  disabled={isLocked}
+                  className={`flex flex-col items-center justify-center p-3 phone-landscape:p-2 rounded-2xl border-3 font-black transition-all cursor-pointer active:scale-95 select-none ${
+                    currentQ.emojiOptions
+                      ? 'text-3xl sm:text-4xl phone-landscape:text-3xl min-h-[68px] sm:min-h-[84px] phone-landscape:min-h-[60px]'
+                      : 'text-sm sm:text-base md:text-lg phone-landscape:text-sm min-h-[64px] sm:min-h-[72px] phone-landscape:min-h-[52px]'
+                  } ${btnClass}`}
+                >
+                  {opt.visual && <div className="mb-1">{opt.visual}</div>}
+                  <span
+                    className={
+                      currentQ.emojiOptions
+                        ? 'leading-tight text-center'
+                        : 'truncate w-full text-center px-1'
+                    }
+                  >
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

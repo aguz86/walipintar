@@ -31,7 +31,10 @@ import { RestBreakModal } from './components/RestBreakModal';
 import { ConfettiCanvas } from './components/ConfettiCanvas';
 import { AnimalSoundGame } from './games/AnimalSoundGame';
 import { QuizGame } from './games/QuizGame';
-import { MemoryGame } from './games/MemoryGame';
+import { SmartMatchGame } from './games/SmartMatchGame';
+import { SmartShopGame } from './games/SmartShopGame';
+import { ClockTimeGame } from './games/ClockTimeGame';
+import { BalanceScaleGame } from './games/BalanceScaleGame';
 import { BubbleGame } from './games/BubbleGame';
 import { OrderGame } from './games/OrderGame';
 import { MonsterGame } from './games/MonsterGame';
@@ -742,8 +745,8 @@ export default function App() {
 
                   <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
                     {data.lang === 'id'
-                      ? 'Tebak hewan, suara alami, buah & sayur tropis, kendaraan, bentuk lucu, memori kartu kembar, dan logika matematika.'
-                      : 'Animal quizzes, realistic sounds, tropical fruits, vehicles, memory cards, and math logic.'}
+                      ? 'Tebak hewan, suara alami, buah & sayur, jam pintar, timbangan angka, belanja memori, dan logika matematika.'
+                      : 'Animal quizzes, realistic sounds, fruits, telling time, balance scale, smart shopping, and math logic.'}
                   </p>
 
                   <ul className="text-xs text-slate-700 font-bold mt-3 space-y-1">
@@ -752,12 +755,12 @@ export default function App() {
                       <span>{data.lang === 'id' ? 'Tebak Hewan & Suara Alami' : 'Animal & Sound Quizzes'}</span>
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <span>🍎</span>
-                      <span>{data.lang === 'id' ? 'Buah, Sayur, Flora & Kendaraan' : 'Fruits, Flora & Vehicles'}</span>
+                      <span>🕒</span>
+                      <span>{data.lang === 'id' ? 'Jam Pintar, Belanja & Jodoh Pintar' : 'Clock, Smart Shop & Matching'}</span>
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <span>🃏</span>
-                      <span>{data.lang === 'id' ? 'Memori Kartu & Urut Angka' : 'Memory Cards & Number Logic'}</span>
+                      <span>⚖️</span>
+                      <span>{data.lang === 'id' ? 'Timbangan Ajaib & Duel Monster' : 'Balance Scale & Hero vs Monster'}</span>
                     </li>
                   </ul>
                 </div>
@@ -946,9 +949,9 @@ export default function App() {
                   />
                 )}
 
-                {/* 2. Memory Match Cards */}
-                {activeGameId === 'memory' && (
-                  <MemoryGame
+                {/* 2. Smart Match */}
+                {activeGameId === 'smart_match' && (
+                  <SmartMatchGame
                     onBack={handleBackToHome}
                     lang={data.lang}
                     level={data.level}
@@ -957,7 +960,40 @@ export default function App() {
                   />
                 )}
 
-                {/* 3. Pop Bubbles */}
+                {/* 3. Smart Shop Memory */}
+                {activeGameId === 'smart_shop' && (
+                  <SmartShopGame
+                    onBack={handleBackToHome}
+                    lang={data.lang}
+                    level={data.level}
+                    playerName={data.name}
+                    onWin={handleWin}
+                  />
+                )}
+
+                {/* 4. Clock Explorer */}
+                {activeGameId === 'clock_time' && (
+                  <ClockTimeGame
+                    onBack={handleBackToHome}
+                    lang={data.lang}
+                    level={data.level}
+                    playerName={data.name}
+                    onWin={handleWin}
+                  />
+                )}
+
+                {/* 5. Balance Scale */}
+                {activeGameId === 'balance_scale' && (
+                  <BalanceScaleGame
+                    onBack={handleBackToHome}
+                    lang={data.lang}
+                    level={data.level}
+                    playerName={data.name}
+                    onWin={handleWin}
+                  />
+                )}
+
+                {/* 6. Pop Bubbles */}
                 {activeGameId === 'bubbles' && (
                   <BubbleGame
                     onBack={handleBackToHome}
@@ -967,7 +1003,7 @@ export default function App() {
                   />
                 )}
 
-                {/* 4. Number Order */}
+                {/* 7. Number Order */}
                 {activeGameId === 'order' && (
                   <OrderGame
                     onBack={handleBackToHome}
@@ -978,7 +1014,7 @@ export default function App() {
                   />
                 )}
 
-                {/* 5. Hero vs Monster */}
+                {/* 8. Hero vs Monster */}
                 {activeGameId === 'monster' && (
                   <MonsterGame
                     onBack={handleBackToHome}
@@ -989,10 +1025,13 @@ export default function App() {
                   />
                 )}
 
-                {/* 6. General Quiz Categories */}
+                {/* 9. General Quiz Categories */}
                 {![
                   'animal_sound',
-                  'memory',
+                  'smart_match',
+                  'smart_shop',
+                  'clock_time',
+                  'balance_scale',
                   'bubbles',
                   'order',
                   'monster',

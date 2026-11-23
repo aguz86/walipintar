@@ -16,10 +16,10 @@ import {
   BookOpen,
   Shuffle,
   Music,
-  X,
   RefreshCw,
   Trophy,
 } from 'lucide-react';
+import { CloseButton3D } from '../components/CloseButton3D';
 import {
   ALPHABET_LIST,
   WORD_BUILDER_ITEMS,
@@ -1280,12 +1280,12 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
                   </span>
                 )}
               </div>
-              <button
+              <CloseButton3D
                 onClick={() => setSelectedLetter(null)}
-                className="p-1 rounded-xl bg-black/20 hover:bg-black/30 text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                size="sm"
+                ariaLabel="Tutup"
+                className="shrink-0"
+              />
             </div>
 
             {/* Modal Content: 4 Example Illustrations */}

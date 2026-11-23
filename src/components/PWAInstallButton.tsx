@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { Download, Smartphone, X, CheckCircle2, ShieldCheck, WifiOff, Sparkles } from 'lucide-react';
+import { Download, CheckCircle2, ShieldCheck, WifiOff, Sparkles } from 'lucide-react';
+import { CloseButton3D } from './CloseButton3D';
 
 interface PWAInstallButtonProps {
   className?: string;
@@ -90,13 +91,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   const renderGuideModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-slate-800">
       <div className="w-full max-w-sm rounded-3xl bg-white p-5 sm:p-6 shadow-2xl text-center relative border-4 border-emerald-300 max-h-[92vh] overflow-y-auto">
-        <button
+        <CloseButton3D
           onClick={() => setShowGuide(false)}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-          aria-label="Tutup"
-        >
-          <X className="w-6 h-6" />
-        </button>
+          ariaLabel="Tutup"
+          className="absolute top-3.5 right-3.5 z-10"
+        />
 
         <div className="text-4xl mb-3">🍏</div>
         <h3 className="text-xl font-black text-slate-900">
@@ -130,72 +129,91 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
   // FOOTER VARIANT (Prominent, High-Converting Offline Banner)
   return (
-    <div className={`w-full bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border-3 border-emerald-200/90 rounded-3xl p-5 md:p-6 shadow-sm ${className}`}>
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-center md:text-left">
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-3xl shadow-sm shrink-0">
-            <WifiOff className="w-7 h-7 md:w-8 md:h-8" />
-          </div>
-          <div>
-            <div className="flex items-center justify-center md:justify-start gap-1.5 text-xs font-black text-emerald-800 uppercase tracking-wide mb-0.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{lang === 'id' ? 'Main Sepuasnya Tanpa Kuota' : 'Play Freely Without Data'}</span>
+    <div className={`w-full space-y-3 ${className}`}>
+      <div className="w-full bg-gradient-to-r from-emerald-50 via-teal-50 to-indigo-50 border-3 border-emerald-200/90 rounded-3xl p-5 md:p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-center md:text-left">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-3xl shadow-sm shrink-0">
+              <WifiOff className="w-7 h-7 md:w-8 md:h-8" />
             </div>
-            <h4 className="text-base md:text-lg font-black text-slate-900">
-              {lang === 'id'
-                ? 'Download Aplikasi Offline untuk HP & Tablet'
-                : 'Download Offline App for Phone & Tablet'}
-            </h4>
-            <p className="text-xs md:text-sm text-slate-600 mt-1 max-w-xl">
-              {lang === 'id'
-                ? 'Pasang aplikasi Wali Pintar di layar utama ponsel atau tablet anak. Cepat dibuka, hemat kuota internet, dan aman digunakan saat bepergian!'
-                : 'Install Wali Pintar on your home screen. Fast to launch, zero internet needed, and 100% safe for travel!'}
-            </p>
+            <div>
+              <div className="flex items-center justify-center md:justify-start gap-1.5 text-xs font-black text-emerald-800 uppercase tracking-wide mb-0.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{lang === 'id' ? 'Main Sepuasnya Tanpa Kuota' : 'Play Freely Without Data'}</span>
+              </div>
+              <h4 className="text-base md:text-lg font-black text-slate-900">
+                {lang === 'id'
+                  ? 'Download Aplikasi Offline untuk HP & Tablet'
+                  : 'Download Offline App for Phone & Tablet'}
+              </h4>
+              <p className="text-xs md:text-sm text-slate-600 mt-1 max-w-xl">
+                {lang === 'id'
+                  ? 'Pasang aplikasi Wali Pintar di layar utama ponsel atau tablet anak. Cepat dibuka, hemat kuota internet, dan aman digunakan saat bepergian!'
+                  : 'Install Wali Pintar on your home screen. Fast to launch, zero internet needed, and 100% safe for travel!'}
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="w-full md:w-auto shrink-0 flex flex-col sm:flex-row md:flex-col items-center gap-2">
-          {isInstalled ? (
-            <div className="w-full md:w-auto px-5 py-3 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-900 font-black text-xs md:text-sm flex items-center justify-center gap-2 shadow-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{lang === 'id' ? 'Aplikasi Sudah Terpasang (Mode Offline Aktif)' : 'App Installed (Offline Mode Active)'}</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              disabled={isTriggering}
-              className="w-full md:w-auto px-7 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm md:text-base shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-75"
-            >
-              <Download className="w-5 h-5 shrink-0" />
-              <span>
-                {isTriggering
-                  ? (lang === 'id' ? 'Mempersiapkan Pemasangan...' : 'Preparing...')
-                  : (lang === 'id' ? '📥 Pasang Aplikasi Sekarang (PWA)' : '📥 Install App Now (PWA)')}
+          <div className="w-full md:w-auto shrink-0 flex flex-col sm:flex-row md:flex-col items-center gap-2">
+            {isInstalled ? (
+              <div className="w-full md:w-auto px-5 py-3 rounded-2xl bg-emerald-100 border border-emerald-300 text-emerald-900 font-black text-xs md:text-sm flex items-center justify-center gap-2 shadow-xs">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{lang === 'id' ? 'Aplikasi Sudah Terpasang (Mode Offline Aktif)' : 'App Installed (Offline Mode Active)'}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                disabled={isTriggering}
+                className="w-full md:w-auto px-7 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-black text-sm md:text-base shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap disabled:opacity-75"
+              >
+                <Download className="w-5 h-5 shrink-0" />
+                <span>
+                  {isTriggering
+                    ? (lang === 'id' ? 'Mempersiapkan Pemasangan...' : 'Preparing...')
+                    : (lang === 'id' ? '📥 Pasang Aplikasi Sekarang (PWA)' : '📥 Install App Now (PWA)')}
+                </span>
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                {lang === 'id' ? 'Bebas Iklan' : 'Ad-Free'}
               </span>
-            </button>
-          )}
-
-          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              {lang === 'id' ? 'Bebas Iklan' : 'Ad-Free'}
-            </span>
-            <span>•</span>
-            <span>{lang === 'id' ? '100% Offline' : '100% Offline'}</span>
-            <span>•</span>
-            <span>{lang === 'id' ? 'Ukuran Ringan' : 'Lightweight'}</span>
+              <span>•</span>
+              <span>{lang === 'id' ? '100% Offline' : '100% Offline'}</span>
+              <span>•</span>
+              <span>{lang === 'id' ? 'Ukuran Ringan' : 'Lightweight'}</span>
+            </div>
           </div>
         </div>
+
+        {feedback && (
+          <div className="mt-3 p-3 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-950 text-xs font-bold text-center">
+            {feedback}
+          </div>
+        )}
+
+        {showGuide && renderGuideModal()}
       </div>
 
-      {feedback && (
-        <div className="mt-3 p-3 rounded-xl bg-emerald-100/80 border border-emerald-300 text-emerald-950 text-xs font-bold text-center">
-          {feedback}
-        </div>
-      )}
-
-      {showGuide && renderGuideModal()}
+      {/* Red YouTube Guide Box (1/3 width of the download box above) */}
+      <div className="flex justify-center">
+        <a
+          href="https://www.youtube.com/@walipintar/playlists"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-2/3 sm:w-1/2 md:w-1/3 px-4 py-3 rounded-2xl bg-red-600 hover:bg-red-700 active:scale-98 text-white font-black text-sm md:text-base shadow-md border-2 border-red-500 transition-all flex items-center justify-center gap-2.5 whitespace-nowrap"
+        >
+          <span className="w-7 h-5 bg-white rounded-md flex items-center justify-center shrink-0 shadow-2xs" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-red-600">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          <span>{lang === 'id' ? 'Panduan YouTube' : 'YouTube Guide'}</span>
+        </a>
+      </div>
     </div>
   );
 };
