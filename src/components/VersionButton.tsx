@@ -6,7 +6,7 @@ const GAS_API_URL =
   'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
 
 const VERSION_STORAGE_KEY = 'walipintar_locked_version';
-const DEFAULT_FALLBACK_VERSION = 'v.1.0.2';
+const DEFAULT_FALLBACK_VERSION = 'v.1.0.3';
 const POLL_INTERVAL_MS = 30000; // Fetch versi terkunci tiap 30 detik
 
 function parseVersionNumber(ver: string): number {
