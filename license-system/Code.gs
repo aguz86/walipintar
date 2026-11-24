@@ -3221,8 +3221,10 @@ function pushAllVersionFilesToGitHub(config, newVersion) {
   };
 
   // 1. Cek branch target (pastikan branch live PWA benar-benar ada)
-  const refUrl = baseRepoUrl + '/git/ref/heads/' + branch.split('/').map(encodeURIComponent).join('/');
-  const refRes = UrlFetchApp.fetch(refUrl, { method: 'get', headers: headers, muteHttpExceptions: true });
+  const encodedBranchPath = 'heads/' + branch.split('/').map(encodeURIComponent).join('/');
+  const refGetUrl = baseRepoUrl + '/git/ref/' + encodedBranchPath;
+  const refPatchUrl = baseRepoUrl + '/git/refs/' + encodedBranchPath;
+  const refRes = UrlFetchApp.fetch(refGetUrl, { method: 'get', headers: headers, muteHttpExceptions: true });
   if (refRes.getResponseCode() !== 200) {
     throw new Error(
       'Branch "' + branch + '" tidak ditemukan di ' + owner + '/' + repo +
@@ -3382,7 +3384,7 @@ function pushAllVersionFilesToGitHub(config, newVersion) {
   }
   const newCommitSha = JSON.parse(newCommitRes.getContentText()).sha;
 
-  const updateRefRes = UrlFetchApp.fetch(refUrl, {
+  const updateRefRes = UrlFetchApp.fetch(refPatchUrl, {
     method: 'patch',
     contentType: 'application/json',
     headers: headers,
@@ -3392,8 +3394,14 @@ function pushAllVersionFilesToGitHub(config, newVersion) {
     }),
     muteHttpExceptions: true
   });
-  if (updateRefRes.getResponseCode() !== 200) {
-    throw new Error('Gagal update branch "' + branch + '" (HTTP ' + updateRefRes.getResponseCode() + ').');
+  const updateCode = updateRefRes.getResponseCode();
+  if (updateCode !== 200) {
+    let ghMsg = '';
+    try {
+      const errJson = JSON.parse(updateRefRes.getContentText() || '{}');
+      if (errJson && errJson.message) ghMsg = ' - ' + errJson.message;
+    } catch (e) {}
+    throw new Error('Gagal update branch "' + branch + '" (HTTP ' + updateCode + ghMsg + ').');
   }
 
   return {
