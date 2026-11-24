@@ -2,7 +2,7 @@
   "id": "/",
   "name": "WaliPintar",
   "short_name": "WaliPintar",
-  "version": "v.1.0.3",
+  "version": "v.1.0.2",
   "description": "Game edukasi offline anak usia 3-8 tahun dengan pengenalan hewan, tumbuhan, buah & sayur, mewarnai, abjad, dan logika.",
   "start_url": "/",
   "scope": "/",
@@ -10,11 +10,7 @@
   "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#10b981",
-  "categories": [
-    "education",
-    "kids",
-    "games"
-  ],
+  "categories": ["education", "kids", "games"],
   "icons": [
     {
       "src": "/pwa-192x192.png",

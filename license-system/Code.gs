@@ -3352,6 +3352,17 @@ function pushAllVersionFilesToGitHub(config, newVersion) {
     );
   }
 
+  // Jika repo memiliki package-lock.json DAN bun.lock yang bermasalah di Cloudflare Pages, hapus bun.lock otomatis agar memakai npm ci
+  if (repoFileMap['bun.lock'] && repoFileMap['package-lock.json']) {
+    treeEntries.push({
+      path: 'bun.lock',
+      mode: '100644',
+      type: 'blob',
+      sha: null
+    });
+    fileLogs.push('🧹 bun.lock (dihapus otomatis agar Cloudflare memakai npm ci)');
+  }
+
   // 5. Buat 1 Git Tree, 1 Git Commit, lalu update branch ref (1 commit atomik semua file!)
   const newTreeRes = UrlFetchApp.fetch(baseRepoUrl + '/git/trees', {
     method: 'post',
