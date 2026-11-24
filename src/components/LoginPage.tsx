@@ -281,7 +281,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
                 maxLength={9}
                 minLength={9}
                 placeholder="CONTOH: WALI-7K9P"
-                className={`w-full h-14 sm:h-15 pl-4 pr-32 text-left font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:text-sm sm:placeholder:text-base placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
+                className={`w-full h-14 sm:h-15 pl-4 pr-36 text-left font-black text-slate-800 text-base sm:text-lg tracking-widest uppercase rounded-2xl border-2 transition-all placeholder:text-slate-400 placeholder:font-bold placeholder:text-sm sm:placeholder:text-base placeholder:tracking-wider shadow-2xs font-mono focus:outline-none ${
                   /^WALI-[2-9A-HJ-NP-Z]{4}$/.test(inputKey)
                     ? 'border-emerald-500 bg-emerald-50/30 text-emerald-950'
                     : inputKey.length === 9 && /[0O1I]/.test(inputKey.slice(5))

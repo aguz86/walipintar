@@ -47,6 +47,22 @@ interface FloatingBubble {
   popped: boolean;
 }
 
+interface AlphabetBurstParticle {
+  tx: number;
+  ty: number;
+  size: number;
+  color: string;
+  isStar: boolean;
+}
+
+interface AlphabetPopBurst {
+  bubbleId: number;
+  color: string;
+  particles: AlphabetBurstParticle[];
+}
+
+const ALPHABET_BURST_SPARKS = ['#ffffff', '#fde047', '#fb7185', '#38bdf8', '#34d399', '#fb923c'];
+
 export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
   onBack,
   lang,
@@ -180,12 +196,24 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
   const [bubbles, setBubbles] = useState<FloatingBubble[]>([]);
   const [bubbleScore, setBubbleScore] = useState(0);
   const [bubbleRound, setBubbleRound] = useState(1);
+  const [bubbleBursts, setBubbleBursts] = useState<Record<number, AlphabetPopBurst>>({});
+  const [wrongBubbleId, setWrongBubbleId] = useState<number | null>(null);
+  const [bubbleNotif, setBubbleNotif] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const bubbleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const bubbleNotifTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const bubbleBurstTimersRef = useRef<number[]>([]);
 
   // Initialize bubble pop round
   const startBubbleRound = () => {
+    if (bubbleTimerRef.current) {
+      clearTimeout(bubbleTimerRef.current);
+      bubbleTimerRef.current = null;
+    }
     const randomTarget = ALPHABET_LIST[Math.floor(Math.random() * ALPHABET_LIST.length)];
     setBubbleTarget(randomTarget);
+    setBubbleBursts({});
+    setWrongBubbleId(null);
+    setBubbleNotif(null);
 
     const colors = ['#f43f5e', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899'];
     const otherLetters = ALPHABET_LIST.filter((l) => l.letter !== randomTarget.letter)
@@ -228,12 +256,61 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
     }
   }, [activeTab]);
 
+  const showBubbleToast = (type: 'success' | 'error', text: string, duration = 2200) => {
+    if (bubbleNotifTimerRef.current) {
+      clearTimeout(bubbleNotifTimerRef.current);
+    }
+    setBubbleNotif({ type, text });
+    bubbleNotifTimerRef.current = setTimeout(() => {
+      setBubbleNotif(null);
+    }, duration);
+  };
+
+  const triggerBubbleExplosion = (bubble: FloatingBubble) => {
+    const particleCount = 10;
+    const baseRadius = 56;
+    const particles: AlphabetBurstParticle[] = Array.from({ length: particleCount }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.35;
+      const dist = baseRadius * (0.75 + Math.random() * 0.55);
+      return {
+        tx: Math.round(Math.cos(angle) * dist),
+        ty: Math.round(Math.sin(angle) * dist),
+        size: Math.round(8 + Math.random() * 7),
+        color: i % 2 === 0 ? bubble.color : ALPHABET_BURST_SPARKS[i % ALPHABET_BURST_SPARKS.length],
+        isStar: i % 3 === 0,
+      };
+    });
+
+    setBubbleBursts((prev) => ({
+      ...prev,
+      [bubble.id]: {
+        bubbleId: bubble.id,
+        color: bubble.color,
+        particles,
+      },
+    }));
+
+    const tId = window.setTimeout(() => {
+      setBubbleBursts((prev) => {
+        const next = { ...prev };
+        delete next[bubble.id];
+        return next;
+      });
+    }, 580);
+    bubbleBurstTimersRef.current.push(tId);
+  };
+
   const handlePopBubble = (bubble: FloatingBubble) => {
     if (bubble.popped) return;
     unlockAudio();
+    const displayName = playerName?.trim() || (lang === 'id' ? 'Sayang' : 'Friend');
 
     if (bubble.letter === bubbleTarget.letter) {
       SFX.pop();
+      SFX.ding();
+      triggerBubbleExplosion(bubble);
+      setWrongBubbleId(null);
+
       setBubbles((prev) =>
         prev.map((b) => (b.id === bubble.id ? { ...b, popped: true } : b))
       );
@@ -246,25 +323,52 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
 
       if (remainingTarget.length === 0) {
         SFX.fanfare();
-        const praise =
+        const finishMsg =
           lang === 'id'
-            ? `Pintar sekali, ${playerName || 'kamu'}! Semua huruf ${bubbleTarget.letter} berhasil dipecahkan!`
-            : `Great job! You popped all letter ${bubbleTarget.letter} bubbles!`;
-        speakText(praise, lang);
-        onWin(2, `${bubbleScore + 1} Poin`);
+            ? `🎉 Selamat ya ${displayName}! Semua huruf ${bubbleTarget.letter} berhasil dipecahkan!`
+            : `🎉 Congratulations ${displayName}! You popped all letter ${bubbleTarget.letter} bubbles!`;
+        showBubbleToast('success', finishMsg, 2600);
+        speakText(
+          lang === 'id'
+            ? `Selamat ya ${displayName}! Semua huruf ${bubbleTarget.letter} berhasil dipecahkan!`
+            : `Congratulations ${displayName}! All letter ${bubbleTarget.letter} bubbles popped!`,
+          lang
+        );
 
-        setTimeout(() => {
+        bubbleTimerRef.current = setTimeout(() => {
+          onWin(2, `${bubbleScore + 1} Poin`);
           setBubbleRound((r) => r + 1);
           startBubbleRound();
         }, 1200);
+      } else {
+        const praiseMsg =
+          lang === 'id'
+            ? `🎉 Selamat ya ${displayName}!`
+            : `🎉 Well done ${displayName}!`;
+        showBubbleToast('success', praiseMsg, 1600);
+        speakText(
+          lang === 'id' ? `Selamat ya ${displayName}!` : `Well done ${displayName}!`,
+          lang
+        );
       }
     } else {
       SFX.no();
-      const retry =
+      setWrongBubbleId(bubble.id);
+      setTimeout(() => {
+        setWrongBubbleId((curr) => (curr === bubble.id ? null : curr));
+      }, 650);
+
+      const errorNotif =
         lang === 'id'
-          ? `Itu huruf ${bubble.letter}. Cari huruf ${bubbleTarget.letter} yaa!`
-          : `That is letter ${bubble.letter}. Find letter ${bubbleTarget.letter}!`;
-      speakText(retry, lang);
+          ? `😅 Coba lagi ${displayName}, kamu salah!`
+          : `😅 Try again ${displayName}, that's wrong!`;
+      showBubbleToast('error', errorNotif, 2200);
+
+      const retrySpeech =
+        lang === 'id'
+          ? `Coba lagi ${displayName}, kamu salah!`
+          : `Try again ${displayName}, that's wrong!`;
+      speakText(retrySpeech, lang);
     }
   };
 
@@ -314,6 +418,9 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
       isAutoPlayingRef.current = false;
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
       if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current);
+      if (bubbleNotifTimerRef.current) clearTimeout(bubbleNotifTimerRef.current);
+      bubbleBurstTimersRef.current.forEach((tId) => clearTimeout(tId));
+      bubbleBurstTimersRef.current = [];
       stopSpeaking();
     };
   }, []);
@@ -936,32 +1043,112 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
             </div>
           </div>
 
+          {/* Notification Banner (Correct / Wrong) */}
+          <div className="min-h-[2.5rem] flex items-center justify-center px-2">
+            {bubbleNotif ? (
+              <div
+                className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-black shadow-sm border-2 text-center animate-scale-up ${
+                  bubbleNotif.type === 'error'
+                    ? 'bg-rose-100 text-rose-800 border-rose-300 animate-shake'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}
+              >
+                {bubbleNotif.text}
+              </div>
+            ) : (
+              <div className="h-5" />
+            )}
+          </div>
+
           {/* Floating Bubble Sky Area */}
           <div className="flex-1 bg-gradient-to-b from-sky-100 via-sky-50 to-indigo-50 rounded-3xl border-3 border-sky-200 shadow-md p-4 min-h-[380px] relative overflow-hidden flex flex-wrap items-center justify-around gap-4">
-            {bubbles.map((bubble) => (
-              <button
-                key={bubble.id}
-                onClick={() => handlePopBubble(bubble)}
-                disabled={bubble.popped}
-                className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex flex-col items-center justify-center cursor-pointer transition-all duration-300 transform select-none ${
-                  bubble.popped
-                    ? 'scale-0 opacity-0 pointer-events-none'
-                    : 'hover:scale-110 active:scale-95 animate-bounce shadow-lg ring-4 ring-white/60'
-                }`}
-                style={{
-                  backgroundColor: bubble.color,
-                  animationDuration: `${bubble.speed}s`,
-                }}
-              >
-                {/* Bubble Gloss Highlight */}
-                <span className="absolute top-2 left-3 w-5 h-2.5 bg-white/40 rounded-full rotate-[-30deg]" />
+            {bubbles.map((bubble) => {
+              const burst = bubbleBursts[bubble.id];
+              const isWrong = wrongBubbleId === bubble.id;
+              return (
+                <div
+                  key={bubble.id}
+                  className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center shrink-0"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handlePopBubble(bubble)}
+                    disabled={bubble.popped}
+                    className={`relative w-full h-full rounded-full flex flex-col items-center justify-center cursor-pointer transition-all duration-300 transform select-none ${
+                      bubble.popped
+                        ? 'scale-0 opacity-0 pointer-events-none'
+                        : isWrong
+                        ? 'animate-shake ring-4 ring-rose-500 shadow-lg'
+                        : 'hover:scale-110 active:scale-95 animate-bounce shadow-lg ring-4 ring-white/60'
+                    }`}
+                    style={{
+                      backgroundColor: bubble.color,
+                      animationDuration: isWrong ? undefined : `${bubble.speed}s`,
+                    }}
+                  >
+                    {/* Bubble Gloss Highlight */}
+                    <span className="absolute top-2 left-3 w-5 h-2.5 bg-white/40 rounded-full rotate-[-30deg]" />
 
-                <span className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
-                  {bubble.letter}
-                </span>
-                <span className="text-sm opacity-90 drop-shadow-xs">{bubble.emoji}</span>
-              </button>
-            ))}
+                    <span className="text-2xl sm:text-3xl font-black text-white drop-shadow-md">
+                      {bubble.letter}
+                    </span>
+                    <span className="text-sm opacity-90 drop-shadow-xs">{bubble.emoji}</span>
+                  </button>
+
+                  {/* Pop Explosion Effect */}
+                  {burst && (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-20">
+                      <div
+                        className="absolute inset-0 rounded-full border-4 animate-bubble-ring"
+                        style={{
+                          borderColor: '#ffffff',
+                          boxShadow: `0 0 18px ${burst.color}`,
+                        }}
+                      />
+                      <div
+                        className="absolute inset-1 rounded-full animate-bubble-flash"
+                        style={{
+                          background: `radial-gradient(circle, #ffffff 15%, ${burst.color} 65%, transparent 100%)`,
+                        }}
+                      />
+                      {burst.particles.map((p, idx) => (
+                        <span
+                          key={idx}
+                          className="absolute left-1/2 top-1/2 animate-bubble-particle"
+                          style={
+                            {
+                              '--tx': `${p.tx}px`,
+                              '--ty': `${p.ty}px`,
+                            } as React.CSSProperties
+                          }
+                        >
+                          {p.isStar ? (
+                            <span
+                              className="block leading-none drop-shadow-xs"
+                              style={{ fontSize: `${p.size + 4}px` }}
+                            >
+                              ✨
+                            </span>
+                          ) : (
+                            <span
+                              className="block rounded-full border-2 border-white shadow-sm"
+                              style={{
+                                width: `${p.size}px`,
+                                height: `${p.size}px`,
+                                backgroundColor: p.color,
+                              }}
+                            />
+                          )}
+                        </span>
+                      ))}
+                      <span className="absolute left-1/2 top-1/2 text-lg sm:text-xl font-black text-amber-500 drop-shadow-[0_2px_2px_rgba(255,255,255,0.95)] animate-bubble-plus">
+                        +1
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className="text-center text-xs font-bold text-slate-500">
@@ -1271,11 +1458,11 @@ export const AlphabetPhonicsGame: React.FC<AlphabetPhonicsGameProps> = ({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border-4 border-indigo-300 overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="p-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-between gap-2">
+              <div className="flex items-center flex-wrap gap-2 min-w-0">
                 <span className="text-3xl font-black">{selectedLetter.letter} {selectedLetter.lower}</span>
                 {selectedLetter.isVowel && (
-                  <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                  <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
                     {lang === 'id' ? 'Huruf Vokal' : 'Vowel'}
                   </span>
                 )}

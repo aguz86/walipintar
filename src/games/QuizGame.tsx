@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Volume2, Star, Sparkles } from 'lucide-react';
 import {
   ANIMALS,
@@ -11,8 +11,9 @@ import {
   GameItem,
   GAME_DEFINITIONS,
 } from '../data/items';
+import { CUSTOM_ITEM_SVGS } from '../data/customSvg';
 import { ItemIcon } from '../components/ItemIcon';
-import { SFX, playAnimalSound, speakText, hasAnimalSound } from '../utils/audio';
+import { SFX, playAnimalSound, speakText, stopSpeaking, hasAnimalSound } from '../utils/audio';
 
 interface QuizGameProps {
   gameId: string;
@@ -51,6 +52,21 @@ export const QuizGame: React.FC<QuizGameProps> = ({
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [feedback, setFeedback] = useState<string>('');
+  const usedFruitVegKeysRef = useRef<Set<string>>(new Set());
+  const usedFruitVegVisualsRef = useRef<Set<string>>(new Set());
+  const speakDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isUnmountedRef = useRef(false);
+
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
+      if (speakDelayTimerRef.current) clearTimeout(speakDelayTimerRef.current);
+      if (nextProgressTimerRef.current) clearTimeout(nextProgressTimerRef.current);
+      stopSpeaking();
+    };
+  }, []);
 
   const generateQuestion = (): Question => {
     // Helper to get age-appropriate slice from pool
@@ -138,11 +154,48 @@ export const QuizGame: React.FC<QuizGameProps> = ({
 
     // 3. FRUITS & VEGGIES
     if (gameId === 'fruitveg') {
+      const fruitsPool = getPool(FRUITS);
+      const veggiesPool = getPool(VEGGIES);
+      const combined = [...fruitsPool, ...veggiesPool];
+
+      const getItemKey = (item: GameItem) => `${item.category}:${item.nameId}`;
+      const getVisualKey = (item: GameItem) =>
+        CUSTOM_ITEM_SVGS[item.nameId] ? `svg:${item.nameId}` : `emoji:${item.emoji}`;
+
+      const pickUniqueFruitVeg = (pool: GameItem[]): GameItem => {
+        const unusedByName = pool.filter((item) => !usedFruitVegKeysRef.current.has(getItemKey(item)));
+        const unusedByVisual = unusedByName.filter(
+          (item) => !usedFruitVegVisualsRef.current.has(getVisualKey(item))
+        );
+        const candidates =
+          unusedByVisual.length > 0
+            ? unusedByVisual
+            : unusedByName.length > 0
+            ? unusedByName
+            : pool;
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        usedFruitVegKeysRef.current.add(getItemKey(chosen));
+        usedFruitVegVisualsRef.current.add(getVisualKey(chosen));
+        return chosen;
+      };
+
       const isFruitCategoryMode = level >= 1 && Math.random() < 0.45;
       if (isFruitCategoryMode) {
-        const isFruit = Math.random() < 0.5;
-        const source = getPool(isFruit ? FRUITS : VEGGIES);
-        const target = source[Math.floor(Math.random() * source.length)];
+        const unusedFruits = fruitsPool.filter((item) => !usedFruitVegKeysRef.current.has(getItemKey(item)));
+        const unusedVeggies = veggiesPool.filter((item) => !usedFruitVegKeysRef.current.has(getItemKey(item)));
+        let sourcePool: GameItem[];
+        if (unusedFruits.length > 0 && unusedVeggies.length > 0) {
+          sourcePool = Math.random() < 0.5 ? unusedFruits : unusedVeggies;
+        } else if (unusedFruits.length > 0) {
+          sourcePool = unusedFruits;
+        } else if (unusedVeggies.length > 0) {
+          sourcePool = unusedVeggies;
+        } else {
+          sourcePool = Math.random() < 0.5 ? fruitsPool : veggiesPool;
+        }
+
+        const target = pickUniqueFruitVeg(sourcePool);
+        const isFruit = target.category === 'fruits';
         return {
           promptText:
             lang === 'id' ? `${target.nameId}: Ini buah atau sayur?` : `${target.nameEn}: Fruit or vegetable?`,
@@ -162,8 +215,7 @@ export const QuizGame: React.FC<QuizGameProps> = ({
       }
 
       // Name guessing mode
-      const combined = getPool([...FRUITS, ...VEGGIES]);
-      const target = combined[Math.floor(Math.random() * combined.length)];
+      const target = pickUniqueFruitVeg(combined);
       const distractors = combined
         .filter((item) => item.nameId !== target.nameId)
         .sort(() => Math.random() - 0.5)
@@ -578,6 +630,10 @@ export const QuizGame: React.FC<QuizGameProps> = ({
   };
 
   useEffect(() => {
+    if (currentIndex === 0) {
+      usedFruitVegKeysRef.current.clear();
+      usedFruitVegVisualsRef.current.clear();
+    }
     const q = generateQuestion();
     setCurrentQ(q);
     setIsLocked(false);
@@ -585,9 +641,10 @@ export const QuizGame: React.FC<QuizGameProps> = ({
     setFeedback('');
 
     if (q.soundEmoji) {
-      setTimeout(() => playAnimalSound(q.soundEmoji!), 400);
+      const timer = setTimeout(() => playAnimalSound(q.soundEmoji!), 400);
+      return () => clearTimeout(timer);
     }
-  }, [currentIndex]);
+  }, [currentIndex, gameId, level]);
 
   const handleSelect = (idx: number, isCorrect: boolean) => {
     if (isLocked) return;
@@ -617,10 +674,36 @@ export const QuizGame: React.FC<QuizGameProps> = ({
         : affirmationsEn[Math.floor(Math.random() * affirmationsEn.length)];
       setFeedback(randomAffirmation);
 
-      setTimeout(() => {
+      const advanceProgress = () => {
+        if (isUnmountedRef.current) return;
+        if (currentIndex + 1 >= totalQuestions) {
+          const stars = mistakes <= 1 ? 3 : mistakes <= 3 ? 2 : 1;
+          onWin(stars, `${currentIndex + 1}/${totalQuestions} soal terjawab dengan baik!`);
+        } else {
+          setCurrentIndex((i) => i + 1);
+        }
+      };
+
+      if (speakDelayTimerRef.current) clearTimeout(speakDelayTimerRef.current);
+      if (nextProgressTimerRef.current) clearTimeout(nextProgressTimerRef.current);
+
+      speakDelayTimerRef.current = setTimeout(() => {
+        if (isUnmountedRef.current) return;
+
         const spokenAffirmation = lang === 'id'
           ? `Hebat sekali, ${displayName}!`
           : `Great job, ${displayName}!`;
+        const fullSpeech = currentQ?.spokenText
+          ? `${spokenAffirmation}. ${currentQ.spokenText}`
+          : spokenAffirmation;
+
+        if (gameId === 'count') {
+          speakText(fullSpeech, lang, () => {
+            if (isUnmountedRef.current) return;
+            nextProgressTimerRef.current = setTimeout(advanceProgress, 250);
+          });
+          return;
+        }
 
         if (currentQ?.soundEmoji) {
           playAnimalSound(currentQ.soundEmoji, () => {
@@ -630,20 +713,11 @@ export const QuizGame: React.FC<QuizGameProps> = ({
               speakText(spokenAffirmation, lang);
             }
           });
-        } else if (currentQ?.spokenText) {
-          speakText(`${spokenAffirmation}. ${currentQ.spokenText}`, lang);
         } else {
-          speakText(spokenAffirmation, lang);
+          speakText(fullSpeech, lang);
         }
 
-        setTimeout(() => {
-          if (currentIndex + 1 >= totalQuestions) {
-            const stars = mistakes <= 1 ? 3 : mistakes <= 3 ? 2 : 1;
-            onWin(stars, `${currentIndex + 1}/${totalQuestions} soal terjawab dengan baik!`);
-          } else {
-            setCurrentIndex((i) => i + 1);
-          }
-        }, 750);
+        nextProgressTimerRef.current = setTimeout(advanceProgress, 750);
       }, 300);
     } else {
       SFX.no();

@@ -24,6 +24,7 @@ import {
 } from './data/items';
 import { ItemIcon } from './components/ItemIcon';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { VersionButton } from './components/VersionButton';
 import { ParentModal } from './components/ParentModal';
 import { ProfileModal } from './components/ProfileModal';
 import { LibraryModal } from './components/LibraryModal';
@@ -41,7 +42,6 @@ import { MonsterGame } from './games/MonsterGame';
 import { AlphabetPhonicsGame } from './games/AlphabetPhonicsGame';
 import { ColoringDrawingGame } from './games/ColoringDrawingGame';
 import { SFX, speakText, unlockAudio, stopSpeaking } from './utils/audio';
-import { SlideScrollContainer } from './components/SlideScrollContainer';
 
 interface UserData {
   lang: 'id' | 'en';
@@ -607,62 +607,69 @@ export default function App() {
       <main className="flex-1 flex flex-col">
         {/* If a category is selected and no mini-game is open, show Category Quick-Switcher Header Bar */}
         {mainCategory && !activeGameId && (
-          <div className="bg-slate-100/95 backdrop-blur-xs border-b border-slate-200/80 px-2 sm:px-4 py-1.5 shadow-2xs sticky top-[49px] sm:top-[57px] z-30 landscape:hidden md:landscape:block">
-            <SlideScrollContainer
-              showScrollbar={false}
-              showChevrons={true}
-              gradientColor="from-slate-100"
-              className="max-w-5xl mx-auto"
-              innerClassName="justify-between"
-            >
+          <nav
+            aria-label={data.lang === 'id' ? 'Navigasi Kategori' : 'Category Navigation'}
+            className="bg-slate-100/95 backdrop-blur-xs border-b-2 border-slate-200/90 px-2 sm:px-4 py-2 phone-landscape:py-1.5 shadow-xs sticky top-[49px] sm:top-[57px] z-30"
+          >
+            <div className="max-w-5xl mx-auto grid grid-cols-4 gap-1.5 sm:gap-3">
               <button
+                type="button"
                 onClick={handleBackToCategories}
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-200 text-slate-700 font-black text-xs shrink-0 cursor-pointer shadow-2xs transition-colors"
+                className="min-h-[54px] sm:min-h-[52px] phone-landscape:min-h-[44px] flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl border-2 border-b-4 bg-amber-50 hover:bg-amber-100 border-amber-300 border-b-amber-400 text-amber-950 font-black uppercase tracking-wider cursor-pointer shadow-2xs active:translate-y-0.5 transition-all select-none"
                 title={data.lang === 'id' ? 'Kembali ke Pilihan Kategori' : 'Back to Categories Hub'}
               >
-                <span>🏠</span>
-                <span className="text-[11px] sm:text-xs">{data.lang === 'id' ? 'Kategori' : 'Categories'}</span>
+                <span className="text-lg sm:text-xl phone-landscape:text-base leading-none shrink-0">🏠</span>
+                <span className="text-[11px] min-[380px]:text-xs sm:text-sm md:text-[15px] leading-none whitespace-nowrap">
+                  {data.lang === 'id' ? 'KATEGORI' : 'MENU'}
+                </span>
               </button>
 
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={() => handleSelectCategory('educational')}
-                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
-                    mainCategory === 'educational'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white/80 hover:bg-white text-slate-700'
-                  }`}
-                >
-                  <span>🎮</span>
-                  <span>{data.lang === 'id' ? 'Edukasi' : 'Educational'}</span>
-                </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCategory('educational')}
+                className={`min-h-[54px] sm:min-h-[52px] phone-landscape:min-h-[44px] flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl border-2 border-b-4 font-black uppercase tracking-wider cursor-pointer active:translate-y-0.5 transition-all select-none ${
+                  mainCategory === 'educational'
+                    ? 'bg-emerald-600 hover:bg-emerald-600 text-white border-emerald-700 border-b-emerald-800 shadow-sm'
+                    : 'bg-white hover:bg-emerald-50 text-slate-800 border-slate-300 border-b-slate-400 shadow-2xs'
+                }`}
+              >
+                <span className="text-lg sm:text-xl phone-landscape:text-base leading-none shrink-0">🎮</span>
+                <span className="text-[11px] min-[380px]:text-xs sm:text-sm md:text-[15px] leading-none whitespace-nowrap">
+                  {data.lang === 'id' ? 'EDUKASI' : 'GAMES'}
+                </span>
+              </button>
 
-                <button
-                  onClick={() => handleSelectCategory('coloring')}
-                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
-                    mainCategory === 'coloring'
-                      ? 'bg-rose-500 text-white shadow-xs'
-                      : 'bg-white/80 hover:bg-white text-slate-700'
-                  }`}
-                >
-                  <span>🎨</span>
-                  <span>{data.lang === 'id' ? 'Mewarnai' : 'Coloring'}</span>
-                </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCategory('coloring')}
+                className={`min-h-[54px] sm:min-h-[52px] phone-landscape:min-h-[44px] flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl border-2 border-b-4 font-black uppercase tracking-wider cursor-pointer active:translate-y-0.5 transition-all select-none ${
+                  mainCategory === 'coloring'
+                    ? 'bg-rose-500 hover:bg-rose-500 text-white border-rose-600 border-b-rose-700 shadow-sm'
+                    : 'bg-white hover:bg-rose-50 text-slate-800 border-slate-300 border-b-slate-400 shadow-2xs'
+                }`}
+              >
+                <span className="text-lg sm:text-xl phone-landscape:text-base leading-none shrink-0">🎨</span>
+                <span className="text-[11px] min-[380px]:text-xs sm:text-sm md:text-[15px] leading-none whitespace-nowrap">
+                  {data.lang === 'id' ? 'MEWARNAI' : 'COLORING'}
+                </span>
+              </button>
 
-                <button
-                  onClick={() => handleSelectCategory('alphabet')}
-                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl font-black text-xs shrink-0 cursor-pointer transition-all ${
-                    mainCategory === 'alphabet'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white/80 hover:bg-white text-slate-700'
-                  }`}
-                >
-                  <span>🔤</span>
-                  <span>{data.lang === 'id' ? 'Abjad' : 'Alphabet'}</span>
-                </button>
-              </div>
-            </SlideScrollContainer>
-          </div>
+              <button
+                type="button"
+                onClick={() => handleSelectCategory('alphabet')}
+                className={`min-h-[54px] sm:min-h-[52px] phone-landscape:min-h-[44px] flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-1 sm:px-3 py-1.5 sm:py-2 rounded-2xl border-2 border-b-4 font-black uppercase tracking-wider cursor-pointer active:translate-y-0.5 transition-all select-none ${
+                  mainCategory === 'alphabet'
+                    ? 'bg-indigo-600 hover:bg-indigo-600 text-white border-indigo-700 border-b-indigo-800 shadow-sm'
+                    : 'bg-white hover:bg-indigo-50 text-slate-800 border-slate-300 border-b-slate-400 shadow-2xs'
+                }`}
+              >
+                <span className="text-lg sm:text-xl phone-landscape:text-base leading-none shrink-0">🔤</span>
+                <span className="text-[11px] min-[380px]:text-xs sm:text-sm md:text-[15px] leading-none whitespace-nowrap">
+                  {data.lang === 'id' ? 'ABJAD' : 'ALPHABET'}
+                </span>
+              </button>
+            </div>
+          </nav>
         )}
 
         {/* 1. CATEGORY HUB SCREEN (Pilih Kategori Utama: Edukasi, Mewarnai, Belajar Abjad) */}
@@ -791,14 +798,18 @@ export default function App() {
 
                   <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
                     {data.lang === 'id'
-                      ? '30+ buku mewarnai interaktif dalam 6 kategori (hewan, manisan, kendaraan, alam, dino), 4 tema palet warna, kuas berkilau, stempel stiker, dan Galeri Karyaku!'
-                      : '30+ interactive coloring pages in 6 categories, 4 color palettes, glitter sparkle brush, sticker stamps, and saved My Art Gallery!'}
+                      ? `${(data.level === 0 ? 5 : data.level === 1 ? 10 : 15) * 6} buku mewarnai interaktif (${data.level === 0 ? 5 : data.level === 1 ? 10 : 15} gambar per kategori dalam 6 kategori), 4 tema palet warna, kuas berkilau, stempel stiker, dan Galeri Karyaku!`
+                      : `${(data.level === 0 ? 5 : data.level === 1 ? 10 : 15) * 6} interactive coloring pages (${data.level === 0 ? 5 : data.level === 1 ? 10 : 15} per category in 6 categories), 4 color palettes, glitter sparkle brush, sticker stamps, and My Art Gallery!`}
                   </p>
 
                   <ul className="text-xs text-slate-700 font-bold mt-3 space-y-1">
                     <li className="flex items-center gap-1.5">
                       <span>🖍️</span>
-                      <span>{data.lang === 'id' ? '30+ Halaman Gambar (6 Kategori)' : '30+ Pages in 6 Categories'}</span>
+                      <span>
+                        {data.lang === 'id'
+                          ? `${(data.level === 0 ? 5 : data.level === 1 ? 10 : 15) * 6} Gambar (${data.level === 0 ? 5 : data.level === 1 ? 10 : 15}/Kategori, 6 Kategori)`
+                          : `${(data.level === 0 ? 5 : data.level === 1 ? 10 : 15) * 6} Pages (${data.level === 0 ? 5 : data.level === 1 ? 10 : 15}/Category, 6 Categories)`}
+                      </span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span>✨</span>
@@ -999,6 +1010,7 @@ export default function App() {
                     onBack={handleBackToHome}
                     lang={data.lang}
                     level={data.level}
+                    playerName={data.name}
                     onWin={handleWin}
                   />
                 )}
@@ -1208,6 +1220,12 @@ export default function App() {
               </div>
             )}
           </>
+        )}
+
+        {!activeGameId && (
+          <div className="pb-5 pt-1 flex justify-center px-4">
+            <VersionButton />
+          </div>
         )}
       </main>
 

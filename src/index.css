@@ -100,3 +100,75 @@
 .slide-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(99, 102, 241, 0.8);
 }
+
+@keyframes bubbleRingBurst {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleCenterFlash {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.95;
+  }
+  45% {
+    transform: scale(1.35);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes bubbleParticleFly {
+  0% {
+    transform: translate(-50%, -50%) translate(0px, 0px) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--tx, 0px), var(--ty, 0px)) scale(0.15) rotate(140deg);
+    opacity: 0;
+  }
+}
+
+@keyframes bubblePlusOne {
+  0% {
+    transform: translate(-50%, -20%) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -55%) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -150%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+.animate-bubble-ring {
+  animation: bubbleRingBurst 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bubble-flash {
+  animation: bubbleCenterFlash 0.34s ease-out forwards;
+}
+
+.animate-bubble-particle {
+  animation: bubbleParticleFly 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bubble-plus {
+  animation: bubblePlusOne 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

@@ -274,6 +274,75 @@ const ANIMAL_SOUNDS_PARAMS: Record<string, SoundParam> = {
     r: 0.2,
     v: [35, 0.04],
   },
+  '🦎': {
+    d: 0.08,
+    f: [[0, 2400], [0.04, 3300], [0.08, 2100]],
+    F: [[[[0, 3100]], 600, 1]],
+    a: 0.004,
+    x: 24,
+    rp: [[0, 1], [0.16, 1.05], [0.32, 0.98]],
+  },
+  '🦗': {
+    d: 0.12,
+    f: [[0, 3700], [0.06, 4150], [0.12, 3550]],
+    F: [[[[0, 3950]], 500, 1]],
+    a: 0.005,
+    r: 0.03,
+    am: [48, 0.7],
+    rp: [[0, 1], [0.2, 1.02], [0.42, 0.98]],
+  },
+  '🦟': {
+    d: 0.75,
+    f: [[0, 560], [0.3, 640], [0.6, 590], [0.75, 530]],
+    F: [[[[0, 1100]], 260, 1], [[[0, 2200]], 400, 0.7]],
+    a: 0.05,
+    r: 0.2,
+    v: [18, 0.06],
+  },
+  '🦉': {
+    d: 0.34,
+    f: [[0, 410], [0.15, 370], [0.34, 320]],
+    F: [[[[0, 420]], 140, 1]],
+    a: 0.05,
+    r: 0.14,
+    k: 1.5,
+    rp: [[0, 1.08], [0.46, 0.92]],
+  },
+  '🐭': {
+    d: 0.1,
+    f: [[0, 1900], [0.05, 2500], [0.1, 1750]],
+    F: [[[[0, 2400]], 450, 1]],
+    a: 0.005,
+    x: 16,
+    rp: [[0, 1], [0.16, 1.1], [0.32, 0.96]],
+  },
+  '🐺': {
+    d: 1.15,
+    f: [[0, 260], [0.3, 480], [0.75, 450], [1.15, 280]],
+    F: [[[[0, 600], [0.4, 900], [1.15, 550]], 200, 1]],
+    a: 0.12,
+    r: 0.35,
+    k: 0.85,
+    v: [4.5, 0.025],
+  },
+  '🐬': {
+    d: 0.24,
+    f: [[0, 1200], [0.1, 2300], [0.24, 1700]],
+    F: [[[[0, 2000]], 450, 1]],
+    a: 0.015,
+    r: 0.08,
+    k: 1.2,
+    rp: [[0, 1], [0.3, 1.18]],
+  },
+  '🐳': {
+    d: 1.2,
+    f: [[0, 140], [0.5, 190], [1.2, 105]],
+    F: [[[[0, 320]], 110, 1]],
+    a: 0.18,
+    r: 0.45,
+    k: 1.3,
+    v: [3, 0.02],
+  },
 };
 
 // Aliases
@@ -286,6 +355,125 @@ ANIMAL_SOUNDS_PARAMS['🐏'] = ANIMAL_SOUNDS_PARAMS['🐐'];
 ANIMAL_SOUNDS_PARAMS['🐤'] = { ...ANIMAL_SOUNDS_PARAMS['🐔'], sc: 1.6 };
 ANIMAL_SOUNDS_PARAMS['🐥'] = { ...ANIMAL_SOUNDS_PARAMS['🐔'], sc: 1.6 };
 ANIMAL_SOUNDS_PARAMS['🐣'] = { ...ANIMAL_SOUNDS_PARAMS['🐔'], sc: 1.6 };
+
+// Library-only sound aliases that reuse existing synthesized animal sounds with tuned pitch
+const LIBRARY_SOUND_ALIAS: Record<string, { baseEmoji: string; pitchRate?: number }> = {
+  '🐄': { baseEmoji: '🐮', pitchRate: 1.04 },
+  '🐂': { baseEmoji: '🐃', pitchRate: 0.9 },
+  '🦬': { baseEmoji: '🐃', pitchRate: 0.82 },
+  '🦒': { baseEmoji: '🐮', pitchRate: 0.95 },
+  '🐪': { baseEmoji: '🐮', pitchRate: 0.8 },
+  '🐫': { baseEmoji: '🐮', pitchRate: 0.78 },
+  '🐎': { baseEmoji: '🐴', pitchRate: 1.05 },
+  '🦓': { baseEmoji: '🐴', pitchRate: 1.15 },
+  '🐕': { baseEmoji: '🐶', pitchRate: 1.0 },
+  '🐩': { baseEmoji: '🐶', pitchRate: 1.25 },
+  '🦮': { baseEmoji: '🐶', pitchRate: 0.95 },
+  '🦊': { baseEmoji: '🐶', pitchRate: 1.38 },
+  '🐆': { baseEmoji: '🐅', pitchRate: 1.1 },
+  '🦍': { baseEmoji: '🦧', pitchRate: 0.78 },
+  '🐨': { baseEmoji: '🐸', pitchRate: 0.72 },
+  '🦥': { baseEmoji: '🐸', pitchRate: 0.68 },
+  '🐻': { baseEmoji: '🦁', pitchRate: 0.82 },
+  '🐼': { baseEmoji: '🦁', pitchRate: 0.94 },
+  '🦡': { baseEmoji: '🦁', pitchRate: 1.18 },
+  '🦨': { baseEmoji: '🦁', pitchRate: 1.25 },
+  '🦝': { baseEmoji: '🐵', pitchRate: 1.28 },
+  '🦦': { baseEmoji: '🐬', pitchRate: 0.9 },
+  '🦛': { baseEmoji: '🐃', pitchRate: 0.7 },
+  '🦏': { baseEmoji: '🐘', pitchRate: 0.72 },
+  '🦣': { baseEmoji: '🐘', pitchRate: 0.8 },
+  '🦖': { baseEmoji: '🦁', pitchRate: 0.55 },
+  '🦕': { baseEmoji: '🐳', pitchRate: 0.75 },
+  '🦅': { baseEmoji: '🦜', pitchRate: 1.18 },
+  '🕊️': { baseEmoji: '🐦', pitchRate: 0.82 },
+  '🦚': { baseEmoji: '🦜', pitchRate: 0.92 },
+  '🦢': { baseEmoji: '🦆', pitchRate: 0.78 },
+  '🦩': { baseEmoji: '🦆', pitchRate: 1.12 },
+  '🐧': { baseEmoji: '🦆', pitchRate: 1.32 },
+  '🦃': { baseEmoji: '🐓', pitchRate: 0.82 },
+  '🦤': { baseEmoji: '🐦', pitchRate: 0.72 },
+  '🪰': { baseEmoji: '🐝', pitchRate: 1.45 },
+  '🪲': { baseEmoji: '🐝', pitchRate: 0.76 },
+  '🐀': { baseEmoji: '🐭', pitchRate: 0.86 },
+  '🐹': { baseEmoji: '🐭', pitchRate: 1.12 },
+  '🐿️': { baseEmoji: '🐭', pitchRate: 1.18 },
+  '🐰': { baseEmoji: '🐭', pitchRate: 0.92 },
+  '🦔': { baseEmoji: '🐭', pitchRate: 0.85 },
+  '🦘': { baseEmoji: '🐐', pitchRate: 0.85 },
+  '🦇': { baseEmoji: '🐦', pitchRate: 1.65 },
+  '🦌': { baseEmoji: '🐐', pitchRate: 0.82 },
+  '🦙': { baseEmoji: '🐐', pitchRate: 0.9 },
+  '🐋': { baseEmoji: '🐳', pitchRate: 0.86 },
+  '🦭': { baseEmoji: '🐶', pitchRate: 0.85 },
+};
+
+const INDONESIAN_ANIMAL_SOUNDS: Record<string, string> = {
+  'Kucing': 'Meong, meong!',
+  'Anjing': 'Guk, guk, guk!',
+  'Pudel': 'Guk, guk!',
+  'Anjing Pemandu': 'Guk, guk!',
+  'Sapi': 'Mooo!',
+  'Sapi Perah': 'Mooo!',
+  'Kerbau': 'Ngowoh, mooo!',
+  'Banteng': 'Mooo, grrr!',
+  'Bison': 'Mooo, grrr!',
+  'Kambing': 'Mbek, mbek!',
+  'Domba': 'Mbek, mbek!',
+  'Domba Jantan': 'Mbek, mbek!',
+  'Bebek': 'Kwek, kwek, kwek!',
+  'Angsa': 'Kwek, kwak!',
+  'Ayam': 'Petok, petok, petok!',
+  'Ayam Jantan': 'Kukuruyuuuk!',
+  'Anak Ayam': 'Ciap, ciap, ciap!',
+  'Anak Ayam Kecil': 'Ciap, ciap, ciap!',
+  'Anak Ayam Menetas': 'Ciap, ciap, ciap!',
+  'Kalkun': 'Klutuk, klutuk!',
+  'Katak': 'Krok, krok, krok!',
+  'Cicak': 'Cik, cik, cik!',
+  'Jangkrik': 'Krik, krik, krik!',
+  'Nyamuk': 'Nging, ngung!',
+  'Lebah': 'Nggiiing!',
+  'Lalat': 'Nggiiing!',
+  'Kumbang': 'Bzzzz!',
+  'Ular': 'Ssssst!',
+  'Burung': 'Cuit, cuit, cuit!',
+  'Merpati': 'Kuur, cuit!',
+  'Burung Beo': 'Koak, koak!',
+  'Burung Merak': 'Koak, kiiik!',
+  'Elang': 'Kiiik, kiiik!',
+  'Burung Hantu': 'Huuu, huuu!',
+  'Singa': 'Auuummm!',
+  'Harimau': 'Auuummm!',
+  'Macan Tutul': 'Auuummm!',
+  'Buaya': 'Grrr!',
+  'Serigala': 'Auuuu!',
+  'Rubah': 'Kik, kik!',
+  'Monyet': 'Uuu, aaa, aaa!',
+  'Orangutan': 'Uuu, aaa!',
+  'Gorila': 'Uuu, aaa, grrr!',
+  'Kuda': 'Hihiii!',
+  'Kuda Pacu': 'Hihiii!',
+  'Zebra': 'Hihiii!',
+  'Gajah': 'Prett!',
+  'Mamut': 'Prett!',
+  'Tikus': 'Cit, cit, cit!',
+  'Tikus Besar': 'Cit, cit, cit!',
+  'Hamster': 'Cit, cit!',
+  'Tupai': 'Cit, cit!',
+  'Kelinci': 'Cit, cik!',
+  'Beruang': 'Grrram!',
+  'Panda': 'Grrram!',
+  'Lumba-lumba': 'Klik, klik, kik!',
+  'Paus': 'Huuu, mmmm!',
+  'Paus Biru': 'Huuu, mmmm!',
+  'Dinosaurus T-Rex': 'Groaaar!',
+  'Dinosaurus Leher Panjang': 'Huuu, groaaar!',
+};
+
+export function getIndonesianAnimalSound(nameId: string): string | undefined {
+  return INDONESIAN_ANIMAL_SOUNDS[nameId];
+}
 
 function interpolateSeg(pts: [number, number][], t: number): number {
   if (t <= pts[0][0]) return pts[0][1];
@@ -337,17 +525,45 @@ function synthesizeWave(p: SoundParam, sc = 1): Float32Array {
 }
 
 const bufferCache: Record<string, AudioBuffer> = {};
+const activeAnimalSources = new Set<AudioBufferSourceNode>();
+const activeAnimalTimers = new Set<number>();
+const pendingSpeechTimers = new Set<number>();
+let animalSoundGeneration = 0;
+let speechGeneration = 0;
 
 export function hasAnimalSound(emoji: string): boolean {
   return !!ANIMAL_SOUNDS_PARAMS[emoji];
 }
 
-export function playAnimalSound(emoji: string, callback?: () => void): void {
+export function hasLibraryAnimalSound(emoji: string): boolean {
+  return !!(ANIMAL_SOUNDS_PARAMS[emoji] || LIBRARY_SOUND_ALIAS[emoji]);
+}
+
+export function stopAnimalSound(): void {
+  animalSoundGeneration++;
+  activeAnimalTimers.forEach((timerId) => clearTimeout(timerId));
+  activeAnimalTimers.clear();
+  activeAnimalSources.forEach((source) => {
+    try {
+      source.onended = null;
+      source.stop();
+      source.disconnect();
+    } catch {
+      // Ignore if already stopped
+    }
+  });
+  activeAnimalSources.clear();
+}
+
+export function playAnimalSound(emoji: string, callback?: () => void, pitchRate = 1): void {
   const ctx = getAudioContext();
   if (!ctx || !ANIMAL_SOUNDS_PARAMS[emoji]) {
     callback?.();
     return;
   }
+
+  stopAnimalSound();
+  const gen = animalSoundGeneration;
 
   try {
     let buf = bufferCache[emoji];
@@ -381,22 +597,52 @@ export function playAnimalSound(emoji: string, callback?: () => void): void {
 
     const source = ctx.createBufferSource();
     source.buffer = buf;
+    if (pitchRate !== 1) {
+      source.playbackRate.value = pitchRate;
+    }
     source.connect(ctx.destination);
+    activeAnimalSources.add(source);
 
     let ended = false;
+    let fallbackTimerId: number | null = null;
+
     const finish = () => {
+      activeAnimalSources.delete(source);
+      if (fallbackTimerId !== null) {
+        clearTimeout(fallbackTimerId);
+        activeAnimalTimers.delete(fallbackTimerId);
+      }
       if (!ended) {
         ended = true;
-        callback?.();
+        if (gen === animalSoundGeneration) {
+          callback?.();
+        }
       }
     };
 
     source.onended = finish;
     source.start();
-    setTimeout(finish, buf.duration * 1000 + 400);
+    const effectiveDurationMs = (buf.duration / Math.max(0.4, pitchRate)) * 1000;
+    fallbackTimerId = window.setTimeout(finish, effectiveDurationMs + 400);
+    activeAnimalTimers.add(fallbackTimerId);
   } catch {
-    callback?.();
+    if (gen === animalSoundGeneration) {
+      callback?.();
+    }
   }
+}
+
+export function playLibraryAnimalSound(emoji: string, callback?: () => void): void {
+  if (ANIMAL_SOUNDS_PARAMS[emoji]) {
+    playAnimalSound(emoji, callback);
+    return;
+  }
+  const alias = LIBRARY_SOUND_ALIAS[emoji];
+  if (alias && ANIMAL_SOUNDS_PARAMS[alias.baseEmoji]) {
+    playAnimalSound(alias.baseEmoji, callback, alias.pitchRate ?? 1);
+    return;
+  }
+  callback?.();
 }
 
 // Indonesian Text-to-Speech with fallback
@@ -405,6 +651,10 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
     onEnd?.();
     return;
   }
+
+  const gen = ++speechGeneration;
+  pendingSpeechTimers.forEach((timerId) => clearTimeout(timerId));
+  pendingSpeechTimers.clear();
 
   try {
     window.speechSynthesis.cancel();
@@ -436,7 +686,9 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
     const done = () => {
       if (!finished) {
         finished = true;
-        onEnd?.();
+        if (gen === speechGeneration) {
+          onEnd?.();
+        }
       }
     };
 
@@ -450,7 +702,12 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
       done();
     };
 
-    setTimeout(() => {
+    const speakTimer = window.setTimeout(() => {
+      pendingSpeechTimers.delete(speakTimer);
+      if (gen !== speechGeneration) {
+        finished = true;
+        return;
+      }
       try {
         window.speechSynthesis.resume();
         window.speechSynthesis.speak(utterance);
@@ -458,21 +715,35 @@ export function speakText(text: string, lang: 'id' | 'en' = 'id', onEnd?: () => 
         done();
       }
     }, 60);
+    pendingSpeechTimers.add(speakTimer);
 
-    setTimeout(() => {
+    const watchdogTimer = window.setTimeout(() => {
+      pendingSpeechTimers.delete(watchdogTimer);
+      if (gen !== speechGeneration) {
+        finished = true;
+        return;
+      }
       if (!finished && !window.speechSynthesis.speaking) {
         done();
       }
     }, 6000);
+    pendingSpeechTimers.add(watchdogTimer);
   } catch {
-    onEnd?.();
+    if (gen === speechGeneration) {
+      onEnd?.();
+    }
   }
 }
 
 /**
- * Menghentikan seluruh pemutaran suara / Text-to-Speech secara instan
+ * Menghentikan seluruh pemutaran suara hewan & Text-to-Speech secara instan
  */
 export function stopSpeaking(): void {
+  speechGeneration++;
+  pendingSpeechTimers.forEach((timerId) => clearTimeout(timerId));
+  pendingSpeechTimers.clear();
+  stopAnimalSound();
+
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();

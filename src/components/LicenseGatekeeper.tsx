@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingCart, MessageCircle, AlertTriangle, CheckCircle2, Loader2, KeyRound, Copy, Check } from 'lucide-react';
 import { SFX, unlockAudio } from '../utils/audio';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -18,6 +18,9 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState('');
   const [copied, setCopied] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+  const redirectTimerRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
   const [paidModalData, setPaidModalData] = useState<{
     email: string;
     license: string;
@@ -33,28 +36,74 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
   } | null>(null);
   const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
 
-  const handleCopyCode = async (code: string) => {
-    const cleanCode = code.trim().toUpperCase();
+  const clearRedirectTimers = () => {
+    if (redirectTimerRef.current !== null) {
+      window.clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current !== null) {
+      window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setRedirectCountdown(null);
+  };
+
+  useEffect(() => {
+    return () => clearRedirectTimers();
+  }, []);
+
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    const cleanCode = text.trim().toUpperCase();
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(cleanCode);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = cleanCode;
-        ta.setAttribute('readonly', '');
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
+        return true;
       }
+    } catch {
+      // Fallback to execCommand
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = cleanCode;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '-9999px';
+      ta.style.fontSize = '16px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus({ preventScroll: true });
+      ta.select();
+      ta.setSelectionRange(0, cleanCode.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopyCode = async (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    const ok = await copyTextToClipboard(cleanCode);
+    if (ok) {
       SFX.ding();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      // Ignore clipboard failure
+      try {
+        localStorage.setItem('walipintar_license', cleanCode);
+        localStorage.setItem('walipintar_auth_time', Date.now().toString());
+      } catch {
+        // Ignore storage error
+      }
+      clearRedirectTimers();
+      setRedirectCountdown(2);
+      countdownIntervalRef.current = window.setInterval(() => {
+        setRedirectCountdown((prev) => (prev !== null && prev > 1 ? prev - 1 : prev));
+      }, 1000);
+      redirectTimerRef.current = window.setTimeout(() => {
+        clearRedirectTimers();
+        onUnlock(cleanCode);
+      }, 2000);
     }
   };
 
@@ -106,6 +155,8 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
         const isCooldown = Boolean(data.cooldownActive || data.copyOnlyPopup || (!data.emailSentNow && data.emailSent === false));
         SFX.fanfare();
+        clearRedirectTimers();
+        setCopied(false);
         setUnpaidModalData(null);
         setPaidModalData({
           email: cleanEmail,
@@ -638,7 +689,10 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
             <CloseButton3D
-              onClick={() => setPaidModalData(null)}
+              onClick={() => {
+                clearRedirectTimers();
+                setPaidModalData(null);
+              }}
               size="sm"
               ariaLabel="Tutup"
               className="absolute top-3.5 right-3.5 z-10"
@@ -688,7 +742,11 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                   {copied ? (
                     <>
                       <Check className="w-4 h-4 stroke-[2.75]" />
-                      <span>Kode Lisensi Tersalin!</span>
+                      <span>
+                        {redirectCountdown !== null
+                          ? `Tersalin! Masuk Game dalam ${redirectCountdown} detik...`
+                          : 'Kode Lisensi Tersalin!'}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -700,7 +758,10 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
                 <button
                   type="button"
-                  onClick={() => onUnlock(paidModalData.license)}
+                  onClick={() => {
+                    clearRedirectTimers();
+                    onUnlock(paidModalData.license);
+                  }}
                   className="w-full py-3 px-4 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all mb-3"
                 >
                   <span>🚀 Mulai Main Game Sekarang</span>
@@ -721,18 +782,23 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                   Pembayaran Anda terverifikasi lunas. Lisensi resmi si kecil siap digunakan dan telah otomatis terpasang di perangkat ini.
                 </p>
 
-                <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3">
+                <div
+                  onClick={() => handleCopyCode(paidModalData.license)}
+                  className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3 cursor-pointer hover:bg-emerald-100/60 transition-colors"
+                  title="Klik untuk menyalin kode lisensi"
+                >
                   <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Kode Lisensi Resmi Anda:</div>
-                  <div
-                    onClick={() => handleCopyCode(paidModalData.license)}
-                    className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1 select-all cursor-pointer"
-                    title="Klik untuk menyalin kode lisensi"
-                  >
+                  <div className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1 select-all">
                     {paidModalData.license}
                   </div>
                   {paidModalData.orderId && (
                     <div className="text-[11px] text-slate-500 font-semibold">
                       Order ID: {paidModalData.orderId}
+                    </div>
+                  )}
+                  {redirectCountdown !== null && (
+                    <div className="mt-2 text-[11px] font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-1 rounded-lg inline-block animate-pulse">
+                      ✅ Tersalin! Membuka game dalam {redirectCountdown} detik...
                     </div>
                   )}
                 </div>
@@ -764,6 +830,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                 <button
                   type="button"
                   onClick={() => {
+                    clearRedirectTimers();
                     onUnlock(paidModalData.license);
                   }}
                   className="w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30 cursor-pointer transition-all active:scale-98 mb-2"
@@ -777,7 +844,11 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                   onClick={() => handleCopyCode(paidModalData.license)}
                   className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
                 >
-                  {copied ? '✅ Berhasil Disalin!' : '📋 Salin Kode Lisensi'}
+                  {copied
+                    ? redirectCountdown !== null
+                      ? `✅ Tersalin! Masuk Game dalam ${redirectCountdown} detik...`
+                      : '✅ Berhasil Disalin!'
+                    : '📋 Salin Kode Lisensi'}
                 </button>
               </>
             )}

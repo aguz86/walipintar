@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   ArrowLeft,
   ChevronLeft,
@@ -60,15 +60,34 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
   // Category filter for coloring books
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  // Strict per-category catalog limit by level: Kecil=5, Pintar=10, Juara=15
+  const perCategoryLimit = level === 0 ? 5 : level === 1 ? 10 : 15;
+
+  // All pages available for the current level (5/10/15 from each of the 6 categories = 30/60/90)
+  const levelAllPages = useMemo(() => {
+    const categoryOrder = COLORING_CATEGORIES.filter((c) => c.id !== 'all').map((c) => c.id);
+    return categoryOrder.flatMap((catId) =>
+      COLORING_PAGES.filter((p) => p.category === catId).slice(0, perCategoryLimit)
+    );
+  }, [perCategoryLimit]);
+
   // Filtered coloring pages
-  const filteredPages =
-    selectedCategory === 'all'
-      ? COLORING_PAGES
-      : COLORING_PAGES.filter((p) => p.category === selectedCategory);
+  const filteredPages = useMemo(() => {
+    if (selectedCategory === 'all') {
+      return levelAllPages;
+    }
+    return COLORING_PAGES.filter((p) => p.category === selectedCategory).slice(0, perCategoryLimit);
+  }, [selectedCategory, levelAllPages, perCategoryLimit]);
 
   // Active coloring page
   const [selectedPageIndex, setSelectedPageIndex] = useState(0);
-  const activePage: ColoringPage = filteredPages[selectedPageIndex] || COLORING_PAGES[0];
+  useEffect(() => {
+    if (selectedPageIndex >= filteredPages.length) {
+      setSelectedPageIndex(0);
+    }
+  }, [selectedPageIndex, filteredPages.length]);
+
+  const activePage: ColoringPage = filteredPages[selectedPageIndex] || levelAllPages[0] || COLORING_PAGES[0];
 
   // Colors filled in current coloring page: { [pageId]: { [partId]: hexColor } }
   const [pageColors, setPageColors] = useState<Record<string, Record<string, string>>>({});
@@ -94,9 +113,9 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
   const [showSampleModal, setShowSampleModal] = useState(false);
   const [savedArtworks, setSavedArtworks] = useState<SavedArtwork[]>([]);
 
-  // Daily Challenge logic (deterministic based on day of year)
+  // Daily Challenge logic (deterministic based on day of year within level catalog)
   const dayOfYear = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
-  const dailyChallengePage = COLORING_PAGES[dayOfYear % COLORING_PAGES.length];
+  const dailyChallengePage = levelAllPages[dayOfYear % levelAllPages.length] || COLORING_PAGES[0];
   const isDailyChallenge = activePage.id === dailyChallengePage.id;
 
   // Free canvas ref & history for undo
@@ -638,10 +657,16 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
                 setIsCatalogOpen(true);
               }}
               className="flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-[11px] sm:text-xs cursor-pointer border border-emerald-200 transition-colors"
-              title="Katalog 30+ Gambar"
+              title={
+                lang === 'id'
+                  ? `Katalog ${levelAllPages.length} Gambar (${perCategoryLimit}/kategori)`
+                  : `Catalog (${levelAllPages.length} Pages)`
+              }
             >
               <Grid className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden md:inline">{lang === 'id' ? '30+ Gambar' : 'Catalog'}</span>
+              <span className="hidden md:inline">
+                {lang === 'id' ? `${levelAllPages.length} Gambar` : `Catalog (${levelAllPages.length})`}
+              </span>
             </button>
           )}
 
@@ -675,24 +700,36 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
               showChevrons={true}
               gradientColor="from-[#d4eeff]"
             >
-              {COLORING_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id);
-                    setSelectedPageIndex(0);
-                    SFX.pop();
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap text-[11px] sm:text-xs font-black transition-all cursor-pointer min-h-[34px] shrink-0 ${
-                    selectedCategory === cat.id
-                      ? 'bg-emerald-600 text-white shadow-2xs scale-102'
-                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs'
-                  }`}
-                >
-                  <span>{cat.emoji}</span>
-                  <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
-                </button>
-              ))}
+              {COLORING_CATEGORIES.map((cat) => {
+                const count = cat.id === 'all' ? levelAllPages.length : perCategoryLimit;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedCategory(cat.id);
+                      setSelectedPageIndex(0);
+                      SFX.pop();
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl whitespace-nowrap text-[11px] sm:text-xs font-black transition-all cursor-pointer min-h-[34px] shrink-0 ${
+                      selectedCategory === cat.id
+                        ? 'bg-emerald-600 text-white shadow-2xs scale-102'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 shadow-2xs'
+                    }`}
+                  >
+                    <span>{cat.emoji}</span>
+                    <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                        selectedCategory === cat.id
+                          ? 'bg-white/25 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </SlideScrollContainer>
           </div>
 
@@ -1149,20 +1186,24 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
         </div>
       )}
 
-      {/* ================= KATALOG 30+ GAMBAR MODAL ================= */}
+      {/* ================= KATALOG GAMBAR MODAL ================= */}
       {isCatalogOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border-4 border-emerald-400 overflow-hidden">
             {/* Header */}
-            <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Grid className="w-5 h-5 sm:w-6 sm:h-6" />
-                <div>
-                  <h3 className="font-black text-base sm:text-lg">
-                    {lang === 'id' ? 'Pilih Gambar Mewarnai (30+ Koleksi)' : 'Coloring Book Catalog'}
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Grid className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-black text-base sm:text-lg leading-tight">
+                    {lang === 'id'
+                      ? `Pilih Gambar Mewarnai (${filteredPages.length} Gambar)`
+                      : `Coloring Book Catalog (${filteredPages.length})`}
                   </h3>
                   <p className="text-[10px] sm:text-xs text-emerald-100">
-                    {lang === 'id' ? 'Ketuk gambar mana saja untuk mulai mewarnai!' : 'Tap any picture to start coloring!'}
+                    {lang === 'id'
+                      ? `${level === 0 ? 'Si Kecil' : level === 1 ? 'Pintar' : 'Juara'} (${perCategoryLimit} gambar/kategori) — Ketuk gambar untuk mulai!`
+                      : `${perCategoryLimit} pages/category — Tap any picture to start coloring!`}
                   </p>
                 </div>
               </div>
@@ -1177,23 +1218,36 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
             {/* Filter Categories inside Catalog */}
             <div className="p-2 sm:p-3 bg-slate-50 border-b border-slate-200">
               <SlideScrollContainer showScrollbar={true} showChevrons={true} gradientColor="from-slate-50">
-                {COLORING_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setSelectedCategory(cat.id);
-                      SFX.pop();
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap cursor-pointer transition-all ${
-                      selectedCategory === cat.id
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
-                    }`}
-                  >
-                    <span>{cat.emoji} </span>
-                    <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
-                  </button>
-                ))}
+                {COLORING_CATEGORIES.map((cat) => {
+                  const count = cat.id === 'all' ? levelAllPages.length : perCategoryLimit;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setSelectedPageIndex(0);
+                        SFX.pop();
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap cursor-pointer transition-all inline-flex items-center gap-1.5 ${
+                        selectedCategory === cat.id
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      <span>{cat.emoji}</span>
+                      <span>{lang === 'id' ? cat.nameId : cat.nameEn}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                          selectedCategory === cat.id
+                            ? 'bg-white/25 text-white'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </SlideScrollContainer>
             </div>
 
@@ -1264,10 +1318,10 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border-4 border-amber-300 overflow-hidden">
             {/* Modal Header */}
-            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-amber-400 to-orange-400 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                <h3 className="font-black text-base sm:text-lg">
+            <div className="p-3.5 sm:p-4 bg-gradient-to-r from-amber-400 to-orange-400 text-white flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
+                <h3 className="font-black text-base sm:text-lg truncate">
                   {lang === 'id' ? 'Galeri Karyaku' : 'My Art Gallery'}
                 </h3>
               </div>
@@ -1355,8 +1409,8 @@ export const ColoringDrawingGame: React.FC<ColoringDrawingGameProps> = ({
       {showSampleModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
           <div className="bg-white rounded-3xl max-w-sm w-full p-4 sm:p-5 shadow-2xl border-4 border-emerald-400 flex flex-col items-center text-center">
-            <div className="flex items-center justify-between w-full mb-1">
-              <span className="text-[11px] sm:text-xs font-black uppercase text-emerald-800 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full">
+            <div className="flex items-center justify-between gap-2 w-full mb-1">
+              <span className="text-[11px] sm:text-xs font-black uppercase text-emerald-800 tracking-wider bg-emerald-100 px-2.5 py-0.5 rounded-full truncate min-w-0">
                 🎨 {lang === 'id' ? 'Contoh Desain Mewarnai' : 'Coloring Design Sample'}
               </span>
               <CloseButton3D

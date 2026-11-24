@@ -1,95 +1,109 @@
 /**
  * ============================================================================
- * WALIPINTAR PWA SERVICE WORKER (sw.js)
+ * WALIPINTAR PWA SERVICE WORKER (service-worker.js)
  * ============================================================================
- * Cache-First Strategy untuk Offline Play tanpa Kuota Internet.
- * Hanya dipasang dan diaktifkan setelah pembeli berhasil login lisensi.
+ * CACHE_NAME mengikuti versi terkunci: "walipintar-[versi-terkunci]"
+ * Cache lama tidak dihapus sebelum cache baru selesai ter-download.
  * ============================================================================
  */
 
-const CACHE_NAME = 'walipintar-cache-v1';
+const LOCKED_VERSION = 'v.1.0.1';
+const CACHE_NAME = 'walipintar-' + LOCKED_VERSION;
 
-// Daftar asset inti yang dicache untuk mode offline
-const ASSETS_TO_CACHE = [
+const CORE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/Satpam.js',
-  '/assets/aistudio/Wali_Pintar_Family_Education_Badge_aebad423.png',
-  '/main/edu.html',
-  '/main/coloring.html',
-  '/smart/alphabet.html'
+  '/icon.svg',
+  '/favicon.ico',
+  '/apple-touch-icon.png',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png',
+  '/pwa-maskable-512x512.png',
 ];
 
-// 1. Install Event: Mengunduh dan menyimpan semua asset ke Cache Storage
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[ServiceWorker] Menyimpan asset ke Cache Storage...');
-      // Lakukan caching resilient (tidak putus jika salah satu sub-asset opsional gagal)
-      for (const asset of ASSETS_TO_CACHE) {
-        try {
-          await cache.add(asset);
-        } catch (err) {
-          console.warn('[ServiceWorker] Opsional asset dilewati:', asset, err);
-        }
+async function cacheAllAssetsSafely(cacheName, assetList) {
+  const cache = await caches.open(cacheName);
+  const requests = assetList.map((url) => new Request(url, { cache: 'reload' }));
+  const responses = await Promise.all(
+    requests.map(async (req) => {
+      const res = await fetch(req);
+      if (!res || !res.ok) {
+        throw new Error('Gagal mengunduh aset PWA: ' + req.url);
       }
+      return { req, res };
     })
   );
-});
+  await Promise.all(responses.map(({ req, res }) => cache.put(req, res)));
+}
 
-// 2. Activate Event: Menghapus cache versi lama saat ada pembaruan
-self.addEventListener('activate', (event) => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            console.log('[ServiceWorker] Menghapus cache lama:', name);
-            return caches.delete(name);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    cacheAllAssetsSafely(CACHE_NAME, CORE_ASSETS).then(() => self.skipWaiting())
   );
 });
 
-// 3. Fetch Event: Cache-First dengan Network Fallback
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames.map((name) => {
+            if (name.startsWith('walipintar-') && name !== CACHE_NAME) {
+              return caches.delete(name);
+            }
+            return Promise.resolve(false);
+          })
+        )
+      )
+      .then(() => self.clients.claim())
+  );
+});
+
 self.addEventListener('fetch', (event) => {
-  // Hanya intercept request GET (abaikan POST / tracking)
   if (event.request.method !== 'GET') return;
 
-  // Abaikan request API ke Google Script agar verifikasi online tetap real-time
-  if (event.request.url.includes('script.google.com')) {
+  const url = new URL(event.request.url);
+  if (
+    url.hostname.includes('script.google.com') ||
+    url.hostname.includes('script.googleusercontent.com') ||
+    url.pathname.startsWith('/api/')
+  ) {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Aset ditemukan di cache offline!
-        return cachedResponse;
-      }
-
-      // Jika belum di cache, ambil dari network dan simpan ke cache untuk pemakaian berikutnya
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+  if (event.request.mode === 'navigate' || url.pathname === '/manifest.json') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.ok && url.origin === self.location.origin) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
           return networkResponse;
-        }
+        })
+        .catch(() =>
+          caches.match(event.request).then((cached) => cached || caches.match('/index.html'))
+        )
+    );
+    return;
+  }
 
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.ok && networkResponse.type === 'basic') {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
         });
-
-        return networkResponse;
-      }).catch(() => {
-        // Fallback jika offline penuh dan halaman navigasi diminta
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
-    })
-  );
+      })
+    );
+  }
 });

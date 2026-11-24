@@ -271,7 +271,7 @@ export const ParentModal: React.FC<ParentModalProps> = ({
             <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 mx-auto flex items-center justify-center mb-3">
               <Shield className="w-8 h-8" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 mb-1">
+            <h3 className="text-2xl font-black text-slate-900 mb-1 px-10">
               {lang === 'id' ? 'Area Khusus Orang Tua' : 'Parental Gate'}
             </h3>
             <p className="text-sm text-slate-600 mb-6">
@@ -306,9 +306,9 @@ export const ParentModal: React.FC<ParentModalProps> = ({
         ) : (
           /* Parent Dashboard */
           <div className="space-y-5 py-2">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <span className="text-2xl">👨‍👩‍👧</span>
-              <h3 className="text-xl font-black text-slate-900">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 pr-12">
+              <span className="text-2xl shrink-0">👨‍👩‍👧</span>
+              <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-tight">
                 {lang === 'id' ? 'Pengaturan Pendamping Anak' : 'Parental Controls'}
               </h3>
             </div>

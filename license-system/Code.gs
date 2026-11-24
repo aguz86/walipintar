@@ -59,6 +59,7 @@ const TAB_REPORT_SCALEV = 'Report_Scalev';
 const TAB_REPORT_LYNK   = 'lynk_affiliate';
 const TAB_DASHBOARD     = 'Dashboard';
 const TAB_ERROR_LOG     = 'Error_Log';
+const TAB_LOGVERSI      = 'Logversi WPApp';
 
 const DEFAULT_AFFILIATE_COMMISSION_RATE = 20; // Default komisi affiliate 20%
 const EMAIL_RESEND_COOLDOWN_DAYS = 90;       // Kirim ulang email Brevo maksimal 1x per 3 bulan (90 hari)
@@ -261,7 +262,10 @@ function initAllSheets(ss) {
     'Incident Key'
   ], '#991b1b');
 
-  // 3. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
+  // 3. Pastikan tab sumber versi tunggal `Logversi WPApp` tersedia & terisi awal No 0..100
+  ensureLogversiSheet(ss);
+
+  // 4. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
   const legacyLicensesSheet = ss.getSheetByName('Licenses');
   if (legacyLicensesSheet && ss.getSheets().length > 1) {
     ss.deleteSheet(legacyLicensesSheet);
@@ -288,9 +292,9 @@ function onOpen() {
     .addItem('🛠️ Siapkan Semua Tab & Header Sheet', 'menuInitializeTabs')
     .addToUi();
 
-  // Menu 2: Alat Manajemen Admin Lengkap
+  // Menu 2: Alat Manajemen Admin Lengkap (Tetap 1 Menu Broadcast Versi)
   ui.createMenu('🎮 WaliPintar Admin')
-    .addItem('📢 Broadcast Pembaruan / Update Fitur ke Pembeli', 'menuBroadcastUpdate')
+    .addItem('broadcast versi brevo & github', 'menuBroadcastUpdate')
     .addSeparator()
     .addItem('🔄 Tarik & Sinkron Semua Order Scalev API', 'menuSyncScalevOrders')
     .addSeparator()
@@ -370,15 +374,25 @@ function doGet(e) {
       return handleApiBroadcastUpdate(params);
     }
 
-    // G. Scalev Redirect URL (?order_id=...&email=...&nama=...&produk=...)
+    // G. API Versi Terkunci Terbaru dari Sheet `Logversi WPApp`
+    if (action === 'version' || action === 'versi' || action === 'latest_version') {
+      return createJsonResponse(getLatestLockedVersionResponse());
+    }
+
+    // H. Halaman Status HTML Admin (jika diminta eksplisit)
+    if (action === 'status') {
+      return renderServerStatusPage();
+    }
+
+    // I. Scalev Redirect URL (?order_id=...&email=...&nama=...&produk=...)
     //    ATAU Frontend Claim (`?action=create&email=...` / `?action=claim`)
     const hasScalevParams = Boolean(params.order_id || params.email || params.nama || params.produk);
     if (action === 'create' || action === 'claim' || (!action && hasScalevParams)) {
       return handleScalevOrder(params);
     }
 
-    // H. Dibuka langsung di browser tanpa parameter: Tampilkan halaman status API
-    return renderServerStatusPage();
+    // J. Default doGet(): Return JSON versi terkunci terbaru dari `Logversi WPApp`
+    return createJsonResponse(getLatestLockedVersionResponse());
 
   } catch (err) {
     Logger.log('Error doGet: ' + err.toString());
@@ -2063,10 +2077,11 @@ function handleApiBroadcastUpdate(params) {
     return createJsonResponse({ success: false, message: 'Akses ditolak: Kunci rahasia admin salah.' });
   }
 
-  const versi = String(params.versi || 'v2.6.0').trim();
-  const tanggal = String(params.tanggal || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy')).trim();
+  const latestLocked = getLatestLockedVersionResponse();
+  const versi = String(params.versi || latestLocked.versi || 'v.1.0.1').trim();
+  const tanggal = String(params.tanggal || latestLocked.tanggal || formatTanggalIndo(new Date())).trim();
   const jenisPerbaikan = String(params.jenis || params.jenis_perbaikan || 'Pembaruan tampilan & performa game edukatif.').trim();
-  const status = 'Free 100% (Gratis Selamanya untuk Pembeli Resmi)';
+  const status = 'Free / Gratis untuk Pembeli Resmi';
   const rangeParam = String(params.range || '').trim();
   const targetSheetName = String(params.sheet || 'SEMUA').trim();
 
@@ -2080,6 +2095,7 @@ function handleApiBroadcastUpdate(params) {
   for (let i = 0; i < recipients.length; i++) {
     const item = recipients[i];
     const res = sendBrevoBroadcastUpdateEmail(item.email, item.name, item.license, {
+      no: params.no !== undefined ? params.no : latestLocked.no,
       versi: versi,
       tanggal: tanggal,
       jenisPerbaikan: jenisPerbaikan,
@@ -2100,138 +2116,879 @@ function handleApiBroadcastUpdate(params) {
 }
 
 // ============================================================================
-// 📢 FITUR MENU ADMIN: BROADCAST PEMBARUAN / UPDATE FITUR (SCALEV & LYNK)
+// 🔢 SISTEM VERSI OTOMATIS: `Logversi WPApp` + GITHUB PUSH + BREVO PENDING
+// ============================================================================
+const REQUIRED_VERSION_PROP_KEYS = [
+  'GITHUB_TOKEN',
+  'GITHUB_OWNER',
+  'GITHUB_REPO',
+  'GITHUB_BRANCH',
+  'GITHUB_FILE_PATH',
+  'BREVO_API_KEY'
+];
+
+const INDO_MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+/**
+ * Inisialisasi sekali saja 6 key Script Properties wajib (tanpa hardcode kredensial apapun).
+ * Isi nilainya melalui Editor Apps Script > Project Settings (⚙️) > Script Properties.
+ */
+function setupProperties() {
+  const props = PropertiesService.getScriptProperties();
+  const existing = props.getProperties();
+  const toCreate = {};
+
+  REQUIRED_VERSION_PROP_KEYS.forEach(function(key) {
+    if (!(key in existing)) {
+      toCreate[key] = '';
+    }
+  });
+
+  if (Object.keys(toCreate).length > 0) {
+    props.setProperties(toCreate, false);
+  }
+
+  Logger.log('6 key Script Properties siap diisi di Project Settings > Script Properties: ' + REQUIRED_VERSION_PROP_KEYS.join(', '));
+}
+
+function validateSixRequiredProperties() {
+  const props = PropertiesService.getScriptProperties();
+  const config = {};
+
+  for (let i = 0; i < REQUIRED_VERSION_PROP_KEYS.length; i++) {
+    const key = REQUIRED_VERSION_PROP_KEYS[i];
+    const val = String(props.getProperty(key) || '').trim();
+    if (!val) {
+      return {
+        ok: false,
+        missingKey: key,
+        message: key + ' belum diisi di Script Properties'
+      };
+    }
+    config[key] = val;
+  }
+
+  return { ok: true, config: config };
+}
+
+function formatVersionFromNo(no) {
+  const n = parseInt(no, 10);
+  return 'v.1.' + Math.floor(n / 10) + '.' + (n % 10);
+}
+
+function formatTanggalIndo(dateObj) {
+  const d = dateObj || new Date();
+  const day = Utilities.formatDate(d, 'Asia/Jakarta', 'd');
+  const monthIdx = parseInt(Utilities.formatDate(d, 'Asia/Jakarta', 'M'), 10) - 1;
+  const year = Utilities.formatDate(d, 'Asia/Jakarta', 'yyyy');
+  return day + ' ' + (INDO_MONTH_NAMES[monthIdx] || 'Januari') + ' ' + year;
+}
+
+function applyLogversiValidationsAndLocks(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // Validasi Duplikat pada kolom B (Versi)
+  const dupRule = SpreadsheetApp.newDataValidation()
+    .requireFormulaSatisfied('=COUNTIF($B$2:$B,B2)=1')
+    .setAllowInvalid(false)
+    .setHelpText('Versi tidak boleh duplikat dan harus urut v.1.INT(No/10).MOD(No,10).')
+    .build();
+  sheet.getRange(2, 2, lastRow - 1, 1).setDataValidation(dupRule);
+}
+
+function protectLogversiRow(sheet, rowNumber) {
+  try {
+    const protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+    const targetA1 = 'A' + rowNumber + ':K' + rowNumber;
+    for (let i = 0; i < protections.length; i++) {
+      if (protections[i].getRange().getA1Notation() === targetA1) {
+        return;
+      }
+    }
+    const prot = sheet.getRange(rowNumber, 1, 1, 11).protect();
+    prot.setDescription('Terkunci otomatis setelah tanggal versi terisi (Baris ' + rowNumber + ')');
+    prot.setWarningOnly(true);
+  } catch (err) {
+    Logger.log('Info proteksi baris Logversi: ' + err.toString());
+  }
+}
+
+function ensureLogversiSheet(ss) {
+  const headers = [
+    'No',
+    'Versi',
+    'Tanggal',
+    'Yang Diubah',
+    'Status',
+    'Jeda (Menit)',
+    'Waktu Klik',
+    'Waktu Push GitHub',
+    'Waktu Jadwal Kirim Brevo',
+    'Waktu Kirim Brevo',
+    'Terkunci'
+  ];
+
+  const sheet = ensureSheetHeaders(ss, TAB_LOGVERSI, headers, '#065f46');
+
+  if (sheet.getLastRow() <= 1) {
+    const initialDate = formatTanggalIndo(new Date());
+    const rows = [];
+    for (let no = 0; no <= 100; no++) {
+      const sheetRow = no + 2;
+      const formulaVersi = '="v.1."&INT(A' + sheetRow + '/10)&"."&MOD(A' + sheetRow + ',10)';
+      if (no === 0) {
+        rows.push([
+          0,
+          formulaVersi,
+          initialDate,
+          'Rilis awal aplikasi Wali Pintar',
+          'TERKIRIM',
+          '-',
+          '-',
+          '-',
+          '-',
+          initialDate,
+          'TERKUNCI'
+        ]);
+      } else if (no === 1) {
+        rows.push([
+          1,
+          formulaVersi,
+          initialDate,
+          'Pembaruan awal & stabilitas sistem',
+          'TERKIRIM',
+          '-',
+          '-',
+          '-',
+          '-',
+          initialDate,
+          'TERKUNCI'
+        ]);
+      } else {
+        rows.push([no, formulaVersi, '', '', '', '', '', '', '', '', '']);
+      }
+    }
+
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    sheet.getRange(2, 1, rows.length, 1).setNumberFormat('0');
+    sheet.getRange(2, 3, rows.length, 1).setNumberFormat('@');
+    sheet.getRange(2, 1, 2, headers.length).setBackground('#ecfdf5');
+    applyLogversiValidationsAndLocks(sheet);
+    protectLogversiRow(sheet, 2);
+    protectLogversiRow(sheet, 3);
+    SpreadsheetApp.flush();
+  }
+
+  return sheet;
+}
+
+/**
+ * Pengaman anti-edit untuk baris yang tanggalnya sudah terisi & anti-duplikat versi di Sheet `Logversi WPApp`.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    const sheet = e.range.getSheet();
+    if (!sheet || sheet.getName() !== TAB_LOGVERSI) return;
+
+    const row = e.range.getRow();
+    const col = e.range.getColumn();
+    if (row < 2) return;
+
+    const lockVal = String(sheet.getRange(row, 11).getDisplayValue() || '').trim().toUpperCase();
+    const dateVal = String(sheet.getRange(row, 3).getDisplayValue() || '').trim();
+
+    // Cegah edit baris yang sudah terisi tanggalnya / berstatus TERKUNCI
+    if (lockVal === 'TERKUNCI' || (col === 3 && e.oldValue !== undefined && String(e.oldValue).trim() !== '') || (col !== 3 && dateVal !== '')) {
+      e.range.setValue(e.oldValue !== undefined ? e.oldValue : '');
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Baris ini sudah terkunci karena tanggal versi sudah terisi.',
+        '🔒 Terkunci',
+        5
+      );
+      return;
+    }
+
+    // Cegah input versi duplikat di kolom B
+    if (col === 2) {
+      const editedVersi = String(e.range.getDisplayValue() || '').trim();
+      const allVersi = sheet.getRange(2, 2, Math.max(1, sheet.getLastRow() - 1), 1).getDisplayValues();
+      let count = 0;
+      for (let i = 0; i < allVersi.length; i++) {
+        if (String(allVersi[i][0] || '').trim() === editedVersi && editedVersi !== '') {
+          count++;
+        }
+      }
+      if (count > 1) {
+        e.range.setValue(e.oldValue !== undefined ? e.oldValue : '');
+        SpreadsheetApp.getActiveSpreadsheet().toast(
+          'Versi "' + editedVersi + '" sudah ada. Duplikat versi dilarang!',
+          '❌ Duplikat Versi',
+          5
+        );
+      }
+    }
+  } catch (err) {
+    Logger.log('Error onEdit Logversi: ' + err.toString());
+  }
+}
+
+/**
+ * Mengambil data versi terbaru yang tanggalnya sudah terisi (SAH / TERKUNCI) dari Sheet `Logversi WPApp`.
+ */
+function getLatestLockedVersionResponse() {
+  try {
+    const ss = getTargetSpreadsheet();
+    const sheet = ensureLogversiSheet(ss);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return { versi: 'v.1.0.1', no: 1, tanggal: formatTanggalIndo(new Date()) };
+    }
+
+    const values = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+    let latest = null;
+
+    for (let i = 0; i < values.length; i++) {
+      const noRaw = String(values[i][0] || '').trim();
+      const versiRaw = String(values[i][1] || '').trim();
+      const tanggalRaw = String(values[i][2] || '').trim();
+
+      if (noRaw !== '' && versiRaw && tanggalRaw !== '') {
+        const noNum = parseInt(noRaw, 10);
+        if (!isNaN(noNum)) {
+          latest = {
+            versi: versiRaw,
+            no: noNum,
+            tanggal: tanggalRaw
+          };
+        }
+      }
+    }
+
+    if (!latest) {
+      return { versi: 'v.1.0.1', no: 1, tanggal: formatTanggalIndo(new Date()) };
+    }
+    return latest;
+  } catch (err) {
+    Logger.log('Error getLatestLockedVersionResponse: ' + err.toString());
+    return { versi: 'v.1.0.1', no: 1, tanggal: '' };
+  }
+}
+
+/**
+ * Tombol GENERATE 50 VERSI BARU:
+ * Hanya jalan jika semua tanggal di daftar sebelumnya sudah terisi semua.
+ * Melanjutkan dari nomor terakhir + 50, serta mengecek duplikat.
+ */
+function generate50() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = getTargetSpreadsheet();
+  const sheet = ensureLogversiSheet(ss);
+  const lastRow = sheet.getLastRow();
+
+  const existingNos = new Set();
+  const existingVersions = new Set();
+  let emptyDateCount = 0;
+  let maxNo = -1;
+
+  if (lastRow >= 2) {
+    const rows = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+    for (let i = 0; i < rows.length; i++) {
+      const noStr = String(rows[i][0] || '').trim();
+      const verStr = String(rows[i][1] || '').trim();
+      const tglStr = String(rows[i][2] || '').trim();
+
+      if (noStr === '') continue;
+      const noNum = parseInt(noStr, 10);
+      if (!isNaN(noNum)) {
+        existingNos.add(noNum);
+        if (noNum > maxNo) maxNo = noNum;
+      }
+      if (verStr) {
+        existingVersions.add(verStr);
+      }
+      if (tglStr === '') {
+        emptyDateCount++;
+      }
+    }
+  }
+
+  if (emptyDateCount > 0) {
+    ui.alert(
+      '⚠️ Belum Bisa Generate 50 Versi Baru',
+      'Semua tanggal di list sebelumnya harus terisi semua terlebih dahulu.\n\n' +
+      'Sisa versi yang tanggalnya masih kosong: ' + emptyDateCount + ' versi.',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  const startNo = maxNo + 1;
+  const newRows = [];
+  const startSheetRow = lastRow + 1;
+
+  for (let offset = 0; offset < 50; offset++) {
+    const nextNo = startNo + offset;
+    const nextVersi = formatVersionFromNo(nextNo);
+    if (existingNos.has(nextNo) || existingVersions.has(nextVersi)) {
+      ui.alert(
+        '❌ Validasi Duplikat Gagal',
+        'Terdeteksi duplikat nomor/versi pada No ' + nextNo + ' (' + nextVersi + '). Proses dibatalkan.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+    existingNos.add(nextNo);
+    existingVersions.add(nextVersi);
+
+    const targetRowNum = startSheetRow + offset;
+    const formulaVersi = '="v.1."&INT(A' + targetRowNum + '/10)&"."&MOD(A' + targetRowNum + ',10)';
+    newRows.push([nextNo, formulaVersi, '', '', '', '', '', '', '', '', '']);
+  }
+
+  sheet.getRange(startSheetRow, 1, newRows.length, 11).setValues(newRows);
+  sheet.getRange(startSheetRow, 1, newRows.length, 1).setNumberFormat('0');
+  sheet.getRange(startSheetRow, 3, newRows.length, 1).setNumberFormat('@');
+  applyLogversiValidationsAndLocks(sheet);
+  SpreadsheetApp.flush();
+
+  ui.alert(
+    '✅ Berhasil Generate 50 Versi Baru',
+    'Berhasil menambahkan 50 versi berurutan:\n' +
+    '• Mulai: No ' + startNo + ' (' + formatVersionFromNo(startNo) + ')\n' +
+    '• Sampai: No ' + (startNo + 49) + ' (' + formatVersionFromNo(startNo + 49) + ')',
+    ui.ButtonSet.OK
+  );
+}
+
+function getNextUnlockedVersionEntry(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+  const lockedVersions = new Set();
+
+  for (let i = 0; i < rows.length; i++) {
+    const v = String(rows[i][1] || '').trim();
+    const t = String(rows[i][2] || '').trim();
+    if (v && t !== '') lockedVersions.add(v);
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const noRaw = String(rows[i][0] || '').trim();
+    const tglRaw = String(rows[i][2] || '').trim();
+    if (noRaw !== '' && tglRaw === '') {
+      const noNum = parseInt(noRaw, 10);
+      if (isNaN(noNum)) continue;
+      const expectedVersi = formatVersionFromNo(noNum);
+      if (lockedVersions.has(expectedVersi)) {
+        throw new Error('Validasi duplikat: versi ' + expectedVersi + ' sudah pernah terkunci.');
+      }
+      return {
+        rowNumber: i + 2,
+        no: noNum,
+        versi: expectedVersi
+      };
+    }
+  }
+
+  return null;
+}
+
+// ============================================================================
+// 📢 1 MENU SAJA: "broadcast versi brevo & github"
 // ============================================================================
 function menuBroadcastUpdate() {
   const ui = SpreadsheetApp.getUi();
+  const propCheck = validateSixRequiredProperties();
+  if (!propCheck.ok) {
+    ui.alert(
+      '⚠️ Script Properties Belum Lengkap',
+      propCheck.message + '\n\nIsi ke-6 key wajib di Apps Script > Project Settings (⚙️) > Script Properties:\n' +
+      REQUIRED_VERSION_PROP_KEYS.join('\n'),
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
+  const logSheet = ensureLogversiSheet(ss);
 
-  // 1. PILIH TARGET TAB (Scalev_Orders / Lynk_Orders / SEMUA)
-  const tabPrompt = ui.prompt(
-    '📢 Broadcast Pembaruan Fitur (Langkah 1/5: Sumber Pembeli)',
-    'Pilih sumber data pembeli yang ingin dikirimi email pembaruan:\n\n' +
-    '• Ketik "SEMUA" atau kosongkan untuk mengirim ke SEMUA pembeli (Scalev + Lynk)\n' +
-    '• Ketik "SCALEV" untuk pembeli Scalev_Orders saja\n' +
-    '• Ketik "LYNK" untuk pembeli Lynk_Orders saja\n\n' +
-    'Masukkan pilihan Anda:',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (tabPrompt.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('Broadcast dibatalkan.');
+  let nextEntry = null;
+  try {
+    nextEntry = getNextUnlockedVersionEntry(logSheet);
+  } catch (err) {
+    ui.alert('❌ Validasi Versi Gagal', err.message, ui.ButtonSet.OK);
     return;
   }
 
-  const tabChoiceRaw = tabPrompt.getResponseText().trim().toUpperCase();
-  let targetSource = 'SEMUA';
-  if (tabChoiceRaw === 'SCALEV' || tabChoiceRaw === 'SCALEV_ORDERS') targetSource = TAB_SCALEV_ORDERS;
-  else if (tabChoiceRaw === 'LYNK' || tabChoiceRaw === 'LYNK_ORDERS') targetSource = TAB_LYNK_ORDERS;
-
-  // 2. OPSI RENTANG BARIS KOLOM C (JIKA MEMILIH 1 SHEET, ATAU SEMUA BARIS)
-  const rangePrompt = ui.prompt(
-    '📢 Broadcast Pembaruan Fitur (Langkah 2/5: Rentang Baris Kolom C)',
-    'Tentukan rentang baris penerima di Kolom C (Email Pembeli):\n\n' +
-    '• Contoh: "2-10" atau "C2:C25"\n' +
-    '• Ketik "semua" atau kosongkan untuk seluruh pembeli di sumber terpilih:\n\n' +
-    'Masukkan pilihan Anda:',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (rangePrompt.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('Broadcast dibatalkan.');
-    return;
-  }
-  const rangeInput = rangePrompt.getResponseText().trim();
-
-  const recipients = collectBroadcastRecipients(ss, targetSource, rangeInput);
-  if (recipients.length === 0) {
-    ui.alert('❌ Data Kosong', 'Tidak ditemukan alamat email pembeli aktif pada sumber/rentang tersebut.', ui.ButtonSet.OK);
+  if (!nextEntry) {
+    ui.alert(
+      '⚠️ Slot Versi Habis',
+      'Semua baris di sheet "' + TAB_LOGVERSI + '" sudah terisi tanggalnya.\n' +
+      'Jalankan fungsi generate50() terlebih dahulu untuk menambah 50 versi baru.',
+      ui.ButtonSet.OK
+    );
     return;
   }
 
-  // 3. ISIAN NOMOR VERSI APLIKASI
-  const versiPrompt = ui.prompt(
-    '📢 Broadcast Pembaruan Fitur (Langkah 3/5: Versi Aplikasi)',
-    'Masukkan nomor versi aplikasi yang baru:\n(Contoh: v2.6.0):',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (versiPrompt.getSelectedButton() !== ui.Button.OK) return;
-  const versi = versiPrompt.getResponseText().trim() || 'v2.6.0';
+  const now = new Date();
+  const lockedDateText = formatTanggalIndo(now);
+  const serverHour = parseInt(Utilities.formatDate(now, 'Asia/Jakarta', 'H'), 10);
+  const serverMinute = parseInt(Utilities.formatDate(now, 'Asia/Jakarta', 'm'), 10);
+  const activeRecipients = collectBroadcastRecipients(ss, 'SEMUA', '');
 
-  // 4. ISIAN TANGGAL PEMBARUAN
-  const todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
-  const tglPrompt = ui.prompt(
-    '📢 Broadcast Pembaruan Fitur (Langkah 4/5: Tanggal Rilis)',
-    'Masukkan tanggal pembaruan (format DD/MM/YYYY):\n(Klik OK langsung untuk hari ini: ' + todayStr + '):',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (tglPrompt.getSelectedButton() !== ui.Button.OK) return;
-  const tanggal = tglPrompt.getResponseText().trim() || todayStr;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { margin: 0; padding: 16px; background: #f8fafc; color: #0f172a; }
+        .card { background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 16px; padding: 18px; }
+        .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .badge { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 6px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 800; }
+        .locked-date { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 800; margin-bottom: 14px; }
+        label { display: block; font-size: 12.5px; font-weight: 800; color: #1e293b; margin-bottom: 6px; }
+        textarea, input[type="number"] { width: 100%; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 13.5px; color: #0f172a; background: #fff; }
+        textarea:focus, input[type="number"]:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+        .field { margin-bottom: 14px; }
+        .preview { margin-top: 6px; font-size: 12.5px; font-weight: 700; color: #047857; background: #ecfdf5; padding: 7px 10px; border-radius: 8px; border: 1px solid #a7f3d0; }
+        .hint { margin-top: 4px; font-size: 11.5px; color: #64748b; }
+        .btn { width: 100%; padding: 13px 16px; border: none; border-radius: 12px; background: #059669; color: #ffffff; font-size: 14.5px; font-weight: 900; cursor: pointer; text-transform: lowercase; letter-spacing: 0.2px; }
+        .btn:hover { background: #047857; }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .status-box { margin-top: 12px; font-size: 12.5px; font-weight: 700; display: none; padding: 10px 12px; border-radius: 10px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="badge-row">
+          <div class="badge">Versi Baru: ${nextEntry.versi} (No ${nextEntry.no})</div>
+          <div class="badge">Penerima Aktif: ${activeRecipients.length} Pembeli</div>
+        </div>
 
-  // 5. ISIAN JENIS PERBAIKAN / FITUR BARU
-  const jenisPrompt = ui.prompt(
-    '📢 Broadcast Pembaruan Fitur (Langkah 5/5: Jenis Perbaikan)',
-    'Jelaskan jenis perbaikan dan fitur baru yang dirilis:\n(Contoh: Menu mewarnai lebih rapi di HP & Tab, suara A-Z lebih responsif, dan peningkatan performa game edukatif):',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (jenisPrompt.getSelectedButton() !== ui.Button.OK) return;
-  const jenisPerbaikan = jenisPrompt.getResponseText().trim() || 'Pembaruan tampilan visual, optimasi game di HP & tablet, serta peningkatan performa game edukatif.';
+        <div class="locked-date">
+          📅 Tanggal: ${lockedDateText} (Hari Ini - Terkunci)
+        </div>
 
-  const status = 'Free 100% (Gratis Selamanya untuk Pembeli Resmi)';
+        <div class="field">
+          <label for="yangDiubah">Yang Diubah</label>
+          <textarea id="yangDiubah" rows="4" placeholder="Tuliskan daftar perbaikan atau pembaruan fitur versi ${nextEntry.versi}..."></textarea>
+        </div>
 
-  const confirmMsg =
-    '📋 RINGKASAN DATA BROADCAST PEMBARUAN:\n\n' +
-    '• Sumber Data       : ' + targetSource + '\n' +
-    '• Rentang Baris     : ' + (rangeInput || 'Semua') + '\n' +
-    '• Jumlah Penerima   : ' + recipients.length + ' pembeli unik\n' +
-    '• Versi Aplikasi    : ' + versi + '\n' +
-    '• Tanggal Pembaruan : ' + tanggal + '\n' +
-    '• Status Update     : ' + status + '\n' +
-    '• Jenis Perbaikan   : ' + jenisPerbaikan + '\n\n' +
-    '⚠️ Apakah Anda yakin ingin MENGIRIM broadcast email ini ke ' + recipients.length + ' pembeli via Brevo?';
+        <div class="field">
+          <label for="jedaMenit">Jeda Kirim Brevo (menit)</label>
+          <input id="jedaMenit" type="number" min="60" max="360" value="60" oninput="updateSchedulePreview()" />
+          <div id="schedulePreview" class="preview"></div>
+          <div class="hint">Minimal 60 menit, maksimal 360 menit (6 jam). Kosongkan = otomatis 60 menit.</div>
+        </div>
 
-  const confirm = ui.alert('🚀 Konfirmasi Kirim Broadcast', confirmMsg, ui.ButtonSet.YES_NO);
-  if (confirm !== ui.Button.YES) {
-    ui.alert('Pengiriman broadcast dibatalkan.');
-    return;
-  }
+        <button id="submitBtn" type="button" class="btn" onclick="submitBroadcast()">broadcast &amp; push git version</button>
+        <div id="statusBox" class="status-box"></div>
+      </div>
 
-  let successCount = 0;
-  let failCount = 0;
-  const errors = [];
+      <script>
+        var BASE_HOUR = ${serverHour};
+        var BASE_MIN = ${serverMinute};
 
-  for (let i = 0; i < recipients.length; i++) {
-    const item = recipients[i];
-    try {
-      const res = sendBrevoBroadcastUpdateEmail(item.email, item.name, item.license, {
-        versi: versi,
-        tanggal: tanggal,
-        jenisPerbaikan: jenisPerbaikan,
-        status: status
-      });
+        function formatJamFromMinutes(totalMinutes) {
+          var wrapped = ((totalMinutes % 1440) + 1440) % 1440;
+          var hh = String(Math.floor(wrapped / 60)).padStart(2, '0');
+          var mm = String(wrapped % 60).padStart(2, '0');
+          return hh + '.' + mm;
+        }
 
-      if (res.success) successCount++;
-      else {
-        failCount++;
-        errors.push(item.email + ': ' + res.error);
+        function updateSchedulePreview() {
+          var raw = document.getElementById('jedaMenit').value.trim();
+          var jeda = raw === '' ? 60 : Number(raw);
+          var el = document.getElementById('schedulePreview');
+
+          if (isNaN(jeda) || jeda < 60) {
+            el.style.color = '#b91c1c';
+            el.style.background = '#fef2f2';
+            el.style.borderColor = '#fecaca';
+            el.textContent = '⚠️ Minimal 60 menit sejak waktu klik sekarang.';
+            return;
+          }
+          if (jeda > 360) {
+            el.style.color = '#b91c1c';
+            el.style.background = '#fef2f2';
+            el.style.borderColor = '#fecaca';
+            el.textContent = '⚠️ Maksimal 360 menit (6 jam).';
+            return;
+          }
+
+          el.style.color = '#047857';
+          el.style.background = '#ecfdf5';
+          el.style.borderColor = '#a7f3d0';
+          var nowTotal = BASE_HOUR * 60 + BASE_MIN;
+          var targetJam = formatJamFromMinutes(nowTotal + Math.round(jeda));
+          el.textContent = '⏰ Brevo akan terkirim jam ' + targetJam + ' WIB';
+        }
+
+        function submitBroadcast() {
+          var yangDiubah = document.getElementById('yangDiubah').value.trim();
+          if (!yangDiubah) {
+            alert('Isian Yang Diubah wajib diisi!');
+            return;
+          }
+
+          var rawJeda = document.getElementById('jedaMenit').value.trim();
+          var jeda = rawJeda === '' ? 60 : Number(rawJeda);
+          if (isNaN(jeda) || jeda < 60) {
+            alert('Minimal 60 menit');
+            return;
+          }
+          if (jeda > 360) {
+            alert('Maksimal 360 menit');
+            return;
+          }
+
+          var btn = document.getElementById('submitBtn');
+          var statusBox = document.getElementById('statusBox');
+          btn.disabled = true;
+          btn.textContent = 'Memproses push GitHub & kunci Sheet...';
+          statusBox.style.display = 'block';
+          statusBox.style.background = '#eff6ff';
+          statusBox.style.color = '#1e3a8a';
+          statusBox.textContent = 'Menyimpan versi ke Logversi WPApp, push GitHub, dan menjadwalkan trigger Brevo...';
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              statusBox.style.background = '#ecfdf5';
+              statusBox.style.color = '#065f46';
+              statusBox.textContent = '✅ ' + res.message;
+              btn.textContent = 'Selesai';
+              setTimeout(function() {
+                google.script.host.close();
+              }, 2200);
+            })
+            .withFailureHandler(function(err) {
+              btn.disabled = false;
+              btn.textContent = 'broadcast & push git version';
+              statusBox.style.background = '#fef2f2';
+              statusBox.style.color = '#991b1b';
+              statusBox.textContent = '❌ ' + (err && err.message ? err.message : String(err));
+              alert(err && err.message ? err.message : String(err));
+            })
+            .processBroadcastAndPushGit({
+              yangDiubah: yangDiubah,
+              jedaMenit: Math.round(jeda)
+            });
+        }
+
+        updateSchedulePreview();
+      </script>
+    </body>
+    </html>
+  `;
+
+  const output = HtmlService.createHtmlOutput(html).setWidth(480).setHeight(490);
+  ui.showModalDialog(output, 'broadcast versi brevo & github');
+}
+
+function pushManifestVersionToGitHub(config, newVersion) {
+  const token = config.GITHUB_TOKEN;
+  const owner = config.GITHUB_OWNER;
+  const repo = config.GITHUB_REPO;
+  const branch = config.GITHUB_BRANCH;
+  const filePath = config.GITHUB_FILE_PATH.replace(/^\/+/, '');
+
+  const apiUrl =
+    'https://api.github.com/repos/' +
+    encodeURIComponent(owner) +
+    '/' +
+    encodeURIComponent(repo) +
+    '/contents/' +
+    filePath.split('/').map(encodeURIComponent).join('/');
+
+  const headers = {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'WaliPintar-AppsScript'
+  };
+
+  let existingSha = null;
+  let manifestObj = {
+    id: '/',
+    name: 'WaliPintar',
+    short_name: 'WaliPintar',
+    version: newVersion,
+    start_url: '/',
+    scope: '/',
+    display: 'standalone'
+  };
+
+  const getRes = UrlFetchApp.fetch(apiUrl + '?ref=' + encodeURIComponent(branch), {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true
+  });
+  const getCode = getRes.getResponseCode();
+
+  if (getCode === 200) {
+    const getJson = JSON.parse(getRes.getContentText());
+    existingSha = getJson.sha || null;
+    if (getJson.content) {
+      const cleanB64 = String(getJson.content).replace(/\s/g, '');
+      const decodedBytes = Utilities.base64Decode(cleanB64);
+      const rawText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
+      const parsed = JSON.parse(rawText);
+      if (parsed && typeof parsed === 'object') {
+        manifestObj = parsed;
       }
-    } catch (err) {
-      failCount++;
-      errors.push(item.email + ': ' + err.toString());
     }
-    Utilities.sleep(50);
+  } else if (getCode !== 404) {
+    throw new Error('Gagal membaca file GitHub (HTTP ' + getCode + '). Cek GITHUB_OWNER, GITHUB_REPO, GITHUB_BRANCH, dan GITHUB_FILE_PATH.');
   }
 
-  let finalMsg =
-    '🎉 PENGIRIMAN BROADCAST SELESAI!\n\n' +
-    '• Berhasil Terkirim : ' + successCount + ' email pembeli\n' +
-    '• Gagal             : ' + failCount + ' email\n' +
-    '• Total Diproses    : ' + recipients.length + ' email unik';
+  manifestObj.name = manifestObj.name || 'WaliPintar';
+  manifestObj.version = newVersion;
 
-  if (errors.length > 0) {
-    finalMsg += '\n\nDetail error (maks 3):\n' + errors.slice(0, 3).join('\n');
+  const updatedText = JSON.stringify(manifestObj, null, 2) + '\n';
+  const encodedContent = Utilities.base64Encode(updatedText, Utilities.Charset.UTF_8);
+
+  const putPayload = {
+    message: 'Update ke ' + newVersion + ' via tombol broadcast',
+    content: encodedContent,
+    branch: branch
+  };
+  if (existingSha) {
+    putPayload.sha = existingSha;
   }
 
-  ui.alert('✅ Laporan Pengiriman Broadcast', finalMsg, ui.ButtonSet.OK);
+  const putRes = UrlFetchApp.fetch(apiUrl, {
+    method: 'put',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify(putPayload),
+    muteHttpExceptions: true
+  });
+
+  const putCode = putRes.getResponseCode();
+  if (putCode !== 200 && putCode !== 201) {
+    throw new Error('Gagal push ke GitHub (HTTP ' + putCode + '). Periksa izin GITHUB_TOKEN & nama branch.');
+  }
+
+  return Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss') + ' WIB';
+}
+
+/**
+ * Dijalankan langsung saat tombol "broadcast & push git version" di dialog diklik.
+ * Hanya melakukan 2 langkah langsung:
+ * 1) Push update manifest.json ke GitHub
+ * 2) Simpan & kunci baris di `Logversi WPApp` (Status: "PUSH BERHASIL - BREVO PENDING") + pasang Time Trigger jeda Brevo.
+ */
+function processBroadcastAndPushGit(formData) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const propCheck = validateSixRequiredProperties();
+    if (!propCheck.ok) {
+      throw new Error(propCheck.message);
+    }
+    const config = propCheck.config;
+
+    const yangDiubah = String((formData && formData.yangDiubah) || '').trim();
+    if (!yangDiubah) {
+      throw new Error('Isian Yang Diubah tidak boleh kosong.');
+    }
+
+    const rawJeda = formData && formData.jedaMenit !== undefined && formData.jedaMenit !== ''
+      ? Number(formData.jedaMenit)
+      : 60;
+    if (isNaN(rawJeda) || rawJeda < 60) {
+      throw new Error('Minimal 60 menit');
+    }
+    if (rawJeda > 360) {
+      throw new Error('Maksimal 360 menit');
+    }
+    const jedaMenit = Math.round(rawJeda);
+
+    const ss = getTargetSpreadsheet();
+    initAllSheets(ss);
+    const logSheet = ensureLogversiSheet(ss);
+
+    const nextEntry = getNextUnlockedVersionEntry(logSheet);
+    if (!nextEntry) {
+      throw new Error('Tidak ada versi kosong di Logversi WPApp. Jalankan generate50() terlebih dahulu.');
+    }
+
+    const clickTime = new Date();
+    const lockedDateStr = formatTanggalIndo(clickTime);
+    const clickTimeFull = Utilities.formatDate(clickTime, 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss');
+    const clickHHmm = Utilities.formatDate(clickTime, 'Asia/Jakarta', 'HH.mm');
+
+    const schedTime = new Date(clickTime.getTime() + jedaMenit * 60000);
+    const schedHHmm = Utilities.formatDate(schedTime, 'Asia/Jakarta', 'HH.mm');
+
+    // 1. Push GitHub langsung ke manifest.json repo
+    const pushTimeStr = pushManifestVersionToGitHub(config, nextEntry.versi);
+
+    // 2. Simpan ke Sheet Logversi WPApp dan KUNCI baris tersebut
+    const scheduleSummary =
+      'Klik: ' + clickHHmm +
+      ', Jeda: ' + jedaMenit + ' menit' +
+      ', Brevo Dijadwalkan: ' + schedHHmm;
+
+    logSheet.getRange(nextEntry.rowNumber, 3, 1, 9).setValues([[
+      lockedDateStr,
+      yangDiubah,
+      'PUSH BERHASIL - BREVO PENDING',
+      jedaMenit,
+      clickTimeFull,
+      pushTimeStr,
+      scheduleSummary,
+      '(Pending - dijadwalkan ' + schedHHmm + ' WIB)',
+      'TERKUNCI'
+    ]]);
+    logSheet.getRange(nextEntry.rowNumber, 1, 1, 11).setBackground('#fefce8');
+    protectLogversiRow(logSheet, nextEntry.rowNumber);
+    SpreadsheetApp.flush();
+
+    // 3. Jadwalkan Time Trigger otomatis untuk Brevo tepat setelah jeda habis (TIDAK kirim sekarang!)
+    ScriptApp.newTrigger('executePendingBrevoBroadcast')
+      .timeBased()
+      .after(jedaMenit * 60 * 1000)
+      .create();
+
+    return {
+      success: true,
+      versi: nextEntry.versi,
+      no: nextEntry.no,
+      tanggal: lockedDateStr,
+      jedaMenit: jedaMenit,
+      scheduledAt: schedHHmm,
+      message: 'Push GitHub ke ' + nextEntry.versi + ' berhasil & Sheet terkunci! Brevo dijadwalkan terkirim otomatis jam ' + schedHHmm + ' WIB (' + jedaMenit + ' menit lagi).'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Trigger otomatis yang berjalan setelah jeda (60-360 menit) habis untuk mengirim Brevo 1 kali saja.
+ */
+function executePendingBrevoBroadcast() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (e) {
+    return;
+  }
+
+  try {
+    const propCheck = validateSixRequiredProperties();
+    if (!propCheck.ok) {
+      Logger.log('Trigger Brevo ditunda: ' + propCheck.message);
+      return;
+    }
+
+    const ss = getTargetSpreadsheet();
+    initAllSheets(ss);
+    const logSheet = ensureLogversiSheet(ss);
+    const lastRow = logSheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const rows = logSheet.getRange(2, 1, lastRow - 1, 11).getDisplayValues();
+    const nowMs = Date.now();
+    let stillHasFuturePending = false;
+
+    for (let i = 0; i < rows.length; i++) {
+      const rowNum = i + 2;
+      const no = String(rows[i][0] || '').trim();
+      const versi = String(rows[i][1] || '').trim();
+      const tanggal = String(rows[i][2] || '').trim();
+      const yangDiubah = String(rows[i][3] || '').trim();
+      const status = String(rows[i][4] || '').trim();
+      const jedaMenit = parseInt(String(rows[i][5] || '60').trim(), 10) || 60;
+      const waktuKlikStr = String(rows[i][6] || '').replace(' WIB', '').trim();
+
+      if (status !== 'PUSH BERHASIL - BREVO PENDING' || !tanggal) continue;
+
+      let scheduledMs = 0;
+      try {
+        const parsedClick = Utilities.parseDate(waktuKlikStr, 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss');
+        scheduledMs = parsedClick.getTime() + jedaMenit * 60000;
+      } catch (parseErr) {
+        scheduledMs = 0;
+      }
+
+      // Jangan pernah kirim Brevo sebelum jeda habis
+      if (scheduledMs > 0 && nowMs < scheduledMs - 60000) {
+        stillHasFuturePending = true;
+        continue;
+      }
+
+      const recipients = collectBroadcastRecipients(ss, 'SEMUA', '');
+      if (recipients.length === 0) {
+        logSheet.getRange(rowNum, 5).setValue('GAGAL KIRIM BREVO: Tidak ada penerima aktif');
+        continue;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      let firstError = '';
+
+      for (let r = 0; r < recipients.length; r++) {
+        const item = recipients[r];
+        const res = sendBrevoBroadcastUpdateEmail(item.email, item.name, item.license, {
+          no: no,
+          versi: versi,
+          tanggal: tanggal,
+          jenisPerbaikan: yangDiubah,
+          status: 'Free / Gratis untuk Pembeli Resmi'
+        });
+
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+          if (!firstError) firstError = String(res.error || 'Gagal kirim Brevo');
+        }
+        Utilities.sleep(50);
+      }
+
+      if (failCount === 0 && successCount > 0) {
+        const sentTimeStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss') + ' WIB';
+        logSheet.getRange(rowNum, 5).setValue('TERKIRIM');
+        logSheet.getRange(rowNum, 10).setValue(sentTimeStr);
+        logSheet.getRange(rowNum, 1, 1, 11).setBackground('#ecfdf5');
+      } else {
+        logSheet.getRange(rowNum, 5).setValue('GAGAL KIRIM BREVO (' + failCount + ' gagal): ' + firstError.slice(0, 120));
+        logSheet.getRange(rowNum, 1, 1, 11).setBackground('#fef2f2');
+        try {
+          recordErrorLog(ss, {
+            incidentKey: 'BREVO_BROADCAST_' + versi,
+            source: 'BREVO_BROADCAST',
+            message: 'Gagal kirim Brevo ' + versi + ': ' + firstError,
+            detail: 'Terkirim: ' + successCount + ', Gagal: ' + failCount
+          });
+        } catch (e) {}
+      }
+      SpreadsheetApp.flush();
+    }
+
+    // Bersihkan trigger lama agar tidak kirim ulang / menumpuk
+    if (!stillHasFuturePending) {
+      const triggers = ScriptApp.getProjectTriggers();
+      for (let t = 0; t < triggers.length; t++) {
+        if (triggers[t].getHandlerFunction() === 'executePendingBrevoBroadcast') {
+          ScriptApp.deleteTrigger(triggers[t]);
+        }
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function collectBroadcastRecipients(ss, targetSource, rangeInput) {
@@ -2295,12 +3052,12 @@ function collectBroadcastRecipients(ss, targetSource, rangeInput) {
 }
 
 function sendBrevoBroadcastUpdateEmail(toEmail, customerName, licenseKey, updateData) {
-  const apiKey = getScriptProp('BREVO_API_KEY', BREVO_API_KEY);
+  const apiKey = String(PropertiesService.getScriptProperties().getProperty('BREVO_API_KEY') || '').trim();
   if (!apiKey) {
-    return { success: false, error: 'BREVO_API_KEY belum diisi di Properti Skrip GAS.' };
+    return { success: false, error: 'BREVO_API_KEY belum diisi di Script Properties' };
   }
 
-  const subject = '🎉 Update Aplikasi ' + BRAND_NAME + ' (' + updateData.versi + '): Pembaruan Tampilan & Fitur (100% Gratis)';
+  const subject = 'WALI PINTAR UPDATE ' + updateData.versi + ' - ' + updateData.jenisPerbaikan;
   const htmlContent = generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData);
   const recipientName = customerName && customerName.trim() && customerName.trim() !== '-' ? customerName.trim() : 'Ayah & Bunda Hebat';
 
@@ -3907,64 +4664,64 @@ function generateUpdateBroadcastHtmlEmail(customerName, licenseKey, updateData) 
     ? 'Halo Bunda / Ayah ' + customerName.trim() + '! 👋'
     : 'Halo Ayah & Bunda Hebat! 👋';
   const playUrl = licenseKey ? APP_URL + '/?key=' + encodeURIComponent(licenseKey) : APP_URL;
+  const noText = updateData.no !== undefined && updateData.no !== '' ? String(updateData.no) : '-';
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; background-color: #f8fafc; padding: 24px; border-radius: 24px; color: #1e293b; border: 1px solid #e2e8f0;">
       <div style="text-align: center; margin-bottom: 20px;">
         <img src="${LOGO_URL}" width="80" height="80" alt="${BRAND_NAME}" style="display: block; margin: 0 auto 12px auto; width: 80px; height: 80px; border-radius: 20px; border: 3px solid #bbf7d0; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18); object-fit: cover;" />
         <span style="display: inline-block; background-color: #dcfce7; color: #166534; font-size: 11px; font-weight: 800; padding: 5px 14px; border-radius: 999px; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px;">
-          ✨ UPDATE TERBARU &bull; FREE 100%
+          ✨ UPDATE TERBARU &bull; FREE / GRATIS UNTUK PEMBELI RESMI
         </span>
         <h1 style="color: #065f46; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px;">🌱 ${BRAND_NAME}</h1>
-        <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Pemberitahuan Resmi Pembaruan Aplikasi &amp; Peningkatan Fitur</p>
       </div>
 
       <div style="background-color: #ffffff; padding: 26px 22px; border-radius: 20px; border: 2px solid #e2e8f0; box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.05);">
         <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 800;">${greeting}</h2>
-        <p style="color: #475569; font-size: 13.5px; line-height: 1.6; margin-bottom: 18px;">
-          Kabar gembira! Tim <strong>${BRAND_NAME}</strong> baru saja merilis pembaruan resmi untuk meningkatkan kenyamanan dan kualitas belajar si kecil. Seluruh pembaruan ini diberikan <strong>GRATIS 100%</strong> tanpa biaya tambahan.
+        <p style="color: #334155; font-size: 14px; line-height: 1.65; margin-bottom: 18px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px;">
+          <strong>WALI PINTAR UPDATE ${updateData.versi}</strong> - Perbaikan Ke-${noText}: ${updateData.jenisPerbaikan} - Tanggal: ${updateData.tanggal} - Gak perlu uninstall. Gak perlu login ulang. Cukup klik tombol di email, PWA kamu langsung jadi versi terbaru otomatis.
         </p>
 
-        <!-- TABEL DETAIL PEMBARUAN RAPI -->
+        <!-- TABEL DETAIL PEMBARUAN -->
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; margin: 18px 0; border: 1.5px solid #cbd5e1; border-radius: 12px; overflow: hidden;">
           <thead>
             <tr style="background-color: #065f46; color: #ffffff;">
               <th align="left" style="padding: 11px 14px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #047857; width: 38%;">Keterangan</th>
-              <th align="left" style="padding: 11px 14px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #047857;">Detail Rilis Pembaruan</th>
+              <th align="left" style="padding: 11px 14px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #047857;">Detail Pembaruan</th>
             </tr>
           </thead>
           <tbody style="font-size: 13px; color: #334155;">
             <tr style="background-color: #f8fafc;">
-              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0;">🚀 Versi Aplikasi</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0;">🚀 Versi</td>
               <td style="padding: 10px 14px; font-weight: 800; color: #047857; border-bottom: 1px solid #e2e8f0;">${updateData.versi}</td>
             </tr>
             <tr style="background-color: #ffffff;">
-              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0;">📅 Tanggal Pembaruan</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0;">📅 Tanggal</td>
               <td style="padding: 10px 14px; font-weight: 600; border-bottom: 1px solid #e2e8f0;">${updateData.tanggal}</td>
             </tr>
             <tr style="background-color: #f8fafc;">
-              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0; vertical-align: top;">🛠️ Jenis Perbaikan</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #e2e8f0; vertical-align: top;">🛠️ Yang Diubah</td>
               <td style="padding: 10px 14px; line-height: 1.5; border-bottom: 1px solid #e2e8f0;">${updateData.jenisPerbaikan}</td>
             </tr>
             <tr style="background-color: #ecfdf5;">
               <td style="padding: 10px 14px; font-weight: 700; color: #065f46; border-bottom: 1px solid #a7f3d0;">🎁 Status Update</td>
-              <td style="padding: 10px 14px; font-weight: 900; color: #059669; border-bottom: 1px solid #a7f3d0;">${updateData.status}</td>
+              <td style="padding: 10px 14px; font-weight: 900; color: #059669; border-bottom: 1px solid #a7f3d0;">Free / Gratis untuk Pembeli Resmi</td>
             </tr>
             ${licenseKey ? `
             <tr style="background-color: #ffffff;">
-              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">🔑 Kode Lisensi Anda</td>
+              <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">🔑 Kode Lisensi</td>
               <td style="padding: 10px 14px; font-family: monospace; font-weight: 900; color: #064e3b; letter-spacing: 1px;">${licenseKey}</td>
             </tr>` : ''}
           </tbody>
         </table>
 
-        <!-- TOMBOL UTAMA BUKA APLIKASI VERSI TERBARU -->
+        <!-- TOMBOL UTAMA -->
         <div style="text-align: center; margin: 22px 0 16px 0;">
-          <a href="${playUrl}" target="_blank" style="display: block; background-color: #10b981; color: #ffffff; padding: 15px 24px; border-radius: 14px; font-size: 15.5px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);">
-            🎮 Perbarui Game Sekarang (Gratis)
+          <a href="${playUrl}" target="_blank" style="display: block; background-color: #10b981; color: #ffffff; padding: 16px 24px; border-radius: 14px; font-size: 16px; font-weight: 900; text-decoration: none; text-align: center; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);">
+            Perbarui Game Sekarang (Gratis)
           </a>
           <span style="font-size: 11.5px; color: #64748b; margin-top: 8px; display: block; font-weight: 600;">
-            *Klik tombol di atas untuk membuka <a href="${APP_URL}" target="_blank" style="color: #059669; text-decoration: underline; font-weight: 800;">walipintar.my.id</a> dan otomatis menikmati game versi terbaru.
+            Klik tombol di atas untuk membuka PWA resmi Wali Pintar dan otomatis menikmati versi terbaru.
           </span>
         </div>
 
@@ -4474,22 +5231,20 @@ function maskSecretValue(val) {
 
 function menuCheckScriptProperties() {
   const props = PropertiesService.getScriptProperties();
-  const rawSenderEmail = String(props.getProperty('BREVO_SENDER_EMAIL') || '').trim();
-  const rawSenderName = String(props.getProperty('BREVO_SENDER_NAME') || '').trim();
-  const rawDevEmail = String(props.getProperty('DEVELOPER_EMAIL') || '').trim();
-  const rawStrictSig = String(props.getProperty('STRICT_LYNK_SIGNATURE') || '').trim();
+  const ghOwner = String(props.getProperty('GITHUB_OWNER') || '').trim();
+  const ghRepo = String(props.getProperty('GITHUB_REPO') || '').trim();
+  const ghBranch = String(props.getProperty('GITHUB_BRANCH') || '').trim();
+  const ghPath = String(props.getProperty('GITHUB_FILE_PATH') || '').trim();
 
   const summary =
-    '📋 STATUS PROPERTI SKRIP GAS (Project Settings ⚙️ > Properti Skrip)\n\n' +
-    '1. BREVO_API_KEY: ' + maskSecretValue(props.getProperty('BREVO_API_KEY')) + '\n' +
-    '2. BREVO_SENDER_NAME: ' + (rawSenderName ? '✅ ' + rawSenderName : 'ℹ️ Belum diset (pakai default: ' + BREVO_SENDER_NAME + ')') + '\n' +
-    '3. BREVO_SENDER_EMAIL: ' + (rawSenderEmail ? '✅ ' + rawSenderEmail : 'ℹ️ Belum diset (pakai default: ' + BREVO_SENDER_EMAIL + ')') + '\n' +
-    '4. DEVELOPER_EMAIL: ' + (rawDevEmail ? '✅ ' + rawDevEmail : '⚠️ Belum diisi (Wajib untuk terima email Error_Log!)') + '\n' +
-    '5. MERCHANT_KEY (Lynk): ' + maskSecretValue(props.getProperty('MERCHANT_KEY')) + '\n' +
-    '6. SCALEV_API_KEY: ' + maskSecretValue(props.getProperty('SCALEV_API_KEY')) + '\n' +
-    '7. ADMIN_SECRET_KEY: ' + maskSecretValue(props.getProperty('ADMIN_SECRET_KEY')) + '\n' +
-    '8. STRICT_LYNK_SIGNATURE: ' + (rawStrictSig || 'false (default)') + '\n\n' +
-    '💡 Semua nilai di atas cukup diatur dari menu Properti Skrip GAS — tanpa perlu edit kode manual.';
+    '📋 STATUS 6 PROPERTI SKRIP WAJIB (Project Settings ⚙️ > Script Properties)\n\n' +
+    '1. GITHUB_TOKEN: ' + maskSecretValue(props.getProperty('GITHUB_TOKEN')) + '\n' +
+    '2. GITHUB_OWNER: ' + (ghOwner ? '✅ ' + ghOwner : '❌ Belum diisi') + '\n' +
+    '3. GITHUB_REPO: ' + (ghRepo ? '✅ ' + ghRepo : '❌ Belum diisi') + '\n' +
+    '4. GITHUB_BRANCH: ' + (ghBranch ? '✅ ' + ghBranch : '❌ Belum diisi') + '\n' +
+    '5. GITHUB_FILE_PATH: ' + (ghPath ? '✅ ' + ghPath : '❌ Belum diisi') + '\n' +
+    '6. BREVO_API_KEY: ' + maskSecretValue(props.getProperty('BREVO_API_KEY')) + '\n\n' +
+    '💡 Token & API Key tidak pernah ditulis di kode atau log. Cukup ubah di Script Properties bila diganti.';
 
   SpreadsheetApp.getUi().alert('⚙️ Status Properti Skrip GAS', summary, SpreadsheetApp.getUi().ButtonSet.OK);
 }

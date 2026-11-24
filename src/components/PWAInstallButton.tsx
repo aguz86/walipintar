@@ -9,6 +9,35 @@ interface PWAInstallButtonProps {
   variant?: 'compact' | 'footer';
 }
 
+const AFFILIATE_WA_URL =
+  'https://wa.me/6288807839599?text=' +
+  encodeURIComponent('halo min saya mau daftar Affliate, gimana ya caranya?');
+
+const RupiahFavicon: React.FC<{ className?: string }> = ({ className = 'w-5 h-4' }) => (
+  <svg
+    viewBox="0 0 32 22"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="1" y="2" width="30" height="18" rx="3" fill="#DCFCE7" stroke="#006A4E" strokeWidth="1.8" />
+    <rect x="3.5" y="4.5" width="25" height="13" rx="1.8" stroke="#16A34A" strokeWidth="1" strokeDasharray="2 1.5" />
+    <circle cx="24.5" cy="11" r="4" fill="#FACC15" stroke="#B45309" strokeWidth="1" />
+    <text
+      x="11.5"
+      y="14.2"
+      textAnchor="middle"
+      fill="#006A4E"
+      fontSize="9.5"
+      fontWeight="900"
+      fontFamily="system-ui, -apple-system, sans-serif"
+    >
+      Rp
+    </text>
+  </svg>
+);
+
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   className = '',
   lang = 'id',
@@ -98,7 +127,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         />
 
         <div className="text-4xl mb-3">🍏</div>
-        <h3 className="text-xl font-black text-slate-900">
+        <h3 className="text-xl font-black text-slate-900 px-10">
           {lang === 'id' ? 'Pasang di iPhone / iPad' : 'Install on iPhone / iPad'}
         </h3>
 
@@ -198,8 +227,8 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         {showGuide && renderGuideModal()}
       </div>
 
-      {/* Red YouTube Guide Box (1/3 width of the download box above) */}
-      <div className="flex justify-center">
+      {/* Red YouTube Guide Box & Bottle-Green Affiliate WaliPintar Button */}
+      <div className="flex flex-col items-center gap-3">
         <a
           href="https://www.youtube.com/@walipintar/playlists"
           target="_blank"
@@ -212,6 +241,18 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
             </svg>
           </span>
           <span>{lang === 'id' ? 'Panduan YouTube' : 'YouTube Guide'}</span>
+        </a>
+
+        <a
+          href={AFFILIATE_WA_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-2/3 sm:w-1/2 md:w-1/3 px-4 py-3 rounded-2xl bg-[#006A4E] hover:bg-[#00563F] active:scale-98 text-white font-black text-sm md:text-base shadow-md border-2 border-[#024D39] transition-all flex items-center justify-center gap-2.5 whitespace-nowrap"
+        >
+          <span className="w-7 h-5 bg-white rounded-md flex items-center justify-center shrink-0 shadow-2xs">
+            <RupiahFavicon className="w-6 h-4" />
+          </span>
+          <span>Affiliate WaliPintar</span>
         </a>
       </div>
     </div>

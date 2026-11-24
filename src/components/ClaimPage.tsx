@@ -31,6 +31,9 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
   } | null>(null);
   const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+  const redirectTimerRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
   const [copyOnlyKey, setCopyOnlyKey] = useState<string | null>(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -60,10 +63,14 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
       textarea.value = cleanText;
       textarea.setAttribute('readonly', '');
       textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '-9999px';
+      textarea.style.fontSize = '16px';
       textarea.style.opacity = '0';
       document.body.appendChild(textarea);
-      textarea.focus();
+      textarea.focus({ preventScroll: true });
       textarea.select();
+      textarea.setSelectionRange(0, cleanText.length);
       const ok = document.execCommand('copy');
       document.body.removeChild(textarea);
       return ok;
@@ -75,20 +82,6 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
   // Set document title
   useEffect(() => {
     document.title = copyOnlyKey ? 'Salin Kode Lisensi - Wali Pintar' : 'Klaim Lisensi Pembelian - Wali Pintar';
-  }, [copyOnlyKey]);
-
-  // Auto-copy saat dibuka dari tombol email ?action=copy&key=WALI-XXXX
-  useEffect(() => {
-    if (!copyOnlyKey) return;
-    let active = true;
-    copyTextToClipboard(copyOnlyKey).then((ok) => {
-      if (active && ok) {
-        setCopied(true);
-      }
-    });
-    return () => {
-      active = false;
-    };
   }, [copyOnlyKey]);
 
   // Check URL parameters for email & optional order metadata from Thank You Page redirect
@@ -147,6 +140,8 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
         const isCooldown = Boolean(data.cooldownActive || data.copyOnlyPopup || (!data.emailSentNow && data.emailSent === false));
         SFX.fanfare();
+        clearRedirectTimers();
+        setCopied(false);
         setUnpaidModalData(null);
         setPaidModalData({
           email: cleanEmail,
@@ -196,17 +191,48 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     triggerVerification(email);
   };
 
+  const clearRedirectTimers = () => {
+    if (redirectTimerRef.current !== null) {
+      window.clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current !== null) {
+      window.clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setRedirectCountdown(null);
+  };
+
+  useEffect(() => {
+    return () => clearRedirectTimers();
+  }, []);
+
   const handleCopyCode = async (code: string) => {
     const cleanCode = code.trim().toUpperCase();
     const ok = await copyTextToClipboard(cleanCode);
     if (ok) {
       SFX.ding();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      try {
+        localStorage.setItem('walipintar_license', cleanCode);
+        localStorage.setItem('walipintar_auth_time', Date.now().toString());
+      } catch {
+        // Ignore storage error
+      }
+      clearRedirectTimers();
+      setRedirectCountdown(2);
+      countdownIntervalRef.current = window.setInterval(() => {
+        setRedirectCountdown((prev) => (prev !== null && prev > 1 ? prev - 1 : prev));
+      }, 1000);
+      redirectTimerRef.current = window.setTimeout(() => {
+        clearRedirectTimers();
+        onUnlockSuccess(cleanCode);
+      }, 2000);
     }
   };
 
   const handlePlayNow = (license: string) => {
+    clearRedirectTimers();
     onUnlockSuccess(license);
   };
 
@@ -251,7 +277,11 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
             {copied ? (
               <>
                 <Check className="w-5 h-5 stroke-[2.75]" />
-                <span>Kode Lisensi Tersalin!</span>
+                <span>
+                  {redirectCountdown !== null
+                    ? `Tersalin! Masuk Game (${redirectCountdown}d)...`
+                    : 'Kode Lisensi Tersalin!'}
+                </span>
               </>
             ) : (
               <>
@@ -263,7 +293,16 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
 
           {copied && (
             <p className="mt-3 text-xs font-bold text-emerald-700">
-              Kode <span className="font-mono underline">{copyOnlyKey}</span> sudah tersalin ke clipboard.
+              {redirectCountdown !== null ? (
+                <>
+                  Kode <span className="font-mono underline">{copyOnlyKey}</span> tersalin! Membuka game otomatis dalam{' '}
+                  <span className="font-black text-emerald-900">{redirectCountdown} detik</span>...
+                </>
+              ) : (
+                <>
+                  Kode <span className="font-mono underline">{copyOnlyKey}</span> sudah tersalin ke clipboard.
+                </>
+              )}
             </p>
           )}
         </div>
@@ -441,7 +480,10 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl text-center border-4 border-emerald-400 relative animate-scale-in">
             <CloseButton3D
-              onClick={() => setPaidModalData(null)}
+              onClick={() => {
+                clearRedirectTimers();
+                setPaidModalData(null);
+              }}
               size="sm"
               ariaLabel="Tutup"
               className="absolute top-3.5 right-3.5 z-10"
@@ -491,7 +533,11 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                   {copied ? (
                     <>
                       <Check className="w-4 h-4 stroke-[2.75]" />
-                      <span>Kode Lisensi Tersalin!</span>
+                      <span>
+                        {redirectCountdown !== null
+                          ? `Tersalin! Masuk Game dalam ${redirectCountdown} detik...`
+                          : 'Kode Lisensi Tersalin!'}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -524,18 +570,23 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                   Alhamdulillah! Pembayaran resmi Anda telah terkonfirmasi lunas. Lisensi resmi si kecil siap digunakan.
                 </p>
 
-                <div className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3">
+                <div
+                  onClick={() => handleCopyCode(paidModalData.license)}
+                  className="bg-emerald-50 border-2 border-dashed border-emerald-400 rounded-2xl p-3 mb-3 cursor-pointer hover:bg-emerald-100/60 transition-colors"
+                  title="Klik untuk menyalin kode lisensi"
+                >
                   <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Kode Lisensi Resmi Anda:</div>
-                  <div
-                    onClick={() => handleCopyCode(paidModalData.license)}
-                    className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1 select-all cursor-pointer"
-                    title="Klik untuk menyalin kode lisensi"
-                  >
+                  <div className="font-mono text-2xl font-black text-emerald-900 tracking-wider my-1 select-all">
                     {paidModalData.license}
                   </div>
                   {paidModalData.orderId && (
                     <div className="text-[11px] text-slate-500 font-semibold">
                       Order ID: {paidModalData.orderId}
+                    </div>
+                  )}
+                  {redirectCountdown !== null && (
+                    <div className="mt-2 text-[11px] font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-1 rounded-lg inline-block animate-pulse">
+                      ✅ Tersalin! Membuka game dalam {redirectCountdown} detik...
                     </div>
                   )}
                 </div>
@@ -579,7 +630,11 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                   onClick={() => handleCopyCode(paidModalData.license)}
                   className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
                 >
-                  {copied ? '✅ Berhasil Disalin!' : '📋 Salin Kode Lisensi'}
+                  {copied
+                    ? redirectCountdown !== null
+                      ? `✅ Tersalin! Masuk Game dalam ${redirectCountdown} detik...`
+                      : '✅ Berhasil Disalin!'
+                    : '📋 Salin Kode Lisensi'}
                 </button>
               </>
             )}

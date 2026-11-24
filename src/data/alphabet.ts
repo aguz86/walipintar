@@ -81,7 +81,7 @@ export const ALPHABET_LIST: AlphabetItem[] = [
     phonicId: 'C untuk Ceri. C... C... Ceri manis!',
     phonicEn: 'C is for Cherry. /tʃ/ /tʃ/ Cherry!',
     descId: 'Buah ceri merah mungil yang sering menghias kue ulang tahun.',
-    descEn: 'Sweet little red cherries on birthday cakes.',
+    descEn: 'Sweet little red cherries on birthday kue.',
     color: '#ffe4e6',
     examples: [
       { wordId: 'Ceri', wordEn: 'Cherry', emoji: '🍒', phonicId: 'C untuk Ceri merah manis!', phonicEn: 'C for Cherry!' },
