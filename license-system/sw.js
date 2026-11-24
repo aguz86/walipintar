@@ -1,11 +1,11 @@
-// Build-Version: v.1.0.2
+// Build-Version: v.1.0.4 (24/11/2026 21.27.49 WIB)
 /**
  * ============================================================================
  * WALIPINTAR PWA SERVICE WORKER (service-worker.js)
  * ============================================================================
  */
 
-const LOCKED_VERSION = 'v.1.0.2';
+const LOCKED_VERSION = 'v.1.0.4';
 const CACHE_NAME = 'walipintar-' + LOCKED_VERSION;
 
 const CORE_ASSETS = [
