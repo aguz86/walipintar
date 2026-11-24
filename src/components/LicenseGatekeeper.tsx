@@ -17,6 +17,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
   const [isLoading, setIsLoading] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState('');
+  const [isBlockedReject, setIsBlockedReject] = useState(false);
   const [copied, setCopied] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const redirectTimerRef = useRef<number | null>(null);
@@ -34,7 +35,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
     nextEligibleDate?: string;
     remainingDays?: number;
   } | null>(null);
-  const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
+  const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean; isBlocked?: boolean } | null>(null);
 
   const clearRedirectTimers = () => {
     if (redirectTimerRef.current !== null) {
@@ -175,18 +176,26 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         SFX.no();
         setPaidModalData(null);
         const rawMsg = String(data?.message || '');
-        const isNotOrdered = Boolean(
-          data?.notOrdered ||
-          rawMsg.toLowerCase().includes('belum pernah order') ||
-          rawMsg.toLowerCase().includes('tidak ditemukan') ||
-          rawMsg.toLowerCase().includes('not found') ||
-          rawMsg.toLowerCase().includes('ayo beli')
-        );
+        const isBlocked = Boolean(data?.blocked || rawMsg.toLowerCase().includes('terblokir'));
+        const isNotOrdered =
+          !isBlocked &&
+          Boolean(
+            data?.notOrdered ||
+            rawMsg.toLowerCase().includes('belum pernah order') ||
+            rawMsg.toLowerCase().includes('tidak ditemukan') ||
+            rawMsg.toLowerCase().includes('not found') ||
+            rawMsg.toLowerCase().includes('ayo beli')
+          );
 
         setUnpaidModalData({
           email: cleanEmail,
-          message: isNotOrdered ? 'email kamu belum pernah order, ayo beli dulu' : rawMsg,
+          message: isBlocked
+            ? 'Lisensi mu terblokir'
+            : isNotOrdered
+              ? 'email kamu belum pernah order, ayo beli dulu'
+              : rawMsg,
           isNotOrdered,
+          isBlocked,
         });
       }
     } catch (err) {
@@ -201,6 +210,7 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
   };
 
   const validateAndUnlock = async (keyToValidate: string) => {
+    setIsBlockedReject(false);
     let trimmed = keyToValidate.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
     // Smart Assist: Jika pembeli hanya mengetik/copy 4-7 karakter unik tanpa 'WALI-' (misal: 7K9P), otomatis tambahkan prefix
@@ -286,9 +296,13 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
         } else {
           // Ditolak oleh server Google Sheet
           setIsLoading(false);
+          const rawMsg = String(resData?.message || '');
+          const isBlocked = Boolean(resData?.blocked || /terblokir/i.test(rawMsg));
+          setIsBlockedReject(isBlocked);
           setRejectMessage(
-            resData?.message ||
-              'Kode lisensi tidak ditemukan di database Google Sheet atau status belum aktif. Pastikan kode diketik persis sesuai email dari admin@walipintar.my.id.'
+            isBlocked
+              ? 'Lisensi mu terblokir'
+              : (rawMsg || 'Kode lisensi tidak ditemukan di database Google Sheet atau status belum aktif. Pastikan kode diketik persis sesuai email dari admin@walipintar.my.id.')
           );
           setShowRejectModal(true);
           SFX.no();
@@ -915,6 +929,40 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
                   </a>
                 </div>
               </>
+            ) : unpaidModalData.isBlocked ? (
+              /* SKENARIO: LISENSI ATAU EMAIL TERBLOKIR */
+              <>
+                <div className="text-5xl mb-3 animate-bounce">🚫</div>
+                <h3 className="text-xl sm:text-2xl font-black text-rose-950 mb-2 leading-snug break-words">
+                  Lisensi mu terblokir
+                </h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                  Akses untuk email <span className="font-bold text-slate-900 underline">{unpaidModalData.email}</span> telah dihapus atau dinonaktifkan dari sistem. Silakan hubungi Admin WhatsApp jika membutuhkan bantuan.
+                </p>
+
+                <div className="space-y-2">
+                  <a
+                    href={`https://wa.me/6285704808186?text=${encodeURIComponent(
+                      `Halo Admin Wali Pintar, lisensi untuk email ${unpaidModalData.email} terblokir. Mohon bantuannya.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+                    <span>Hubungi Admin WhatsApp (085704808186)</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setUnpaidModalData(null)}
+                    className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Ganti Email Lain
+                  </button>
+                </div>
+              </>
             ) : (
               /* SKENARIO: SUDAH CHECKOUT TAPI BELUM LUNAS */
               <>
@@ -978,11 +1026,13 @@ export const LicenseGatekeeper: React.FC<LicenseGatekeeperProps> = ({ onUnlock }
 
             <div className="text-5xl mb-3 animate-bounce">🚫</div>
             <h3 className="text-xl font-black text-slate-900 mb-1.5">
-              Lisensi Tidak Valid!
+              {isBlockedReject ? 'Lisensi mu terblokir' : 'Lisensi Tidak Valid!'}
             </h3>
             
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-5">
-              {rejectMessage || 'Kode lisensi yang dimasukkan tidak ditemukan atau belum aktif. Pastikan kode diketik sama persis dengan yang dikirimkan ke email Anda.'}
+              {isBlockedReject
+                ? 'Lisensi mu terblokir karena kode lisensi ini telah dihapus atau dinonaktifkan dari sistem. Silakan hubungi Admin WhatsApp jika membutuhkan bantuan.'
+                : (rejectMessage || 'Kode lisensi yang dimasukkan tidak ditemukan atau belum aktif. Pastikan kode diketik sama persis dengan yang dikirimkan ke email Anda.')}
             </p>
 
             <div className="space-y-2.5">

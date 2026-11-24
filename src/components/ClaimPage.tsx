@@ -29,7 +29,7 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     nextEligibleDate?: string;
     remainingDays?: number;
   } | null>(null);
-  const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean } | null>(null);
+  const [unpaidModalData, setUnpaidModalData] = useState<{ email: string; message?: string; isNotOrdered?: boolean; isBlocked?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const redirectTimerRef = useRef<number | null>(null);
@@ -95,8 +95,12 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
       if (urlEmail && urlEmail.includes('@')) {
         setEmail(urlEmail.trim());
         triggerVerification(urlEmail.trim());
-      } else if (savedEmail && savedEmail.includes('@')) {
-        setEmail(savedEmail.trim());
+      } else {
+        if (savedEmail && savedEmail.includes('@')) {
+          setEmail(savedEmail.trim());
+        }
+        // Bangunkan container GAS secara diam-diam saat halaman dibuka agar saat tombol diklik langsung cepat
+        fetch(`${GAS_API_URL}?action=ping&t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
       }
     } catch {
       // Ignore
@@ -111,6 +115,8 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
     }
 
     setIsLoading(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
 
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -126,7 +132,8 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
       if (produkParam && !produkParam.startsWith('{')) query.set('produk', produkParam.trim());
 
       const apiUrl = `${GAS_API_URL}?${query.toString()}`;
-      const res = await fetch(apiUrl);
+      const res = await fetch(apiUrl, { signal: controller.signal, cache: 'no-store' });
+      window.clearTimeout(timeoutId);
       const data = await res.json();
       setIsLoading(false);
 
@@ -161,27 +168,39 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
         SFX.no();
         setPaidModalData(null);
         const rawMsg = String(data?.message || '');
-        const isNotOrdered = Boolean(
-          data?.notOrdered ||
-          rawMsg.toLowerCase().includes('belum pernah order') ||
-          rawMsg.toLowerCase().includes('tidak ditemukan') ||
-          rawMsg.toLowerCase().includes('not found') ||
-          rawMsg.toLowerCase().includes('ayo beli')
-        );
+        const isBlocked = Boolean(data?.blocked || rawMsg.toLowerCase().includes('terblokir'));
+        const isNotOrdered =
+          !isBlocked &&
+          Boolean(
+            data?.notOrdered ||
+              rawMsg.toLowerCase().includes('belum pernah order') ||
+              rawMsg.toLowerCase().includes('tidak ditemukan') ||
+              rawMsg.toLowerCase().includes('not found') ||
+              rawMsg.toLowerCase().includes('ayo beli')
+          );
 
         setUnpaidModalData({
           email: cleanEmail,
-          message: isNotOrdered ? 'email kamu belum pernah order, ayo beli dulu' : rawMsg,
+          message: isBlocked
+            ? 'Lisensi mu terblokir'
+            : isNotOrdered
+              ? 'email kamu belum pernah order, ayo beli dulu'
+              : rawMsg,
           isNotOrdered,
+          isBlocked,
         });
       }
     } catch (err) {
+      window.clearTimeout(timeoutId);
       setIsLoading(false);
       SFX.no();
       setPaidModalData(null);
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
       setUnpaidModalData({
         email: cleanEmail,
-        message: 'Koneksi jaringan bermasalah saat menghubungi server. Pastikan internet Anda aktif lalu coba lagi.',
+        message: isTimeout
+          ? 'Waktu koneksi ke server habis. Silakan klik Periksa Ulang Pembayaran untuk mencoba kembali.'
+          : 'Koneksi jaringan bermasalah saat menghubungi server. Pastikan internet Anda aktif lalu coba lagi.',
       });
     }
   };
@@ -699,6 +718,40 @@ export const ClaimPage: React.FC<ClaimPageProps> = ({ onUnlockSuccess, onNavigat
                     <WhatsAppIcon className="w-3.5 h-3.5 shadow-2xs rounded-full inline-block align-text-bottom mr-1.5" />
                     <span>Sudah bayar dengan email lain? Chat WhatsApp Admin</span>
                   </a>
+                </div>
+              </>
+            ) : unpaidModalData.isBlocked ? (
+              /* SKENARIO: LISENSI ATAU EMAIL TERBLOKIR */
+              <>
+                <div className="text-5xl mb-3 animate-bounce">🚫</div>
+                <h3 className="text-xl sm:text-2xl font-black text-rose-950 mb-2 leading-snug break-words">
+                  Lisensi mu terblokir
+                </h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                  Akses untuk email <span className="font-bold text-slate-900 underline">{unpaidModalData.email}</span> telah dihapus atau dinonaktifkan dari sistem. Silakan hubungi Admin WhatsApp jika membutuhkan bantuan.
+                </p>
+
+                <div className="space-y-2">
+                  <a
+                    href={`https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(
+                      `Halo Admin Wali Pintar, lisensi untuk email ${unpaidModalData.email} terblokir. Mohon bantuannya.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-98"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 shadow-2xs rounded-full" />
+                    <span>Hubungi Admin WhatsApp (0857-0480-8186)</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setUnpaidModalData(null)}
+                    className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Ganti Email Lain
+                  </button>
                 </div>
               </>
             ) : (

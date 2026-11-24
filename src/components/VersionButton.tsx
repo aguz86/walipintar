@@ -6,8 +6,14 @@ const GAS_API_URL =
   'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
 
 const VERSION_STORAGE_KEY = 'walipintar_locked_version';
-const DEFAULT_FALLBACK_VERSION = 'v.1.0.1';
+const DEFAULT_FALLBACK_VERSION = 'v.1.0.2';
 const POLL_INTERVAL_MS = 30000; // Fetch versi terkunci tiap 30 detik
+
+function parseVersionNumber(ver: string): number {
+  const match = /^v\.(\d+)\.(\d+)\.(\d+)$/i.exec(ver.trim());
+  if (!match) return -1;
+  return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+}
 
 interface VersionResponse {
   versi?: string;
@@ -20,7 +26,10 @@ export const VersionButton: React.FC = () => {
     try {
       const saved = localStorage.getItem(VERSION_STORAGE_KEY);
       if (saved && saved.trim() !== '') {
-        return saved.trim();
+        const trimmed = saved.trim();
+        if (parseVersionNumber(trimmed) >= parseVersionNumber(DEFAULT_FALLBACK_VERSION)) {
+          return trimmed;
+        }
       }
     } catch {
       // Ignore storage error

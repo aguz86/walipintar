@@ -1,13 +1,11 @@
+// Build-Version: v.1.0.2
 /**
  * ============================================================================
  * WALIPINTAR PWA SERVICE WORKER (service-worker.js)
  * ============================================================================
- * CACHE_NAME mengikuti versi terkunci: "walipintar-[versi-terkunci]"
- * Cache lama tidak dihapus sebelum cache baru selesai ter-download.
- * ============================================================================
  */
 
-const LOCKED_VERSION = 'v.1.0.1';
+const LOCKED_VERSION = 'v.1.0.2';
 const CACHE_NAME = 'walipintar-' + LOCKED_VERSION;
 
 const CORE_ASSETS = [
@@ -24,7 +22,7 @@ const CORE_ASSETS = [
 
 async function cacheAllAssetsSafely(cacheName, assetList) {
   const cache = await caches.open(cacheName);
-  const requests = assetList.map((url) => new Request(url, { cache: 'reload' }));
+  const requests = assetList.map((url) => new Request(url, { cache: 'no-store' }));
   const responses = await Promise.all(
     requests.map(async (req) => {
       const res = await fetch(req);
@@ -50,7 +48,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames.map((name) => {
-            if (name.startsWith('walipintar-') && name !== CACHE_NAME) {
+            if (name !== CACHE_NAME) {
               return caches.delete(name);
             }
             return Promise.resolve(false);
@@ -61,11 +59,19 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
   if (
+    url.pathname === '/service-worker.js' ||
+    url.pathname === '/sw.js' ||
     url.hostname.includes('script.google.com') ||
     url.hostname.includes('script.googleusercontent.com') ||
     url.pathname.startsWith('/api/')
@@ -73,9 +79,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (event.request.mode === 'navigate' || url.pathname === '/manifest.json') {
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname === '/manifest.webmanifest'
+  ) {
     event.respondWith(
-      fetch(event.request)
+      fetch(new Request(event.request.url, { cache: 'no-store' }))
         .then((networkResponse) => {
           if (networkResponse && networkResponse.ok && url.origin === self.location.origin) {
             const clone = networkResponse.clone();

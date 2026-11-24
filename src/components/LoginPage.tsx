@@ -18,17 +18,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   const [pasteFeedback, setPasteFeedback] = useState<'pasted' | 'blocked' | null>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectMessage, setRejectMessage] = useState('');
+  const [isBlockedReject, setIsBlockedReject] = useState(false);
 
   // Set document title
   useEffect(() => {
     document.title = 'Login Lisensi - Wali Pintar';
   }, []);
 
-  // Auto-detect URL parameter ?key=WALI-XXXX or ?license=
+  // Auto-detect URL parameter ?key=WALI-XXXX or ?license= or ?blocked=1
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlLicense = params.get('license') || params.get('key') || params.get('lisensi');
+      const blockedParam = params.get('blocked');
+
+      if (blockedParam === '1') {
+        setIsBlockedReject(true);
+        setRejectMessage('Lisensi mu terblokir');
+        setShowRejectModal(true);
+      }
 
       if (urlLicense) {
         const cleanKey = urlLicense.trim().toUpperCase();
@@ -41,6 +49,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
   }, []);
 
   const validateAndUnlock = async (keyToValidate: string) => {
+    setIsBlockedReject(false);
     let trimmed = keyToValidate.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
     // Smart Assist: Jika hanya ketik 4 karakter unik tanpa 'WALI-' (misal: 7K9P), otomatis tambahkan prefix
@@ -124,9 +133,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
           return;
         } else {
           setIsLoading(false);
+          const rawMsg = String(resData?.message || '');
+          const isBlocked = Boolean(resData?.blocked || /terblokir/i.test(rawMsg));
+          setIsBlockedReject(isBlocked);
           setRejectMessage(
-            resData?.message ||
-              'Kode lisensi tidak ditemukan di database resmi atau status belum aktif. Silakan cek kembali atau lakukan aktivasi via email jika baru saja membeli.'
+            isBlocked
+              ? 'Lisensi mu terblokir'
+              : (rawMsg || 'Kode lisensi tidak ditemukan di database resmi atau status belum aktif. Silakan cek kembali atau lakukan aktivasi via email jika baru saja membeli.')
           );
           setShowRejectModal(true);
           SFX.no();
@@ -516,11 +529,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onNavigate
 
             <div className="text-5xl mb-3 animate-bounce">🚫</div>
             <h3 className="text-xl font-black text-slate-900 mb-1.5">
-              Lisensi Tidak Valid!
+              {isBlockedReject ? 'Lisensi mu terblokir' : 'Lisensi Tidak Valid!'}
             </h3>
             
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-5">
-              {rejectMessage || 'Kode lisensi yang dimasukkan tidak ditemukan atau belum aktif.'}
+              {isBlockedReject
+                ? 'Lisensi mu terblokir karena kode lisensi ini telah dihapus atau dinonaktifkan dari sistem. Silakan hubungi Admin WhatsApp jika membutuhkan bantuan.'
+                : (rejectMessage || 'Kode lisensi yang dimasukkan tidak ditemukan atau belum aktif.')}
             </p>
 
             <div className="space-y-2.5">

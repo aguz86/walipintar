@@ -57,6 +57,9 @@ interface UserData {
 }
 
 const STORAGE_KEY = 'tbc_kids_v2';
+const GAS_API_URL =
+  (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_GAS_API_URL ||
+  'https://script.google.com/macros/s/AKfycbwRXacMOX7jFffw73voAxPcdgYtu7in5kt7PQ0M7qK3FaaC3YOYm0F9WeQSBcnRFlVG/exec';
 
 export default function App() {
   const [data, setData] = useState<UserData>(() => {
@@ -164,6 +167,52 @@ export default function App() {
       window.scrollTo(0, 0);
     }
   };
+
+  // Background license block check when online (preserves offline mode on network errors)
+  useEffect(() => {
+    if (!activeLicense) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timerId = window.setTimeout(() => controller.abort(), 8000);
+
+    fetch(`${GAS_API_URL}?action=check&license_key=${encodeURIComponent(activeLicense)}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((resData) => {
+        if (cancelled || !resData) return;
+        const isBlocked = Boolean(
+          resData.blocked === true ||
+            (resData.valid === false && /terblokir/i.test(String(resData.message || '')))
+        );
+        if (isBlocked) {
+          try {
+            localStorage.removeItem('walipintar_license');
+          } catch {
+            // Ignore
+          }
+          setActiveLicense(null);
+          setMainCategory(null);
+          setActiveGameId(null);
+          navigate('/login?blocked=1');
+        }
+      })
+      .catch(() => {
+        // Offline / timeout -> keep playing normally
+      })
+      .finally(() => {
+        window.clearTimeout(timerId);
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+      controller.abort();
+    };
+  }, [activeLicense]);
 
   // Listen to popstate (Back/Forward browser buttons)
   useEffect(() => {

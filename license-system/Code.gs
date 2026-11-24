@@ -58,8 +58,10 @@ const TAB_LYNK_ORDERS   = 'Lynk_Orders';
 const TAB_REPORT_SCALEV = 'Report_Scalev';
 const TAB_REPORT_LYNK   = 'lynk_affiliate';
 const TAB_DASHBOARD     = 'Dashboard';
-const TAB_ERROR_LOG     = 'Error_Log';
-const TAB_LOGVERSI      = 'Logversi WPApp';
+const TAB_ERROR_LOG        = 'Error_Log';
+const TAB_LOGVERSI         = 'Logversi WPApp';
+const TAB_BLOCKED_LICENSES = 'Lisensi terblokir';
+const TAB_ORDERS_SNAPSHOT  = '_Snapshot_Orders';
 
 const DEFAULT_AFFILIATE_COMMISSION_RATE = 20; // Default komisi affiliate 20%
 const EMAIL_RESEND_COOLDOWN_DAYS = 90;       // Kirim ulang email Brevo maksimal 1x per 3 bulan (90 hari)
@@ -128,9 +130,10 @@ function ujiCobaSistem_KlikDiSini() {
   generateDashboard(true);
   try {
     setupErrorMonitorTrigger(true);
-    Logger.log('✅ 2. Tab laporan & Dashboard disegarkan + trigger digest Error_Log 18:01 WIB aktif (Auto-Width manual lewat menu).');
+    setupBlockedLicenseMonitorTrigger(true);
+    Logger.log('✅ 2. Tab laporan, Lisensi terblokir & Dashboard disegarkan + trigger monitor aktif.');
   } catch (trigErr) {
-    Logger.log('ℹ️ 2. Tab laporan & Dashboard disegarkan (Auto-Width manual lewat menu). Trigger 18:01 WIB: ' + trigErr.toString());
+    Logger.log('ℹ️ 2. Tab laporan & Dashboard disegarkan. Trigger monitor: ' + trigErr.toString());
   }
 
   if (!getScriptProp('BREVO_API_KEY', BREVO_API_KEY)) {
@@ -262,8 +265,10 @@ function initAllSheets(ss) {
     'Incident Key'
   ], '#991b1b');
 
-  // 3. Pastikan tab sumber versi tunggal `Logversi WPApp` tersedia & terisi awal No 0..100
+  // 3. Pastikan tab sumber versi tunggal `Logversi WPApp` & tab `Lisensi terblokir` tersedia
   ensureLogversiSheet(ss);
+  ensureBlockedLicensesSheet(ss);
+  syncOrderSnapshot(ss);
 
   // 4. Hapus tab legacy `Licenses` jika masih ada agar tidak pernah double-count
   const legacyLicensesSheet = ss.getSheetByName('Licenses');
@@ -274,10 +279,25 @@ function initAllSheets(ss) {
   return { scalevSheet: scalevSheet, lynkSheet: lynkSheet };
 }
 
+/**
+ * Lookup cepat tab order tanpa memformat ulang 7 sheet & snapshot pada setiap API request.
+ */
+function getFastOrderSheets(ss) {
+  const scalevSheet = ss.getSheetByName(TAB_SCALEV_ORDERS);
+  const lynkSheet = ss.getSheetByName(TAB_LYNK_ORDERS);
+  if (!scalevSheet || !lynkSheet) {
+    return initAllSheets(ss);
+  }
+  return { scalevSheet: scalevSheet, lynkSheet: lynkSheet };
+}
+
 // ============================================================================
 // 📋 MENU KHUSUS GOOGLE SHEETS (`📊 Menu Laporan` & `🎮 WaliPintar Admin`)
 // ============================================================================
 function onOpen() {
+  try {
+    syncOrderSnapshot(getTargetSpreadsheet());
+  } catch (e) {}
   const ui = SpreadsheetApp.getUi();
 
   // Menu 1: Laporan Keuangan & Affiliate
@@ -311,6 +331,7 @@ function onOpen() {
     .addSeparator()
     .addItem('⚙️ Cek Status Properti Skrip GAS', 'menuCheckScriptProperties')
     .addItem('⏰ Aktifkan Task Otomatis Error Log (18:01 WIB)', 'menuSetupErrorMonitorTrigger')
+    .addItem('🚫 Aktifkan Auto-Deteksi Hapus Baris ke Lisensi terblokir', 'menuSetupBlockedLicenseMonitorTrigger')
     .addItem('🧪 Test Simulasi Error Log & Kirim ke Gmail', 'menuSimulateErrorLogAndNotify')
     .addItem('🚨 Cek & Kirim Digest Error Log ke Gmail', 'menuRunErrorDigestManual')
     .addItem('🧹 Bersihkan Tab Error_Log Manual', 'menuClearErrorLog')
@@ -326,11 +347,12 @@ function menuInitializeTabs() {
   let trigNote = '';
   try {
     setupErrorMonitorTrigger(true);
-    trigNote = '\nTask otomatis Error_Log (18:01 WIB) juga diaktifkan.';
+    setupBlockedLicenseMonitorTrigger(true);
+    trigNote = '\nTask otomatis Error_Log (18:01 WIB) & pemantau hapus baris ke "Lisensi terblokir" juga diaktifkan.';
   } catch (e) {}
   SpreadsheetApp.getUi().alert(
     '✅ Berhasil',
-    'Semua tab (Scalev_Orders, Lynk_Orders, Report_Scalev, lynk_affiliate, Dashboard, Error_Log) siap.\nGunakan menu "📐 Rapikan Lebar Kolom Semua Sheet (Auto-Width)" bila ingin merapikan lebar kolom manual.' + trigNote,
+    'Semua tab (Scalev_Orders, Lynk_Orders, Lisensi terblokir, Report_Scalev, lynk_affiliate, Dashboard, Error_Log) siap.\nGunakan menu "📐 Rapikan Lebar Kolom Semua Sheet (Auto-Width)" bila ingin merapikan lebar kolom manual.' + trigNote,
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -344,6 +366,11 @@ function doGet(e) {
   const action = String(params.action || '').trim().toLowerCase();
 
   try {
+    // 0. Ping / Warm-up super cepat untuk membangunkan container GAS tanpa menyentuh Sheet
+    if (action === 'ping' || action === 'warmup') {
+      return createJsonResponse({ ok: true, warm: true, ts: Date.now() });
+    }
+
     // A. Cek Lisensi dari Halaman Login / Gatekeeper Web Game (lintas Scalev & Lynk)
     if (action === 'check') {
       return handleLicenseCheck(params);
@@ -414,215 +441,259 @@ function doGet(e) {
   }
 }
 
+function buildExistingOrderSuccessResponse(found, sourceName, emailSentNow, elig) {
+  return createJsonResponse({
+    status: 'success',
+    success: true,
+    isExisting: true,
+    isAlreadyClaimed: true,
+    source: sourceName,
+    license: found.licenseKey,
+    licenseKey: found.licenseKey,
+    orderId: found.orderId,
+    email: found.email,
+    name: found.customerName,
+    emailSent: emailSentNow || !elig.cooldownActive,
+    emailSentNow: emailSentNow,
+    wasBrevoPending: !elig.isResend && elig.allowed,
+    cooldownActive: !emailSentNow && elig.cooldownActive,
+    copyOnlyPopup: !emailSentNow && elig.cooldownActive,
+    resendAllowed: elig.allowed,
+    daysSinceLastEmail: elig.daysSince,
+    remainingDays: elig.remainingDays,
+    cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
+    lastEmailDate: elig.lastEmailDate,
+    nextEligibleDate: elig.nextEligibleDate,
+    message: (!emailSentNow && elig.cooldownActive)
+      ? 'Lisensi aktif ditemukan! Kirim ulang email tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung Copy-Paste kode lisensi Anda.'
+      : (sourceName === 'Scalev'
+          ? 'Alhamdulillah! Pembayaran Anda telah terkonfirmasi. Lisensi siap digunakan!'
+          : 'Alhamdulillah! Pembayaran Anda dari ' + sourceName + ' telah terkonfirmasi. Lisensi siap digunakan!')
+  });
+}
+
+function trySendExistingOrderEmailAndBuildResponse(sheet, found, sourceName, noteCol, notePrefix) {
+  let emailSentNow = false;
+  const elig = evaluateEmailResendEligibility(found.paymentTime, found.catatan);
+  if (elig.allowed && found.email && found.email.includes('@')) {
+    const resendRes = sendEmailBrevo(found.email, found.licenseKey, found.customerName, found.orderId, elig.isResend);
+    if (resendRes.success) {
+      emailSentNow = true;
+      const baseLabel = elig.isResend ? 'TERKIRIM ULANG (Brevo 3-Bulanan)' : 'Email Brevo: TERKIRIM (Auto-Retry)';
+      const noteLabel = notePrefix ? (notePrefix + baseLabel) : baseLabel;
+      sheet.getRange(found.rowIndex, noteCol).setValue(stampEmailSentDate(noteLabel));
+      SpreadsheetApp.flush();
+    }
+  }
+  return buildExistingOrderSuccessResponse(found, sourceName, emailSentNow, elig);
+}
+
+function isPaidPaymentStatus(paymentStatusRaw) {
+  const s = String(paymentStatusRaw || '').trim().toUpperCase();
+  return (
+    s === 'PAID' ||
+    s === 'COMPLETED' ||
+    s === 'SETTLED' ||
+    s === 'SETTLEMENT' ||
+    s === 'SUCCESS' ||
+    s === 'LUNAS'
+  );
+}
+
+function isOrderRecordClaimable(record) {
+  if (!record) return false;
+  const lic = String(record.licenseKey || '').trim().toUpperCase();
+  const status = String(record.status || '').trim().toUpperCase();
+  return lic.startsWith('WALI-') && status === 'ACTIVE' && isPaidPaymentStatus(record.paymentStatus);
+}
+
+function doesFoundOrderMatchCallerEmail(found, callerEmail) {
+  if (!found) return false;
+  if (!callerEmail) return true;
+  const rowEmail = String(found.email || '').trim().toLowerCase();
+  return Boolean(rowEmail && rowEmail === callerEmail);
+}
+
 /**
  * Memproses Order Scalev dari Redirect URL (`doGet`) atau Klaim Frontend (`?action=create`)
+ * Anti-Bypass Ketat:
+ * - Email/order yang pernah diblokir selalu ditolak ("Lisensi mu terblokir").
+ * - Row existing di Sheet hanya sah jika Status Lisensi = ACTIVE DAN Payment Status = PAID/COMPLETED/SETTLED/SUCCESS.
+ * - Order baru WAJIB terverifikasi lunas lewat Scalev API v3 server-side (parameter URL tidak pernah dipercaya mentah).
  */
 function handleScalevOrder(params) {
+  const ss = getTargetSpreadsheet();
+  const sheets = getFastOrderSheets(ss);
+  const scalevSheet = sheets.scalevSheet;
+  const lynkSheet = sheets.lynkSheet;
+
+  let orderId = String(params.order_id || params.orderId || '').trim();
+  let email = String(params.email || params.customer_email || '').trim().toLowerCase();
+  let nama = String(params.nama || params.name || params.customer_name || params.buyer_name || '').trim();
+  let produk = String(params.produk || params.product || params.product_name || '').trim();
+
+  if (orderId.startsWith('{')) orderId = '';
+  if (email.startsWith('{')) email = '';
+  if (nama.startsWith('{')) nama = '';
+  if (produk.startsWith('{')) produk = '';
+
+  let grossRevenue = 0;
+
+  if (!orderId && !email) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      message: 'Parameter order_id atau email wajib diisi.'
+    });
+  }
+
+  // 1. CEK TERBLOKIR PERTAMA (Mencegah email/order terblokir pernah diklaim ulang)
+  const blockedCreateMatch = findBlockedLicenseEntry(ss, '', email, orderId);
+  if (blockedCreateMatch) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      verified: false,
+      blocked: true,
+      email: email || blockedCreateMatch.email,
+      licenseKey: blockedCreateMatch.licenseKey,
+      message: 'Lisensi mu terblokir',
+      adminWaUrl: 'https://wa.me/' + ADMIN_WA + '?text=' + encodeURIComponent(
+        'Halo Admin ' + BRAND_NAME + ', lisensi saya (' + (blockedCreateMatch.licenseKey || email) + ') terblokir. Mohon bantuannya.'
+      )
+    });
+  }
+
+  // 2. CEK EXISTING DI Scalev_Orders & Lynk_Orders (WAJIB ACTIVE + PAID + email cocok)
+  const existingScalev = findExistingOrder(scalevSheet, orderId, email);
+  if (isOrderRecordClaimable(existingScalev) && doesFoundOrderMatchCallerEmail(existingScalev, email)) {
+    return trySendExistingOrderEmailAndBuildResponse(scalevSheet, existingScalev, 'Scalev', existingScalev.noteCol || 9, '');
+  }
+
+  if (lynkSheet) {
+    const foundLynk = findExistingOrder(lynkSheet, orderId, email);
+    if (isOrderRecordClaimable(foundLynk) && doesFoundOrderMatchCallerEmail(foundLynk, email)) {
+      return trySendExistingOrderEmailAndBuildResponse(lynkSheet, foundLynk, 'Lynk.id', foundLynk.noteCol || 11, 'Webhook Lynk.id | ');
+    }
+  }
+
+  // 3. ANTI-BYPASS MUTLAK: Setiap order/email baru WAJIB lolos verifikasi lunas di Scalev API v3
+  if (!SCALEV_API_KEY) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      verified: false,
+      notOrdered: true,
+      email: email,
+      message: 'email kamu belum pernah order, ayo beli dulu'
+    });
+  }
+
+  let paymentTime = new Date();
+  let scalevVerify = verifyScalevPayment(email || orderId);
+
+  // Jika pencarian awal memakai email gagal tapi orderId tersedia (misal Thank You Page redirect), cek ulang by orderId lalu cocokkan email
+  if ((!scalevVerify || !scalevVerify.verified) && orderId && email) {
+    const byOrderVerify = verifyScalevPayment(orderId);
+    if (byOrderVerify && byOrderVerify.verified) {
+      const apiEmail = String(byOrderVerify.customerEmail || '').trim().toLowerCase();
+      if (!apiEmail || apiEmail === email) {
+        scalevVerify = byOrderVerify;
+      }
+    }
+  }
+
+  if (!scalevVerify || !scalevVerify.verified) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      verified: false,
+      notOrdered: Boolean(!scalevVerify || scalevVerify.notOrdered),
+      email: email,
+      orderId: orderId,
+      grossRevenue: (scalevVerify && scalevVerify.grossRevenue) || 0,
+      paymentStatus: (scalevVerify && scalevVerify.paymentStatus) || 'unpaid',
+      message: (!scalevVerify || scalevVerify.notOrdered)
+        ? 'email kamu belum pernah order, ayo beli dulu'
+        : (scalevVerify.message || 'Pembayaran belum terkonfirmasi lunas.')
+    });
+  }
+
+  // Selalu gunakan data resmi dari Scalev API (bukan dari URL parameter agar tidak bisa dipalsukan)
+  orderId = scalevVerify.officialOrderId || orderId || ('SCLV-' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMddHHmmss'));
+  if (scalevVerify.customerEmail) {
+    const verifiedEmail = String(scalevVerify.customerEmail).trim().toLowerCase();
+    if (email && email !== verifiedEmail) {
+      return createJsonResponse({
+        status: 'error',
+        success: false,
+        verified: false,
+        notOrdered: true,
+        email: email,
+        message: 'email kamu belum pernah order, ayo beli dulu'
+      });
+    }
+    email = verifiedEmail;
+  }
+  nama = nama || scalevVerify.customerName || '-';
+  grossRevenue = scalevVerify.grossRevenue > 0 ? scalevVerify.grossRevenue : 0;
+  if (scalevVerify.paymentTime) paymentTime = new Date(scalevVerify.paymentTime);
+
+  if (!email || !email.includes('@')) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      message: 'Alamat email pembeli valid diperlukan untuk pengiriman lisensi resmi.'
+    });
+  }
+
+  // Cek ulang daftar blokir menggunakan official email/orderId hasil verifikasi Scalev
+  const postVerifyBlocked = findBlockedLicenseEntry(ss, '', email, orderId);
+  if (postVerifyBlocked) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      verified: false,
+      blocked: true,
+      email: email,
+      licenseKey: postVerifyBlocked.licenseKey,
+      message: 'Lisensi mu terblokir',
+      adminWaUrl: 'https://wa.me/' + ADMIN_WA + '?text=' + encodeURIComponent(
+        'Halo Admin ' + BRAND_NAME + ', lisensi saya (' + (postVerifyBlocked.licenseKey || email) + ') terblokir. Mohon bantuannya.'
+      )
+    });
+  }
+
+  // 4. KUNCI HANYA SAAT AKAN MENULIS ORDER BARU KE SHEET
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(30000);
+    lock.waitLock(12000);
   } catch (lockErr) {
     return createJsonResponse({
       status: 'error',
       success: false,
-      message: 'Server sedang sibuk memproses pesanan lain. Silakan muat ulang dalam beberapa detik.'
+      message: 'Server sedang sibuk memproses pesanan lain. Silakan coba lagi beberapa detik lagi.'
     });
   }
 
   try {
-    const ss = getTargetSpreadsheet();
-    const sheets = initAllSheets(ss);
-    const scalevSheet = sheets.scalevSheet;
-    const lynkSheet = sheets.lynkSheet;
-
-    let orderId = String(params.order_id || params.orderId || '').trim();
-    let email = String(params.email || params.customer_email || '').trim().toLowerCase();
-    let nama = String(params.nama || params.name || params.customer_name || params.buyer_name || '').trim();
-    let produk = String(params.produk || params.product || params.product_name || '').trim();
-    let rawRevenue = params.gross_revenue || params.total || params.amount || params.harga || 0;
-
-    if (orderId.startsWith('{')) orderId = '';
-    if (email.startsWith('{')) email = '';
-    if (nama.startsWith('{')) nama = '';
-    if (produk.startsWith('{')) produk = '';
-
-    let grossRevenue = parseRevenueNumber(rawRevenue);
-
-    if (!orderId && !email) {
-      return createJsonResponse({
-        status: 'error',
-        success: false,
-        message: 'Parameter order_id atau email wajib diisi.'
-      });
+    // Re-check idempotency di dalam lock pada KEDUA sheet (Scalev_Orders & Lynk_Orders)
+    const raceScalev = findExistingOrder(scalevSheet, orderId, email);
+    if (isOrderRecordClaimable(raceScalev) && doesFoundOrderMatchCallerEmail(raceScalev, email)) {
+      return trySendExistingOrderEmailAndBuildResponse(scalevSheet, raceScalev, 'Scalev', raceScalev.noteCol || 9, '');
     }
-
-    // ------------------------------------------------------------------------
-    // IDEMPOTENCY CHECK: Cek apakah Order ID / Email sudah ada di Scalev_Orders
-    // ------------------------------------------------------------------------
-    const existingScalev = findExistingOrder(scalevSheet, orderId, email);
-    if (existingScalev) {
-      let emailSentNow = false;
-      const elig = evaluateEmailResendEligibility(existingScalev.paymentTime, existingScalev.catatan);
-      if (elig.allowed && existingScalev.email && existingScalev.email.includes('@')) {
-        const resendRes = sendEmailBrevo(existingScalev.email, existingScalev.licenseKey, existingScalev.customerName, existingScalev.orderId, elig.isResend);
-        if (resendRes.success) {
-          emailSentNow = true;
-          const noteLabel = elig.isResend ? 'TERKIRIM ULANG (Brevo 3-Bulanan)' : 'Email Brevo: TERKIRIM (Auto-Retry)';
-          scalevSheet.getRange(existingScalev.rowIndex, 9).setValue(stampEmailSentDate(noteLabel));
-          SpreadsheetApp.flush();
-        }
+    if (lynkSheet) {
+      const raceLynk = findExistingOrder(lynkSheet, orderId, email);
+      if (isOrderRecordClaimable(raceLynk) && doesFoundOrderMatchCallerEmail(raceLynk, email)) {
+        return trySendExistingOrderEmailAndBuildResponse(lynkSheet, raceLynk, 'Lynk.id', raceLynk.noteCol || 11, 'Webhook Lynk.id | ');
       }
-
-      return createJsonResponse({
-        status: 'success',
-        success: true,
-        isExisting: true,
-        isAlreadyClaimed: true,
-        source: 'Scalev',
-        license: existingScalev.licenseKey,
-        licenseKey: existingScalev.licenseKey,
-        orderId: existingScalev.orderId,
-        email: existingScalev.email,
-        name: existingScalev.customerName,
-        emailSent: emailSentNow || !elig.cooldownActive,
-        emailSentNow: emailSentNow,
-        wasBrevoPending: !elig.isResend && elig.allowed,
-        cooldownActive: !emailSentNow && elig.cooldownActive,
-        copyOnlyPopup: !emailSentNow && elig.cooldownActive,
-        resendAllowed: elig.allowed,
-        daysSinceLastEmail: elig.daysSince,
-        remainingDays: elig.remainingDays,
-        cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
-        lastEmailDate: elig.lastEmailDate,
-        nextEligibleDate: elig.nextEligibleDate,
-        message: (!emailSentNow && elig.cooldownActive)
-          ? 'Lisensi aktif ditemukan! Kirim ulang email tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung Copy-Paste kode lisensi Anda.'
-          : 'Alhamdulillah! Pembayaran Anda telah terkonfirmasi. Lisensi siap digunakan!'
-      });
-    }
-
-    // Cek juga di Lynk_Orders jika user klaim dari /claim
-    if (orderId || email) {
-      const altSheets = [
-        { sh: lynkSheet, src: 'Lynk.id', noteCol: 11 }
-      ];
-      for (let a = 0; a < altSheets.length; a++) {
-        if (!altSheets[a].sh) continue;
-        const foundAlt = findExistingOrder(altSheets[a].sh, orderId, email);
-        if (foundAlt) {
-          let emailSentNow = false;
-          const elig = evaluateEmailResendEligibility(foundAlt.paymentTime, foundAlt.catatan);
-          if (elig.allowed && foundAlt.email && foundAlt.email.includes('@')) {
-            const resendRes = sendEmailBrevo(foundAlt.email, foundAlt.licenseKey, foundAlt.customerName, foundAlt.orderId, elig.isResend);
-            if (resendRes.success) {
-              emailSentNow = true;
-              if (altSheets[a].noteCol > 0) {
-                const noteLabel = elig.isResend ? 'Webhook Lynk.id | TERKIRIM ULANG (Brevo 3-Bulanan)' : 'Webhook Lynk.id | Email Brevo: TERKIRIM (Auto-Retry)';
-                altSheets[a].sh.getRange(foundAlt.rowIndex, altSheets[a].noteCol).setValue(stampEmailSentDate(noteLabel));
-                SpreadsheetApp.flush();
-              }
-            }
-          }
-
-          return createJsonResponse({
-            status: 'success',
-            success: true,
-            isExisting: true,
-            isAlreadyClaimed: true,
-            source: altSheets[a].src,
-            license: foundAlt.licenseKey,
-            licenseKey: foundAlt.licenseKey,
-            orderId: foundAlt.orderId,
-            email: foundAlt.email,
-            name: foundAlt.customerName,
-            emailSent: emailSentNow || !elig.cooldownActive,
-            emailSentNow: emailSentNow,
-            wasBrevoPending: !elig.isResend && elig.allowed,
-            cooldownActive: !emailSentNow && elig.cooldownActive,
-            copyOnlyPopup: !emailSentNow && elig.cooldownActive,
-            resendAllowed: elig.allowed,
-            daysSinceLastEmail: elig.daysSince,
-            remainingDays: elig.remainingDays,
-            cooldownDays: EMAIL_RESEND_COOLDOWN_DAYS,
-            lastEmailDate: elig.lastEmailDate,
-            nextEligibleDate: elig.nextEligibleDate,
-            message: (!emailSentNow && elig.cooldownActive)
-              ? 'Lisensi aktif ditemukan! Kirim ulang email tersedia tiap 3 bulan sekali (berikutnya: ' + elig.nextEligibleDate + '). Silakan langsung Copy-Paste kode lisensi Anda.'
-              : 'Alhamdulillah! Pembayaran Anda dari ' + altSheets[a].src + ' telah terkonfirmasi. Lisensi siap digunakan!'
-          });
-        }
-      }
-    }
-
-    // ------------------------------------------------------------------------
-    // ANTI-BYPASS: Jika user memanggil ?action=create&email=... dari ClaimPage
-    // (tanpa order_id/produk dari redirect Scalev), verifikasi ke Scalev API v3
-    // ------------------------------------------------------------------------
-    const isFrontendEmailClaimOnly = (String(params.action || '').toLowerCase() === 'create' && !orderId && !produk);
-    let paymentTime = new Date();
-
-    if (isFrontendEmailClaimOnly) {
-      if (SCALEV_API_KEY) {
-        const scalevVerify = verifyScalevPayment(email || orderId);
-        if (!scalevVerify.verified) {
-          return createJsonResponse({
-            status: 'error',
-            success: false,
-            verified: false,
-            notOrdered: Boolean(scalevVerify.notOrdered),
-            email: email,
-            orderId: orderId,
-            grossRevenue: scalevVerify.grossRevenue || 0,
-            paymentStatus: scalevVerify.paymentStatus || 'unpaid',
-            message: scalevVerify.notOrdered
-              ? 'email kamu belum pernah order, ayo beli dulu'
-              : (scalevVerify.message || 'Pembayaran belum terkonfirmasi lunas.')
-          });
-        }
-        orderId = scalevVerify.officialOrderId || ('SCLV-' + Date.now());
-        if (scalevVerify.customerEmail && (!email || !email.includes('@'))) {
-          email = scalevVerify.customerEmail.toLowerCase();
-        }
-        nama = nama || scalevVerify.customerName || '-';
-        if (scalevVerify.grossRevenue > 0) grossRevenue = scalevVerify.grossRevenue;
-        if (scalevVerify.paymentTime) paymentTime = scalevVerify.paymentTime;
-      } else {
-        return createJsonResponse({
-          status: 'error',
-          success: false,
-          verified: false,
-          notOrdered: true,
-          email: email,
-          message: 'email kamu belum pernah order, ayo beli dulu'
-        });
-      }
-    } else if (orderId && SCALEV_API_KEY && grossRevenue === 0) {
-      // Perkaya nominal Gross Revenue dari Scalev API jika redirect URL tidak membawa nominal
-      const enrich = verifyScalevPayment(orderId);
-      if (enrich && enrich.verified) {
-        if (enrich.grossRevenue > 0) grossRevenue = enrich.grossRevenue;
-        if (enrich.customerName && !nama) nama = enrich.customerName;
-        if (enrich.paymentTime) paymentTime = enrich.paymentTime;
-      }
-    }
-
-    if (!orderId) {
-      orderId = 'SCLV-' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMddHHmmss');
-    }
-
-    if (!email || !email.includes('@')) {
-      return createJsonResponse({
-        status: 'error',
-        success: false,
-        message: 'Alamat email pembeli valid diperlukan untuk pengiriman lisensi resmi.'
-      });
     }
 
     // Pastikan 1 email selalu memiliki 1 kode lisensi WALI-XXXX yang fix & paten di sheet
     const fixedExisting = findFixedLicenseForEmail(ss, email);
     const licenseKey = fixedExisting ? fixedExisting.licenseKey : generateUniqueLicenseKey(ss);
 
-    // Simpan lebih dulu ke tab Scalev_Orders & flush sebelum mengirim email
+    // Simpan ke tab Scalev_Orders
     scalevSheet.appendRow([
       paymentTime,
       orderId,
@@ -647,7 +718,7 @@ function handleScalevOrder(params) {
     if (produk) catatanParts.push('Produk: ' + produk);
     catatanParts.push(brevoRes.success ? stampEmailSentDate('Email Brevo: TERKIRIM') : 'Email Brevo: GAGAL (' + brevoRes.error + ')');
     scalevSheet.getRange(lastRow, 9).setValue(catatanParts.join(' | '));
-    generateDashboard(true);
+    appendOrderSnapshotRow(ss, TAB_SCALEV_ORDERS, orderId, email, licenseKey, nama || '-');
     SpreadsheetApp.flush();
 
     if (brevoRes.success) {
@@ -806,11 +877,15 @@ function doPost(e) {
     const msgData = dataObj.message_data || dataObj;
 
     const eventName = String(payload.event || dataObj.message_action || '').trim().toUpperCase();
-    const rawPayStatus = String(
+    const explicitPayStatus = String(
       msgData.payment_status ||
       msgData.status ||
+      ''
+    ).trim().toUpperCase();
+    const rawPayStatus = String(
+      explicitPayStatus ||
       dataObj.message_action ||
-      'PAID'
+      ''
     ).trim().toUpperCase();
 
     if (
@@ -827,8 +902,15 @@ function doPost(e) {
 
     if (
       eventName &&
-      (eventName.includes('FAILED') || eventName.includes('EXPIRED') || eventName.includes('CANCEL'))
+      (eventName.includes('FAILED') || eventName.includes('EXPIRED') || eventName.includes('CANCEL') || eventName.includes('REFUND'))
     ) {
+      return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
+    }
+
+    // Tolak aktivasi lisensi jika status pembayaran Lynk.id belum lunas (UNPAID / PENDING / dll.)
+    const lynkPaidByEvent = !explicitPayStatus && (eventName === 'PAYMENT.RECEIVED' || String(dataObj.message_action || '').trim().toUpperCase() === 'SUCCESS');
+    if (!isPaidPaymentStatus(rawPayStatus) && !lynkPaidByEvent) {
+      Logger.log('Webhook Lynk.id diabaikan karena status belum lunas: ' + (rawPayStatus || eventName || 'UNKNOWN'));
       return ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
     }
 
@@ -935,7 +1017,7 @@ function doPost(e) {
       customerEmail,
       licenseKey,
       'ACTIVE',
-      rawPayStatus === 'SUCCESS' || rawPayStatus === 'PAID' || rawPayStatus === 'COMPLETED' ? 'PAID' : rawPayStatus,
+      'PAID',
       grandTotal,
       customerName || '-',
       affiliateId || '-',
@@ -953,6 +1035,7 @@ function doPost(e) {
     const catatan = brevoRes.success ? stampEmailSentDate(rawCatatan) : rawCatatan;
     lynkSheet.getRange(lastRow, 11).setValue(catatan);
     generateDashboard(true);
+    syncOrderSnapshot(ss);
     SpreadsheetApp.flush();
 
     // Auto-resolve error webhook Lynk (dan Brevo jika sukses)
@@ -1154,6 +1237,20 @@ function autoFitSheetColumns(sheet, numCols, minWidth, paddingPx) {
   }
 }
 
+function formatDashboardLayout(dashSheet) {
+  if (!dashSheet) return;
+  try {
+    dashSheet.setHiddenGridlines(true);
+    dashSheet.setFrozenRows(1);
+    dashSheet.setColumnWidth(1, 235);
+    dashSheet.setColumnWidth(2, 145);
+    dashSheet.setColumnWidth(3, 115);
+    dashSheet.setColumnWidth(4, 195);
+  } catch (err) {
+    Logger.log('Warning formatDashboardLayout: ' + err.toString());
+  }
+}
+
 function autoFitAllSheets(ss) {
   const targetSs = ss || getTargetSpreadsheet();
   const s1 = targetSs.getSheetByName(TAB_SCALEV_ORDERS);
@@ -1165,19 +1262,20 @@ function autoFitAllSheets(ss) {
   const s4 = targetSs.getSheetByName(TAB_REPORT_LYNK);
   if (s4) autoFitSheetColumns(s4, 5, 130, 26);
   const s5 = targetSs.getSheetByName(TAB_DASHBOARD);
-  if (s5) {
-    autoFitSheetColumns(s5, 4, 145, 28);
-    if (s5.getColumnWidth(4) < 220) s5.setColumnWidth(4, 220);
-  }
+  if (s5) formatDashboardLayout(s5);
   const s6 = targetSs.getSheetByName(TAB_ERROR_LOG);
   if (s6) autoFitSheetColumns(s6, 10, 110, 22);
+  const s7 = targetSs.getSheetByName(TAB_BLOCKED_LICENSES);
+  if (s7) autoFitSheetColumns(s7, 7, 120, 22);
+  const s8 = targetSs.getSheetByName(TAB_LOGVERSI);
+  if (s8) formatLogversiLayout(s8);
 }
 
 function menuAutoFitAllSheets() {
   const ss = getTargetSpreadsheet();
   initAllSheets(ss);
   autoFitAllSheets(ss);
-  SpreadsheetApp.getUi().alert('✅ Selesai', 'Lebar seluruh kolom di semua tab telah dirapikan secara manual sesuai isinya.', SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('✅ Selesai', 'Lebar seluruh kolom di semua tab (termasuk Dashboard & Logversi WPApp) telah dirapikan.', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 function isSameJakartaDay(val, todayKey) {
@@ -1211,22 +1309,27 @@ function generateAllReports() {
 
 function writeDashboardTable(dashSheet, startRow, title, headerBg, rows) {
   dashSheet.getRange(startRow, 1, 1, 4).merge()
-    .setValue(title)
+    .setValue('  ' + title)
     .setBackground(headerBg)
     .setFontColor('#ffffff')
+    .setFontFamily('Roboto')
     .setFontWeight('bold')
     .setFontSize(10.5)
+    .setHorizontalAlignment('left')
     .setVerticalAlignment('middle');
-  dashSheet.setRowHeight(startRow, 28);
+  dashSheet.setRowHeight(startRow, 32);
 
   for (let r = 0; r < rows.length; r++) {
     const rowIdx = startRow + 1 + r;
     const item = rows[r];
     dashSheet.getRange(rowIdx, 1, 1, 3).merge()
-      .setValue(item.label)
+      .setValue('  ' + item.label)
       .setBackground(item.bg)
       .setFontColor(item.color)
+      .setFontFamily('Roboto')
+      .setFontSize(10)
       .setFontWeight(item.bold ? 'bold' : 'normal')
+      .setWrap(true)
       .setHorizontalAlignment('left')
       .setVerticalAlignment('middle');
 
@@ -1240,15 +1343,19 @@ function writeDashboardTable(dashSheet, startRow, title, headerBg, rows) {
       .setNumberFormat(item.fmt)
       .setBackground(item.bg)
       .setFontColor(item.color)
+      .setFontFamily('Roboto')
+      .setFontSize(10)
       .setFontWeight(item.bold ? 'bold' : 'normal')
       .setHorizontalAlignment('right')
       .setVerticalAlignment('middle');
-    dashSheet.setRowHeight(rowIdx, 24);
+    dashSheet.setRowHeight(rowIdx, 27);
   }
 
   const endRow = startRow + rows.length;
   dashSheet.getRange(startRow, 1, rows.length + 1, 4)
-    .setBorder(true, true, true, true, true, true, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
+    .setBorder(true, true, true, true, false, true, '#e2e8f0', SpreadsheetApp.BorderStyle.SOLID);
+  dashSheet.getRange(startRow, 1, rows.length + 1, 4)
+    .setBorder(true, true, true, true, null, null, '#94a3b8', SpreadsheetApp.BorderStyle.SOLID);
   return endRow;
 }
 
@@ -1263,6 +1370,7 @@ function generateDashboard(silent) {
 
     const todayKey = getJakartaDateKey(new Date());
     const todayDisplay = getJakartaDateDisplay(new Date());
+    const sep = getFormulaSeparator(ss);
 
     let scalevRevenue = 0;
     let scalevPaidTx = 0;
@@ -1343,29 +1451,42 @@ function generateDashboard(silent) {
     dashSheet.clear();
     dashSheet.clearFormats();
 
-    // Banner Utama (Row 1)
+    // Banner Utama (Row 1) & Info Bar (Row 2)
     dashSheet.getRange('A1:D1').merge()
       .setValue('📊 DASHBOARD MONITORING PENJUALAN, LISENSI & BREVO WALI PINTAR')
       .setBackground('#0f172a')
       .setFontColor('#ffffff')
+      .setFontFamily('Roboto')
       .setFontWeight('bold')
-      .setFontSize(13)
+      .setFontSize(12.5)
       .setHorizontalAlignment('center')
       .setVerticalAlignment('middle');
-    dashSheet.setRowHeight(1, 38);
-    dashSheet.setRowHeight(2, 14);
+    dashSheet.setRowHeight(1, 42);
+
+    dashSheet.getRange('A2:D2').merge()
+      .setValue('🔄 Diperbarui otomatis: ' + updatedAt + ' WIB   •   Sumber: Scalev_Orders & Lynk_Orders')
+      .setBackground('#f1f5f9')
+      .setFontColor('#334155')
+      .setFontFamily('Roboto')
+      .setFontSize(9.5)
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle')
+      .setBorder(false, true, true, true, false, false, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
+    dashSheet.setRowHeight(2, 24);
+    dashSheet.setRowHeight(3, 12);
 
     // ========================================================================
-    // TABEL 1: SALES SCALEV (META ADS • BIRU LAUT) — Row 3..8
+    // TABEL 1: SALES SCALEV (META ADS • BIRU LAUT)
     // ========================================================================
+    const scalevStartRow = 4;
     const scalevSumifsFormula =
-      '=SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "PAID") + ' +
-      'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "COMPLETED") + ' +
-      'SUMIFS(Scalev_Orders!G:G, Scalev_Orders!D:D, "WALI-*", Scalev_Orders!E:E, "ACTIVE", Scalev_Orders!F:F, "SETTLED")';
+      '=SUMIFS(Scalev_Orders!G:G' + sep + ' Scalev_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Scalev_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Scalev_Orders!F:F' + sep + ' "PAID") + ' +
+      'SUMIFS(Scalev_Orders!G:G' + sep + ' Scalev_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Scalev_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Scalev_Orders!F:F' + sep + ' "COMPLETED") + ' +
+      'SUMIFS(Scalev_Orders!G:G' + sep + ' Scalev_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Scalev_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Scalev_Orders!F:F' + sep + ' "SETTLED")';
 
     const t1End = writeDashboardTable(
       dashSheet,
-      3,
+      scalevStartRow,
       '🔵 TABEL 1: SALES SCALEV (META ADS • LUNAS + BERLISENSI)',
       '#0369a1',
       [
@@ -1376,16 +1497,16 @@ function generateDashboard(silent) {
         { label: 'Formula Otomatis Scalev (=SUMIFS Paid)', val: scalevRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: scalevSumifsFormula }
       ]
     );
-    dashSheet.setRowHeight(t1End + 1, 14);
+    dashSheet.setRowHeight(t1End + 1, 12);
 
     // ========================================================================
-    // TABEL 2: SALES LYNK.ID (AFFILIATE & ORGANIK • HIJAU BOTOL) — Row 10..15
+    // TABEL 2: SALES LYNK.ID (AFFILIATE & ORGANIK • HIJAU BOTOL)
     // ========================================================================
     const lynkStartRow = t1End + 2;
     const lynkSumifsFormula =
-      '=SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "PAID") + ' +
-      'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "COMPLETED") + ' +
-      'SUMIFS(Lynk_Orders!G:G, Lynk_Orders!D:D, "WALI-*", Lynk_Orders!E:E, "ACTIVE", Lynk_Orders!F:F, "SETTLED")';
+      '=SUMIFS(Lynk_Orders!G:G' + sep + ' Lynk_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Lynk_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Lynk_Orders!F:F' + sep + ' "PAID") + ' +
+      'SUMIFS(Lynk_Orders!G:G' + sep + ' Lynk_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Lynk_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Lynk_Orders!F:F' + sep + ' "COMPLETED") + ' +
+      'SUMIFS(Lynk_Orders!G:G' + sep + ' Lynk_Orders!D:D' + sep + ' "WALI-*"' + sep + ' Lynk_Orders!E:E' + sep + ' "ACTIVE"' + sep + ' Lynk_Orders!F:F' + sep + ' "SETTLED")';
 
     const t2End = writeDashboardTable(
       dashSheet,
@@ -1400,13 +1521,13 @@ function generateDashboard(silent) {
         { label: 'Formula Otomatis Lynk.id (=SUMIFS Paid)', val: lynkRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: lynkSumifsFormula }
       ]
     );
-    dashSheet.setRowHeight(t2End + 1, 14);
+    dashSheet.setRowHeight(t2End + 1, 12);
 
     // ========================================================================
-    // TABEL 3: REKAP TOTAL / SUMMARY PENJUALAN (SCALEV + LYNK.ID) — Row 17..23
+    // TABEL 3: REKAP TOTAL / SUMMARY PENJUALAN (SCALEV + LYNK.ID)
     // ========================================================================
     const summaryStartRow = t2End + 2;
-    const scalevTotalCellRef = 'D4';
+    const scalevTotalCellRef = 'D' + (scalevStartRow + 1);
     const lynkTotalCellRef = 'D' + (lynkStartRow + 1);
     const scalevFormulaCellRef = 'D' + t1End;
     const lynkFormulaCellRef = 'D' + t2End;
@@ -1425,7 +1546,7 @@ function generateDashboard(silent) {
         { label: 'Formula Otomatis Gabungan (=SUMIFS Paid + Lisensi)', val: totalRevenue, fmt: '"Rp"#,##0', color: '#475569', bg: '#ffffff', bold: false, formula: '=' + scalevFormulaCellRef + '+' + lynkFormulaCellRef }
       ]
     );
-    dashSheet.setRowHeight(t3End + 1, 14);
+    dashSheet.setRowHeight(t3End + 1, 12);
 
     // Anti-#ERROR! Guard pada seluruh cell formula
     SpreadsheetApp.flush();
@@ -1443,14 +1564,14 @@ function generateDashboard(silent) {
     });
 
     // ========================================================================
-    // TABEL 4: MATRIKS OPERASIONAL LISENSI & BREVO — Row 25..31
+    // TABEL 4: MATRIKS OPERASIONAL LISENSI & BREVO
     // ========================================================================
     const opsStartRow = t3End + 2;
     const t4End = writeDashboardTable(
       dashSheet,
       opsStartRow,
       '📈 TABEL 4: MATRIKS OPERASIONAL LISENSI & BREVO',
-      '#0f172a',
+      '#1e293b',
       [
         { label: 'Total Lisensi Diterbitkan', val: totalLicenses, fmt: '#,##0', color: '#0f172a', bg: '#ffffff', bold: true },
         { label: 'Lisensi Aktif (Siap Main)', val: activeLicenses, fmt: '#,##0', color: '#0f172a', bg: '#f8fafc', bold: true },
@@ -1463,29 +1584,41 @@ function generateDashboard(silent) {
     dashSheet.setRowHeight(t4End + 1, 14);
 
     // ========================================================================
-    // PANDUAN SINGKAT (Merged A:D agar tidak merusak auto-width Kolom A)
+    // PANDUAN SINGKAT (Kartu rapi A:D dengan wrap & tinggi baris pas)
     // ========================================================================
     const guideStartRow = t4End + 2;
     dashSheet.getRange(guideStartRow, 1, 1, 4).merge()
-      .setValue('💡 PANDUAN PENGELOLAAN SCALEV, LYNK.ID & LISENSI:')
+      .setValue('  💡 PANDUAN PENGELOLAAN SCALEV, LYNK.ID & LISENSI')
+      .setBackground('#e2e8f0')
+      .setFontFamily('Roboto')
+      .setFontSize(10)
       .setFontWeight('bold')
-      .setFontColor('#0f172a');
+      .setFontColor('#0f172a')
+      .setVerticalAlignment('middle');
+    dashSheet.setRowHeight(guideStartRow, 28);
+
     const guides = [
       '1. Tabel 1 (Sales Scalev) & Tabel 2 (Sales Lynk.id) dipisah untuk memantau performa Meta Ads dan Affiliate secara mandiri.',
       '2. Tabel 3 (Rekap Total) menggabungkan seluruh transaksi yang benar-benar LUNAS (PAID/COMPLETED) dan sudah terbit lisensi ACTIVE.',
       '3. Tabel 4 (Matriks Operasional) memantau total lisensi aktif dan kuota email harian Brevo secara real-time.',
-      '4. Gunakan menu "📊 Menu Laporan" untuk rincian komisi `lynk_affiliate` atau "🎮 WaliPintar Admin" untuk sinkronisasi Scalev API.'
+      '4. Gunakan menu "📊 Menu Laporan" untuk rincian komisi lynk_affiliate atau "🎮 WaliPintar Admin" untuk sinkronisasi Scalev API.'
     ];
     for (let g = 0; g < guides.length; g++) {
-      dashSheet.getRange(guideStartRow + 1 + g, 1, 1, 4).merge()
-        .setValue(guides[g])
+      const rGuide = guideStartRow + 1 + g;
+      dashSheet.getRange(rGuide, 1, 1, 4).merge()
+        .setValue('  ' + guides[g])
+        .setBackground('#f8fafc')
+        .setFontFamily('Roboto')
         .setWrap(true)
         .setFontColor('#334155')
-        .setFontSize(10);
-      dashSheet.setRowHeight(guideStartRow + 1 + g, 22);
+        .setFontSize(9.5)
+        .setVerticalAlignment('middle');
+      dashSheet.setRowHeight(rGuide, 30);
     }
+    dashSheet.getRange(guideStartRow, 1, guides.length + 1, 4)
+      .setBorder(true, true, true, true, null, null, '#cbd5e1', SpreadsheetApp.BorderStyle.SOLID);
 
-    // Auto-width dinonaktifkan dari mode otomatis agar hanya dijalankan saat trigger manual menu
+    formatDashboardLayout(dashSheet);
     SpreadsheetApp.flush();
 
     if (!silent) {
@@ -1496,7 +1629,7 @@ function generateDashboard(silent) {
           '• Sales Lynk.id: Rp ' + formatNumberId(lynkRevenue) + ' (' + lynkPaidTx + ' transaksi)\n' +
           '• Rekap Total Paid: Rp ' + formatNumberId(totalRevenue) + ' (' + totalPaidTx + ' transaksi)\n' +
           '• Email Terkirim Hari Ini (Brevo): ' + emailsTodayTotal + ' email\n' +
-          '• Seluruh 4 tabel & lebar kolom sudah dirapikan otomatis.',
+          '• Layout & lebar kolom Dashboard sudah dirapikan otomatis.',
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       } catch (uiErr) {}
@@ -1835,18 +1968,40 @@ function handleLicenseCheck(params) {
   }
 
   const ss = getTargetSpreadsheet();
-  initAllSheets(ss);
+  getFastOrderSheets(ss);
+
+  // 1. Cek terlebih dahulu di sheet "Lisensi terblokir"
+  const blockedEntry = findBlockedLicenseEntry(ss, licenseKey, String(params.email || ''), '');
+  if (blockedEntry) {
+    return createJsonResponse({
+      status: 'error',
+      success: true,
+      valid: false,
+      blocked: true,
+      reason: 'BLOCKED',
+      licenseKey: licenseKey,
+      email: blockedEntry.email,
+      message: 'Lisensi mu terblokir',
+      orderUrl: SCALEV_URL,
+      lynkUrl: LYNK_LP_URL,
+      adminWaUrl: 'https://wa.me/' + ADMIN_WA + '?text=' + encodeURIComponent(
+        'Halo Admin ' + BRAND_NAME + ', lisensi saya (' + licenseKey + ') terblokir. Mohon bantuannya.'
+      )
+    });
+  }
 
   const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   for (let s = 0; s < sheetsToCheck.length; s++) {
     const sh = ss.getSheetByName(sheetsToCheck[s]);
-    if (!sh) continue;
+    if (!sh || sh.getLastRow() <= 1) continue;
 
     const data = sh.getDataRange().getValues();
+    const cols = getOrderSheetColumnIndices(data[0], sheetsToCheck[s]);
     for (let i = 1; i < data.length; i++) {
-      const rowKey = String(data[i][3] || '').trim().toUpperCase();
-      const rowStatus = String(data[i][4] || '').trim().toUpperCase();
-      if (rowKey === licenseKey && rowStatus === 'ACTIVE') {
+      const rowKey = String(data[i][cols.license] || '').trim().toUpperCase();
+      const rowStatus = String(data[i][cols.status] || '').trim().toUpperCase();
+      const rowPayStatus = String(data[i][cols.paymentStatus] || '').trim().toUpperCase();
+      if (rowKey === licenseKey && rowStatus === 'ACTIVE' && isPaidPaymentStatus(rowPayStatus)) {
         return createJsonResponse({
           status: 'success',
           success: true,
@@ -1854,8 +2009,8 @@ function handleLicenseCheck(params) {
           source: sheetsToCheck[s],
           licenseKey: licenseKey,
           license: licenseKey,
-          email: data[i][2],
-          orderId: data[i][1],
+          email: String(data[i][cols.email] || '').trim().toLowerCase(),
+          orderId: String(data[i][cols.orderId] || '').trim(),
           message: 'Lisensi valid dan aktif!'
         });
       }
@@ -1866,6 +2021,7 @@ function handleLicenseCheck(params) {
     status: 'error',
     success: true,
     valid: false,
+    blocked: false,
     message: 'Kode lisensi tidak valid, sudah dinonaktifkan, atau belum terdaftar.',
     orderUrl: SCALEV_URL,
     lynkUrl: LYNK_LP_URL,
@@ -1882,7 +2038,22 @@ function handleResendLicense(params) {
   }
 
   const ss = getTargetSpreadsheet();
-  initAllSheets(ss);
+  getFastOrderSheets(ss);
+
+  const blockedEmailMatch = findBlockedLicenseEntry(ss, '', email, '');
+  if (blockedEmailMatch) {
+    return createJsonResponse({
+      status: 'error',
+      success: false,
+      found: false,
+      blocked: true,
+      licenseKey: blockedEmailMatch.licenseKey,
+      message: 'Lisensi mu terblokir',
+      adminWaUrl: 'https://wa.me/' + ADMIN_WA + '?text=' + encodeURIComponent(
+        'Halo Admin ' + BRAND_NAME + ', lisensi saya (' + (blockedEmailMatch.licenseKey || email) + ') terblokir. Mohon bantuannya.'
+      )
+    });
+  }
 
   const sheetsToCheck = [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS];
   for (let s = 0; s < sheetsToCheck.length; s++) {
@@ -1890,7 +2061,7 @@ function handleResendLicense(params) {
     if (!sh) continue;
 
     const existing = findExistingOrder(sh, '', email);
-    if (existing && existing.status === 'ACTIVE') {
+    if (isOrderRecordClaimable(existing)) {
       const elig = evaluateEmailResendEligibility(existing.paymentTime, existing.catatan);
       if (!elig.allowed) {
         return createJsonResponse({
@@ -1917,7 +2088,7 @@ function handleResendLicense(params) {
       }
 
       const brevoRes = sendEmailBrevo(email, existing.licenseKey, existing.customerName, existing.orderId, elig.isResend);
-      const statusCol = sheetsToCheck[s] === TAB_LYNK_ORDERS ? 11 : 9;
+      const statusCol = existing.noteCol || (sheetsToCheck[s] === TAB_LYNK_ORDERS ? 11 : 9);
       sh.getRange(existing.rowIndex, statusCol).setValue(
         brevoRes.success ? stampEmailSentDate('TERKIRIM ULANG (Brevo)') : 'GAGAL KIRIM ULANG (' + brevoRes.error + ')'
       );
@@ -2049,11 +2220,23 @@ function handleApiDeleteAll(params) {
       const lastRow = sh.getLastRow();
       if (lastRow > 1) {
         const cnt = lastRow - 1;
+        const rows = sh.getRange(2, 1, cnt, Math.min(8, sh.getLastColumn())).getValues();
+        for (let r = 0; r < rows.length; r++) {
+          archiveBlockedLicenseRow(ss, {
+            licenseKey: rows[r][3],
+            email: rows[r][2],
+            orderId: rows[r][1],
+            sourceSheet: tabName,
+            customerName: rows[r][7],
+            reason: 'Dihapus via API Reset (' + tabName + ')'
+          });
+        }
         sh.deleteRows(2, cnt);
         totalDeleted += cnt;
       }
     });
 
+    syncOrderSnapshot(ss);
     generateScalevReport(true);
     generateLynkReport(true);
     generateDashboard(true);
@@ -2078,7 +2261,7 @@ function handleApiBroadcastUpdate(params) {
   }
 
   const latestLocked = getLatestLockedVersionResponse();
-  const versi = String(params.versi || latestLocked.versi || 'v.1.0.1').trim();
+  const versi = String(params.versi || latestLocked.versi || 'v.1.0.2').trim();
   const tanggal = String(params.tanggal || latestLocked.tanggal || formatTanggalIndo(new Date())).trim();
   const jenisPerbaikan = String(params.jenis || params.jenis_perbaikan || 'Pembaruan tampilan & performa game edukatif.').trim();
   const status = 'Free / Gratis untuk Pembeli Resmi';
@@ -2174,6 +2357,28 @@ function validateSixRequiredProperties() {
   return { ok: true, config: config };
 }
 
+function getFormulaSeparator(ss) {
+  try {
+    const loc = String((ss || getTargetSpreadsheet()).getSpreadsheetLocale() || '').toLowerCase();
+    // Locale pemisah koma (,) untuk argumen fungsi: en_*, ja_*, ko_*, zh_*, th_*, ms_*
+    // Locale Indonesia (id_ID / id) & kebanyakan negara lainnya wajib memakai titik koma (;)
+    if (/^(en|ja|ko|zh|th|ms|he|hi|ta|bn|my|km|lo|ne|si|ur)/.test(loc)) {
+      return ',';
+    }
+    return ';';
+  } catch (e) {
+    return ';';
+  }
+}
+
+function buildVersionFormula(rowNumber, argSep) {
+  if (argSep === 'ARITH') {
+    return '="v.1."&INT(A' + rowNumber + '/10)&"."&(A' + rowNumber + '-INT(A' + rowNumber + '/10)*10)';
+  }
+  const sep = argSep || ';';
+  return '="v.1."&INT(A' + rowNumber + '/10)&"."&MOD(A' + rowNumber + sep + '10)';
+}
+
 function formatVersionFromNo(no) {
   const n = parseInt(no, 10);
   return 'v.1.' + Math.floor(n / 10) + '.' + (n % 10);
@@ -2187,17 +2392,100 @@ function formatTanggalIndo(dateObj) {
   return day + ' ' + (INDO_MONTH_NAMES[monthIdx] || 'Januari') + ' ' + year;
 }
 
-function applyLogversiValidationsAndLocks(sheet) {
+function applyLogversiValidationsAndLocks(sheet, argSep) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const sep = argSep || getFormulaSeparator(sheet.getParent());
+
+  // Validasi Duplikat pada kolom B (Versi) — aman di locale Indonesia (;) maupun US (,)
+  try {
+    const dupRule = SpreadsheetApp.newDataValidation()
+      .requireFormulaSatisfied('=COUNTIF($B$2:$B' + sep + 'B2)=1')
+      .setAllowInvalid(false)
+      .setHelpText('Versi tidak boleh duplikat dan harus urut v.1.INT(No/10).MOD(No,10).')
+      .build();
+    sheet.getRange(2, 2, lastRow - 1, 1).setDataValidation(dupRule);
+  } catch (err) {
+    Logger.log('Info validasi Logversi: ' + err.toString());
+  }
+}
+
+function formatLogversiLayout(sheet) {
+  if (!sheet) return;
+  try {
+    sheet.setFrozenRows(1);
+    sheet.setRowHeight(1, 32);
+    const widths = [64, 110, 155, 320, 235, 115, 165, 165, 235, 195, 115];
+    for (let c = 0; c < widths.length; c++) {
+      sheet.setColumnWidth(c + 1, widths[c]);
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const count = lastRow - 1;
+      sheet.getRange(2, 1, count, 11).setVerticalAlignment('middle');
+      sheet.getRange(2, 1, count, 3).setHorizontalAlignment('center');
+      sheet.getRange(2, 2, count, 1).setFontWeight('bold').setFontColor('#065f46');
+      sheet.getRange(2, 4, count, 1).setHorizontalAlignment('left').setWrap(true);
+      sheet.getRange(2, 5, count, 7).setHorizontalAlignment('center').setWrap(true);
+    }
+  } catch (err) {
+    Logger.log('Warning formatLogversiLayout: ' + err.toString());
+  }
+}
+
+function repairLogversiColumnBFormulas(ss, sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  // Validasi Duplikat pada kolom B (Versi)
-  const dupRule = SpreadsheetApp.newDataValidation()
-    .requireFormulaSatisfied('=COUNTIF($B$2:$B,B2)=1')
-    .setAllowInvalid(false)
-    .setHelpText('Versi tidak boleh duplikat dan harus urut v.1.INT(No/10).MOD(No,10).')
-    .build();
-  sheet.getRange(2, 2, lastRow - 1, 1).setDataValidation(dupRule);
+  const numRows = lastRow - 1;
+  const noValues = sheet.getRange(2, 1, numRows, 1).getDisplayValues();
+  let workingSep = getFormulaSeparator(ss);
+
+  function writeFormulasWithSep(sepMode) {
+    const formulas = [];
+    for (let i = 0; i < numRows; i++) {
+      const rowNum = i + 2;
+      const noStr = String(noValues[i][0] || '').trim();
+      if (noStr === '') {
+        formulas.push(['']);
+      } else {
+        formulas.push([buildVersionFormula(rowNum, sepMode)]);
+      }
+    }
+    sheet.getRange(2, 2, numRows, 1).setFormulas(formulas);
+    SpreadsheetApp.flush();
+  }
+
+  // Hapus data validation sementara agar sel #ERROR! lama bisa diperbaiki tanpa tertahan rule duplikat
+  try {
+    sheet.getRange(2, 2, numRows, 1).clearDataValidations();
+  } catch (e) {}
+
+  writeFormulasWithSep(workingSep);
+
+  // Verifikasi hasil nyata di sheet (cari sel pertama yang punya No)
+  let sampleRow = 2;
+  for (let i = 0; i < numRows; i++) {
+    if (String(noValues[i][0] || '').trim() !== '') {
+      sampleRow = i + 2;
+      break;
+    }
+  }
+  let sampleDisp = String(sheet.getRange(sampleRow, 2).getDisplayValue() || '').trim();
+
+  if (sampleDisp.startsWith('#') || sampleDisp === '') {
+    workingSep = workingSep === ';' ? ',' : ';';
+    writeFormulasWithSep(workingSep);
+    sampleDisp = String(sheet.getRange(sampleRow, 2).getDisplayValue() || '').trim();
+  }
+
+  if (sampleDisp.startsWith('#') || sampleDisp === '') {
+    writeFormulasWithSep('ARITH');
+  }
+
+  applyLogversiValidationsAndLocks(sheet, workingSep);
+  formatLogversiLayout(sheet);
+  SpreadsheetApp.flush();
 }
 
 function protectLogversiRow(sheet, rowNumber) {
@@ -2233,13 +2521,14 @@ function ensureLogversiSheet(ss) {
   ];
 
   const sheet = ensureSheetHeaders(ss, TAB_LOGVERSI, headers, '#065f46');
+  const sep = getFormulaSeparator(ss);
 
   if (sheet.getLastRow() <= 1) {
     const initialDate = formatTanggalIndo(new Date());
     const rows = [];
     for (let no = 0; no <= 100; no++) {
       const sheetRow = no + 2;
-      const formulaVersi = '="v.1."&INT(A' + sheetRow + '/10)&"."&MOD(A' + sheetRow + ',10)';
+      const formulaVersi = buildVersionFormula(sheetRow, sep);
       if (no === 0) {
         rows.push([
           0,
@@ -2268,6 +2557,20 @@ function ensureLogversiSheet(ss) {
           initialDate,
           'TERKUNCI'
         ]);
+      } else if (no === 2) {
+        rows.push([
+          2,
+          formulaVersi,
+          initialDate,
+          'Perbaikan affiliate, logika game & stabilitas lisensi',
+          'TERKIRIM',
+          '-',
+          '-',
+          '-',
+          '-',
+          initialDate,
+          'TERKUNCI'
+        ]);
       } else {
         rows.push([no, formulaVersi, '', '', '', '', '', '', '', '', '']);
       }
@@ -2276,11 +2579,61 @@ function ensureLogversiSheet(ss) {
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
     sheet.getRange(2, 1, rows.length, 1).setNumberFormat('0');
     sheet.getRange(2, 3, rows.length, 1).setNumberFormat('@');
-    sheet.getRange(2, 1, 2, headers.length).setBackground('#ecfdf5');
-    applyLogversiValidationsAndLocks(sheet);
+    sheet.getRange(2, 1, 3, headers.length).setBackground('#ecfdf5');
+    SpreadsheetApp.flush();
+
+    // Pastikan rumus kolom B tidak #ERROR! apa pun locale spreadsheet-nya
+    const checkDisp = String(sheet.getRange(2, 2).getDisplayValue() || '').trim();
+    if (checkDisp.startsWith('#') || checkDisp === '') {
+      repairLogversiColumnBFormulas(ss, sheet);
+    } else {
+      applyLogversiValidationsAndLocks(sheet, sep);
+      formatLogversiLayout(sheet);
+    }
     protectLogversiRow(sheet, 2);
     protectLogversiRow(sheet, 3);
+    protectLogversiRow(sheet, 4);
     SpreadsheetApp.flush();
+  } else {
+    // Auto-deteksi & perbaiki otomatis jika masih ada #ERROR! atau versi kosong di sheet existing
+    const lastRow = sheet.getLastRow();
+    const checkPairs = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+    let needsRepair = false;
+    const defaultSeeds = {
+      0: 'Rilis awal aplikasi Wali Pintar',
+      1: 'Pembaruan awal & stabilitas sistem',
+      2: 'Perbaikan affiliate, logika game & stabilitas lisensi'
+    };
+    const defaultDate = formatTanggalIndo(new Date());
+
+    for (let i = 0; i < checkPairs.length; i++) {
+      const a = String(checkPairs[i][0] || '').trim();
+      const b = String(checkPairs[i][1] || '').trim();
+      const c = String(checkPairs[i][2] || '').trim();
+      if (b.startsWith('#') || (a !== '' && b === '')) {
+        needsRepair = true;
+      }
+      const noInt = parseInt(a, 10);
+      if (!isNaN(noInt) && (noInt === 0 || noInt === 1 || noInt === 2) && c === '') {
+        const targetRow = i + 2;
+        sheet.getRange(targetRow, 3, 1, 9).setValues([[
+          defaultDate,
+          defaultSeeds[noInt],
+          'TERKIRIM',
+          '-',
+          '-',
+          '-',
+          '-',
+          defaultDate,
+          'TERKUNCI'
+        ]]);
+        sheet.getRange(targetRow, 1, 1, 11).setBackground('#ecfdf5');
+        protectLogversiRow(sheet, targetRow);
+      }
+    }
+    if (needsRepair) {
+      repairLogversiColumnBFormulas(ss, sheet);
+    }
   }
 
   return sheet;
@@ -2293,7 +2646,18 @@ function onEdit(e) {
   try {
     if (!e || !e.range) return;
     const sheet = e.range.getSheet();
-    if (!sheet || sheet.getName() !== TAB_LOGVERSI) return;
+    if (!sheet) return;
+    const sheetName = sheet.getName();
+
+    // Deteksi penghapusan / pengosongan lisensi atau email manual di sheet order -> pindahkan ke "Lisensi terblokir"
+    if (sheetName === TAB_SCALEV_ORDERS || sheetName === TAB_LYNK_ORDERS) {
+      if (e.range.getRow() >= 2) {
+        reconcileDeletedOrderRows(sheet.getParent(), 'Dihapus / dikosongkan manual di ' + sheetName);
+      }
+      return;
+    }
+
+    if (sheetName !== TAB_LOGVERSI) return;
 
     const row = e.range.getRow();
     const col = e.range.getColumn();
@@ -2346,7 +2710,7 @@ function getLatestLockedVersionResponse() {
     const sheet = ensureLogversiSheet(ss);
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      return { versi: 'v.1.0.1', no: 1, tanggal: formatTanggalIndo(new Date()) };
+      return { versi: 'v.1.0.2', no: 2, tanggal: formatTanggalIndo(new Date()) };
     }
 
     const values = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
@@ -2357,11 +2721,12 @@ function getLatestLockedVersionResponse() {
       const versiRaw = String(values[i][1] || '').trim();
       const tanggalRaw = String(values[i][2] || '').trim();
 
-      if (noRaw !== '' && versiRaw && tanggalRaw !== '') {
+      if (noRaw !== '' && tanggalRaw !== '') {
         const noNum = parseInt(noRaw, 10);
         if (!isNaN(noNum)) {
+          const safeVersi = (versiRaw && !versiRaw.startsWith('#')) ? versiRaw : formatVersionFromNo(noNum);
           latest = {
-            versi: versiRaw,
+            versi: safeVersi,
             no: noNum,
             tanggal: tanggalRaw
           };
@@ -2370,12 +2735,12 @@ function getLatestLockedVersionResponse() {
     }
 
     if (!latest) {
-      return { versi: 'v.1.0.1', no: 1, tanggal: formatTanggalIndo(new Date()) };
+      return { versi: 'v.1.0.2', no: 2, tanggal: formatTanggalIndo(new Date()) };
     }
     return latest;
   } catch (err) {
     Logger.log('Error getLatestLockedVersionResponse: ' + err.toString());
-    return { versi: 'v.1.0.1', no: 1, tanggal: '' };
+    return { versi: 'v.1.0.2', no: 2, tanggal: '' };
   }
 }
 
@@ -2431,6 +2796,7 @@ function generate50() {
   const newRows = [];
   const startSheetRow = lastRow + 1;
 
+  const sep = getFormulaSeparator(ss);
   for (let offset = 0; offset < 50; offset++) {
     const nextNo = startNo + offset;
     const nextVersi = formatVersionFromNo(nextNo);
@@ -2446,14 +2812,22 @@ function generate50() {
     existingVersions.add(nextVersi);
 
     const targetRowNum = startSheetRow + offset;
-    const formulaVersi = '="v.1."&INT(A' + targetRowNum + '/10)&"."&MOD(A' + targetRowNum + ',10)';
+    const formulaVersi = buildVersionFormula(targetRowNum, sep);
     newRows.push([nextNo, formulaVersi, '', '', '', '', '', '', '', '', '']);
   }
 
   sheet.getRange(startSheetRow, 1, newRows.length, 11).setValues(newRows);
   sheet.getRange(startSheetRow, 1, newRows.length, 1).setNumberFormat('0');
   sheet.getRange(startSheetRow, 3, newRows.length, 1).setNumberFormat('@');
-  applyLogversiValidationsAndLocks(sheet);
+  SpreadsheetApp.flush();
+
+  const checkNewDisp = String(sheet.getRange(startSheetRow, 2).getDisplayValue() || '').trim();
+  if (checkNewDisp.startsWith('#') || checkNewDisp === '') {
+    repairLogversiColumnBFormulas(ss, sheet);
+  } else {
+    applyLogversiValidationsAndLocks(sheet, sep);
+    formatLogversiLayout(sheet);
+  }
   SpreadsheetApp.flush();
 
   ui.alert(
@@ -2664,17 +3038,19 @@ function menuBroadcastUpdate() {
             .withSuccessHandler(function(res) {
               statusBox.style.background = '#ecfdf5';
               statusBox.style.color = '#065f46';
+              statusBox.style.whiteSpace = 'pre-line';
               statusBox.textContent = '✅ ' + res.message;
               btn.textContent = 'Selesai';
               setTimeout(function() {
                 google.script.host.close();
-              }, 2200);
+              }, 3500);
             })
             .withFailureHandler(function(err) {
               btn.disabled = false;
               btn.textContent = 'broadcast & push git version';
               statusBox.style.background = '#fef2f2';
               statusBox.style.color = '#991b1b';
+              statusBox.style.whiteSpace = 'pre-line';
               statusBox.textContent = '❌ ' + (err && err.message ? err.message : String(err));
               alert(err && err.message ? err.message : String(err));
             })
@@ -2690,32 +3066,11 @@ function menuBroadcastUpdate() {
     </html>
   `;
 
-  const output = HtmlService.createHtmlOutput(html).setWidth(480).setHeight(490);
+  const output = HtmlService.createHtmlOutput(html).setWidth(520).setHeight(540);
   ui.showModalDialog(output, 'broadcast versi brevo & github');
 }
 
-function pushManifestVersionToGitHub(config, newVersion) {
-  const token = config.GITHUB_TOKEN;
-  const owner = config.GITHUB_OWNER;
-  const repo = config.GITHUB_REPO;
-  const branch = config.GITHUB_BRANCH;
-  const filePath = config.GITHUB_FILE_PATH.replace(/^\/+/, '');
-
-  const apiUrl =
-    'https://api.github.com/repos/' +
-    encodeURIComponent(owner) +
-    '/' +
-    encodeURIComponent(repo) +
-    '/contents/' +
-    filePath.split('/').map(encodeURIComponent).join('/');
-
-  const headers = {
-    'Authorization': 'Bearer ' + token,
-    'Accept': 'application/vnd.github+json',
-    'User-Agent': 'WaliPintar-AppsScript'
-  };
-
-  let existingSha = null;
+function buildUpdatedManifestJsonText(rawText, newVersion) {
   let manifestObj = {
     id: '/',
     name: 'WaliPintar',
@@ -2725,65 +3080,338 @@ function pushManifestVersionToGitHub(config, newVersion) {
     scope: '/',
     display: 'standalone'
   };
-
-  const getRes = UrlFetchApp.fetch(apiUrl + '?ref=' + encodeURIComponent(branch), {
-    method: 'get',
-    headers: headers,
-    muteHttpExceptions: true
-  });
-  const getCode = getRes.getResponseCode();
-
-  if (getCode === 200) {
-    const getJson = JSON.parse(getRes.getContentText());
-    existingSha = getJson.sha || null;
-    if (getJson.content) {
-      const cleanB64 = String(getJson.content).replace(/\s/g, '');
-      const decodedBytes = Utilities.base64Decode(cleanB64);
-      const rawText = Utilities.newBlob(decodedBytes).getDataAsString('UTF-8');
+  if (rawText && rawText.trim() !== '') {
+    try {
       const parsed = JSON.parse(rawText);
       if (parsed && typeof parsed === 'object') {
         manifestObj = parsed;
       }
-    }
-  } else if (getCode !== 404) {
-    throw new Error('Gagal membaca file GitHub (HTTP ' + getCode + '). Cek GITHUB_OWNER, GITHUB_REPO, GITHUB_BRANCH, dan GITHUB_FILE_PATH.');
+    } catch (e) {}
   }
-
+  // Jaga id, start_url, scope tetap konstan "/" agar update menimpa app lama (tidak ter-install jadi app kedua)
+  manifestObj.id = '/';
+  manifestObj.start_url = '/';
+  manifestObj.scope = '/';
   manifestObj.name = manifestObj.name || 'WaliPintar';
+  manifestObj.short_name = manifestObj.short_name || 'WaliPintar';
   manifestObj.version = newVersion;
+  return JSON.stringify(manifestObj, null, 2) + '\n';
+}
 
-  const updatedText = JSON.stringify(manifestObj, null, 2) + '\n';
-  const encodedContent = Utilities.base64Encode(updatedText, Utilities.Charset.UTF_8);
-
-  const putPayload = {
-    message: 'Update ke ' + newVersion + ' via tombol broadcast',
-    content: encodedContent,
-    branch: branch
-  };
-  if (existingSha) {
-    putPayload.sha = existingSha;
+function buildUpdatedServiceWorkerText(rawText, newVersion, stampStr) {
+  const buildBanner = '// Build-Version: ' + newVersion + ' (' + stampStr + ')';
+  if (rawText && rawText.trim() !== '') {
+    let updated = String(rawText);
+    updated = updated.replace(/^\/\/ Build-Version:.*$/gm, '').replace(/^\s+/, '');
+    updated = updated.replace(
+      /(const\s+LOCKED_VERSION\s*=\s*['"])[^'"]*(['"];?)/,
+      '$1' + newVersion + '$2'
+    );
+    if (!/const\s+LOCKED_VERSION\s*=/.test(updated)) {
+      updated = "const LOCKED_VERSION = '" + newVersion + "';\n" + updated;
+    }
+    return buildBanner + '\n' + updated;
   }
 
-  const putRes = UrlFetchApp.fetch(apiUrl, {
-    method: 'put',
-    contentType: 'application/json',
+  // Template lengkap fallback jika file service-worker.js belum ada di repo
+  return [
+    buildBanner,
+    "const LOCKED_VERSION = '" + newVersion + "';",
+    "const CACHE_NAME = 'walipintar-' + LOCKED_VERSION;",
+    "const CORE_ASSETS = ['/', '/index.html', '/manifest.json', '/pwa-192x192.png', '/pwa-512x512.png'];",
+    '',
+    "self.addEventListener('install', (event) => {",
+    '  event.waitUntil((async () => {',
+    '    const cache = await caches.open(CACHE_NAME);',
+    '    await Promise.all(CORE_ASSETS.map(async (url) => {',
+    "      const res = await fetch(new Request(url, { cache: 'no-store' }));",
+    '      if (res && res.ok) await cache.put(url, res);',
+    '    }));',
+    '    await self.skipWaiting();',
+    '  })());',
+    '});',
+    '',
+    "self.addEventListener('activate', (event) => {",
+    '  event.waitUntil((async () => {',
+    '    const keys = await caches.keys();',
+    "    await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));",
+    '    await self.clients.claim();',
+    '  })());',
+    '});',
+    '',
+    "self.addEventListener('message', (event) => {",
+    "  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();",
+    '});',
+    '',
+    "self.addEventListener('fetch', (event) => {",
+    "  if (event.request.method !== 'GET') return;",
+    '  const url = new URL(event.request.url);',
+    "  if (url.pathname === '/service-worker.js' || url.hostname.includes('script.google.com')) return;",
+    "  if (event.request.mode === 'navigate' || url.pathname === '/manifest.json') {",
+    '    event.respondWith(',
+    "      fetch(new Request(event.request.url, { cache: 'no-store' }))",
+    '        .then((res) => {',
+    '          if (res && res.ok) {',
+    '            const copy = res.clone();',
+    '            caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));',
+    '          }',
+    '          return res;',
+    '        })',
+    "        .catch(() => caches.match(event.request).then((c) => c || caches.match('/index.html')))",
+    '    );',
+    '    return;',
+    '  }',
+    '  if (url.origin === self.location.origin) {',
+    '    event.respondWith(',
+    '      caches.match(event.request).then((cached) => {',
+    '        if (cached) return cached;',
+    '        return fetch(event.request).then((res) => {',
+    "          if (res && res.ok && res.type === 'basic') {",
+    '            const copy = res.clone();',
+    '            caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));',
+    '          }',
+    '          return res;',
+    '        });',
+    '      })',
+    '    );',
+    '  }',
+    '});',
+    ''
+  ].join('\n');
+}
+
+function buildUpdatedVersionButtonText(rawText, newVersion) {
+  return String(rawText).replace(
+    /(const\s+DEFAULT_FALLBACK_VERSION\s*=\s*['"])[^'"]*(['"];?)/,
+    '$1' + newVersion + '$2'
+  );
+}
+
+function fetchGitHubBlobText(owner, repo, sha, headers) {
+  if (!sha) return '';
+  const url =
+    'https://api.github.com/repos/' +
+    encodeURIComponent(owner) +
+    '/' +
+    encodeURIComponent(repo) +
+    '/git/blobs/' +
+    encodeURIComponent(sha);
+  const res = UrlFetchApp.fetch(url, { method: 'get', headers: headers, muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) return '';
+  const json = JSON.parse(res.getContentText());
+  if (!json || !json.content) return '';
+  const cleanB64 = String(json.content).replace(/\s/g, '');
+  const bytes = Utilities.base64Decode(cleanB64);
+  return Utilities.newBlob(bytes).getDataAsString('UTF-8');
+}
+
+function pushAllVersionFilesToGitHub(config, newVersion) {
+  const token = String(config.GITHUB_TOKEN || '').trim();
+  const owner = String(config.GITHUB_OWNER || '').trim();
+  const repo = String(config.GITHUB_REPO || '').trim();
+  const branch = String(config.GITHUB_BRANCH || '').trim();
+  const configuredManifestPath = String(config.GITHUB_FILE_PATH || 'manifest.json').trim().replace(/^\/+/, '');
+  const nowStamp = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss') + ' WIB';
+
+  const baseRepoUrl = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
+  const headers = {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'WaliPintar-AppsScript'
+  };
+
+  // 1. Cek branch target (pastikan branch live PWA benar-benar ada)
+  const refUrl = baseRepoUrl + '/git/ref/heads/' + branch.split('/').map(encodeURIComponent).join('/');
+  const refRes = UrlFetchApp.fetch(refUrl, { method: 'get', headers: headers, muteHttpExceptions: true });
+  if (refRes.getResponseCode() !== 200) {
+    throw new Error(
+      'Branch "' + branch + '" tidak ditemukan di ' + owner + '/' + repo +
+      ' (HTTP ' + refRes.getResponseCode() + '). Periksa GITHUB_BRANCH di Script Properties.'
+    );
+  }
+  const headCommitSha = JSON.parse(refRes.getContentText()).object.sha;
+
+  // 2. Ambil base commit & tree lengkap repo
+  const commitRes = UrlFetchApp.fetch(baseRepoUrl + '/git/commits/' + encodeURIComponent(headCommitSha), {
+    method: 'get',
     headers: headers,
-    payload: JSON.stringify(putPayload),
     muteHttpExceptions: true
   });
+  if (commitRes.getResponseCode() !== 200) {
+    throw new Error('Gagal membaca commit HEAD branch "' + branch + '" (HTTP ' + commitRes.getResponseCode() + ').');
+  }
+  const baseTreeSha = JSON.parse(commitRes.getContentText()).tree.sha;
 
-  const putCode = putRes.getResponseCode();
-  if (putCode !== 200 && putCode !== 201) {
-    throw new Error('Gagal push ke GitHub (HTTP ' + putCode + '). Periksa izin GITHUB_TOKEN & nama branch.');
+  const treeRes = UrlFetchApp.fetch(baseRepoUrl + '/git/trees/' + encodeURIComponent(baseTreeSha) + '?recursive=1', {
+    method: 'get',
+    headers: headers,
+    muteHttpExceptions: true
+  });
+  const repoFileMap = {};
+  if (treeRes.getResponseCode() === 200) {
+    const treeItems = JSON.parse(treeRes.getContentText()).tree || [];
+    for (let i = 0; i < treeItems.length; i++) {
+      if (treeItems[i].type === 'blob' && treeItems[i].path) {
+        repoFileMap[treeItems[i].path] = treeItems[i].sha;
+      }
+    }
   }
 
-  return Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH.mm.ss') + ' WIB';
+  // 3. Kumpulkan seluruh file yang WAJIB ikut ter-push dalam 1 commit
+  const targetTasks = [];
+  const addedPaths = {};
+  function addTask(path, kind) {
+    const clean = String(path || '').replace(/^\/+/, '');
+    if (!clean || addedPaths[clean]) return;
+    addedPaths[clean] = true;
+    targetTasks.push({ path: clean, kind: kind, existingSha: repoFileMap[clean] || null });
+  }
+
+  // Manifest utama dari Script Property + manifest lain yang ada di repo
+  addTask(configuredManifestPath, 'manifest');
+  ['manifest.json', 'public/manifest.json', 'public/manifest.webmanifest', 'license-system/manifest.json'].forEach(function(p) {
+    if (repoFileMap[p]) addTask(p, 'manifest');
+  });
+
+  // Service Worker (semua path SW yang ada di repo, atau fallback di folder yang sama dengan manifest utama)
+  let foundSwCount = 0;
+  ['service-worker.js', 'public/service-worker.js', 'sw.js', 'license-system/sw.js'].forEach(function(p) {
+    if (repoFileMap[p]) {
+      addTask(p, 'sw');
+      foundSwCount++;
+    }
+  });
+  if (foundSwCount === 0) {
+    const folderPrefix = configuredManifestPath.indexOf('/') !== -1
+      ? configuredManifestPath.slice(0, configuredManifestPath.lastIndexOf('/') + 1)
+      : '';
+    addTask(folderPrefix + 'service-worker.js', 'sw');
+  }
+
+  // Fallback versi tombol di UI React (jika ada di repo)
+  if (repoFileMap['src/components/VersionButton.tsx']) {
+    addTask('src/components/VersionButton.tsx', 'version_button');
+  }
+
+  // 4. Siapkan konten & buat Git Blob per file + catat log per file
+  const treeEntries = [];
+  const fileLogs = [];
+  let failedCount = 0;
+
+  for (let i = 0; i < targetTasks.length; i++) {
+    const task = targetTasks[i];
+    try {
+      const currentText = task.existingSha ? fetchGitHubBlobText(owner, repo, task.existingSha, headers) : '';
+      let nextText = currentText;
+
+      if (task.kind === 'manifest') {
+        nextText = buildUpdatedManifestJsonText(currentText, newVersion);
+      } else if (task.kind === 'sw') {
+        nextText = buildUpdatedServiceWorkerText(currentText, newVersion, nowStamp);
+      } else if (task.kind === 'version_button') {
+        nextText = buildUpdatedVersionButtonText(currentText, newVersion);
+      }
+
+      const blobRes = UrlFetchApp.fetch(baseRepoUrl + '/git/blobs', {
+        method: 'post',
+        contentType: 'application/json',
+        headers: headers,
+        payload: JSON.stringify({
+          content: nextText,
+          encoding: 'utf-8'
+        }),
+        muteHttpExceptions: true
+      });
+      const blobCode = blobRes.getResponseCode();
+      if (blobCode !== 200 && blobCode !== 201) {
+        failedCount++;
+        fileLogs.push('❌ ' + task.path + ' (HTTP ' + blobCode + ')');
+        continue;
+      }
+
+      const blobSha = JSON.parse(blobRes.getContentText()).sha;
+      treeEntries.push({
+        path: task.path,
+        mode: '100644',
+        type: 'blob',
+        sha: blobSha
+      });
+      fileLogs.push('✅ ' + task.path);
+    } catch (fileErr) {
+      failedCount++;
+      fileLogs.push('❌ ' + task.path + ' (' + fileErr.message + ')');
+    }
+  }
+
+  if (treeEntries.length === 0 || failedCount > 0) {
+    throw new Error(
+      'Sebagian/seluruh file gagal disiapkan untuk push ke branch "' + branch + '":\n' +
+      fileLogs.join('\n')
+    );
+  }
+
+  // 5. Buat 1 Git Tree, 1 Git Commit, lalu update branch ref (1 commit atomik semua file!)
+  const newTreeRes = UrlFetchApp.fetch(baseRepoUrl + '/git/trees', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: treeEntries
+    }),
+    muteHttpExceptions: true
+  });
+  if (newTreeRes.getResponseCode() !== 200 && newTreeRes.getResponseCode() !== 201) {
+    throw new Error('Gagal membuat Git Tree (HTTP ' + newTreeRes.getResponseCode() + '):\n' + fileLogs.join('\n'));
+  }
+  const newTreeSha = JSON.parse(newTreeRes.getContentText()).sha;
+
+  const newCommitRes = UrlFetchApp.fetch(baseRepoUrl + '/git/commits', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify({
+      message: 'Update ke ' + newVersion + ' via tombol broadcast',
+      tree: newTreeSha,
+      parents: [headCommitSha]
+    }),
+    muteHttpExceptions: true
+  });
+  if (newCommitRes.getResponseCode() !== 200 && newCommitRes.getResponseCode() !== 201) {
+    throw new Error('Gagal membuat Git Commit (HTTP ' + newCommitRes.getResponseCode() + ').');
+  }
+  const newCommitSha = JSON.parse(newCommitRes.getContentText()).sha;
+
+  const updateRefRes = UrlFetchApp.fetch(refUrl, {
+    method: 'patch',
+    contentType: 'application/json',
+    headers: headers,
+    payload: JSON.stringify({
+      sha: newCommitSha,
+      force: false
+    }),
+    muteHttpExceptions: true
+  });
+  if (updateRefRes.getResponseCode() !== 200) {
+    throw new Error('Gagal update branch "' + branch + '" (HTTP ' + updateRefRes.getResponseCode() + ').');
+  }
+
+  return {
+    timestamp: nowStamp,
+    branch: branch,
+    commitSha: newCommitSha,
+    fileLogs: fileLogs
+  };
+}
+
+function pushManifestVersionToGitHub(config, newVersion) {
+  return pushAllVersionFilesToGitHub(config, newVersion).timestamp;
 }
 
 /**
  * Dijalankan langsung saat tombol "broadcast & push git version" di dialog diklik.
  * Hanya melakukan 2 langkah langsung:
- * 1) Push update manifest.json ke GitHub
+ * 1) Push multi-file (manifest + service-worker.js + versi UI) ke GitHub dalam 1 commit atomik
  * 2) Simpan & kunci baris di `Logversi WPApp` (Status: "PUSH BERHASIL - BREVO PENDING") + pasang Time Trigger jeda Brevo.
  */
 function processBroadcastAndPushGit(formData) {
@@ -2830,8 +3458,9 @@ function processBroadcastAndPushGit(formData) {
     const schedTime = new Date(clickTime.getTime() + jedaMenit * 60000);
     const schedHHmm = Utilities.formatDate(schedTime, 'Asia/Jakarta', 'HH.mm');
 
-    // 1. Push GitHub langsung ke manifest.json repo
-    const pushTimeStr = pushManifestVersionToGitHub(config, nextEntry.versi);
+    // 1. Push GitHub multi-file dalam 1 commit ke branch live
+    const pushResult = pushAllVersionFilesToGitHub(config, nextEntry.versi);
+    const pushTimeStr = pushResult.timestamp + ' [' + pushResult.branch + ']';
 
     // 2. Simpan ke Sheet Logversi WPApp dan KUNCI baris tersebut
     const scheduleSummary =
@@ -2867,7 +3496,13 @@ function processBroadcastAndPushGit(formData) {
       tanggal: lockedDateStr,
       jedaMenit: jedaMenit,
       scheduledAt: schedHHmm,
-      message: 'Push GitHub ke ' + nextEntry.versi + ' berhasil & Sheet terkunci! Brevo dijadwalkan terkirim otomatis jam ' + schedHHmm + ' WIB (' + jedaMenit + ' menit lagi).'
+      branch: pushResult.branch,
+      commitSha: pushResult.commitSha,
+      fileLogs: pushResult.fileLogs,
+      message:
+        'Push GitHub ke ' + nextEntry.versi + ' (branch: ' + pushResult.branch + ') berhasil & Sheet terkunci!\n' +
+        'File ter-push:\n' + pushResult.fileLogs.join('\n') + '\n' +
+        'Brevo dijadwalkan otomatis jam ' + schedHHmm + ' WIB (' + jedaMenit + ' menit lagi).'
     };
   } finally {
     lock.releaseLock();
@@ -2905,7 +3540,9 @@ function executePendingBrevoBroadcast() {
     for (let i = 0; i < rows.length; i++) {
       const rowNum = i + 2;
       const no = String(rows[i][0] || '').trim();
-      const versi = String(rows[i][1] || '').trim();
+      const rawVersi = String(rows[i][1] || '').trim();
+      const noInt = parseInt(no, 10);
+      const versi = (rawVersi && !rawVersi.startsWith('#')) ? rawVersi : (!isNaN(noInt) ? formatVersionFromNo(noInt) : rawVersi);
       const tanggal = String(rows[i][2] || '').trim();
       const yangDiubah = String(rows[i][3] || '').trim();
       const status = String(rows[i][4] || '').trim();
@@ -3195,6 +3832,7 @@ function menuGenerateManual() {
     if (isLynk) generateLynkReport(true);
     else generateScalevReport(true);
     generateDashboard(true);
+    syncOrderSnapshot(ss);
 
     ui.alert(
       '🎉 Lisensi Manual Berhasil Dibuat!',
@@ -3276,6 +3914,255 @@ function menuResendManual() {
   ui.alert('Data email / kode lisensi "' + query + '" tidak ditemukan di Scalev_Orders maupun Lynk_Orders.');
 }
 
+function ensureBlockedLicensesSheet(ss) {
+  const targetSs = ss || getTargetSpreadsheet();
+  return ensureSheetHeaders(targetSs, TAB_BLOCKED_LICENSES, [
+    'Waktu Diblokir',
+    'License Key',
+    'Email',
+    'Order ID',
+    'Sumber Sheet',
+    'Nama Pelanggan',
+    'Keterangan'
+  ], '#991b1b');
+}
+
+function archiveBlockedLicenseRow(ss, entry) {
+  const targetSs = ss || getTargetSpreadsheet();
+  const cleanLicense = String((entry && entry.licenseKey) || '').trim().toUpperCase();
+  const cleanEmail = String((entry && entry.email) || '').trim().toLowerCase();
+  const cleanOrderId = String((entry && entry.orderId) || '').trim();
+  const sourceSheet = String((entry && entry.sourceSheet) || '').trim();
+  const customerName = String((entry && entry.customerName) || '').trim();
+  const reason = String((entry && entry.reason) || 'Dihapus dari daftar lisensi').trim();
+
+  if (!cleanLicense && !cleanEmail) return false;
+
+  const blockedSheet = ensureBlockedLicensesSheet(targetSs);
+  const lastRow = blockedSheet.getLastRow();
+  if (lastRow > 1) {
+    const existingRows = blockedSheet.getRange(2, 2, lastRow - 1, 2).getValues();
+    for (let i = 0; i < existingRows.length; i++) {
+      const exLic = String(existingRows[i][0] || '').trim().toUpperCase();
+      const exEmail = String(existingRows[i][1] || '').trim().toLowerCase();
+      if (exLic === cleanLicense && exEmail === cleanEmail) {
+        return false;
+      }
+    }
+  }
+
+  blockedSheet.appendRow([
+    new Date(),
+    cleanLicense || '-',
+    cleanEmail || '-',
+    cleanOrderId || '-',
+    sourceSheet || '-',
+    customerName || '-',
+    reason
+  ]);
+  const newRow = blockedSheet.getLastRow();
+  blockedSheet.getRange(newRow, 1).setNumberFormat('dd/MM/yyyy HH:mm:ss');
+  SpreadsheetApp.flush();
+  return true;
+}
+
+function findBlockedLicenseEntry(ss, licenseKey, email, orderId) {
+  const targetSs = ss || getTargetSpreadsheet();
+  const blockedSheet = targetSs.getSheetByName(TAB_BLOCKED_LICENSES);
+  if (!blockedSheet || blockedSheet.getLastRow() <= 1) return null;
+
+  const cleanLic = String(licenseKey || '').trim().toUpperCase();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanOrder = String(orderId || '').trim();
+  if (!cleanLic && !cleanEmail && !cleanOrder) return null;
+
+  const data = blockedSheet.getDataRange().getValues();
+  for (let i = data.length - 1; i >= 1; i--) {
+    const rowLic = String(data[i][1] || '').trim().toUpperCase();
+    const rowEmail = String(data[i][2] || '').trim().toLowerCase();
+    const rowOrder = String(data[i][3] || '').trim();
+
+    const licMatch = cleanLic && rowLic && rowLic !== '-' && rowLic === cleanLic;
+    const emailMatch = cleanEmail && rowEmail && rowEmail !== '-' && rowEmail === cleanEmail;
+    const orderMatch = cleanOrder && rowOrder && rowOrder !== '-' && rowOrder === cleanOrder;
+
+    if (licMatch || emailMatch || orderMatch) {
+      return {
+        rowIndex: i + 1,
+        blockedAt: data[i][0],
+        licenseKey: rowLic,
+        email: rowEmail,
+        orderId: rowOrder,
+        sourceSheet: String(data[i][4] || '').trim(),
+        reason: String(data[i][6] || '').trim()
+      };
+    }
+  }
+  return null;
+}
+
+function ensureOrderSnapshotSheet(ss) {
+  const targetSs = ss || getTargetSpreadsheet();
+  let snapSheet = targetSs.getSheetByName(TAB_ORDERS_SNAPSHOT);
+  if (!snapSheet) {
+    snapSheet = targetSs.insertSheet(TAB_ORDERS_SNAPSHOT);
+  }
+  if (snapSheet.getLastRow() === 0) {
+    snapSheet.appendRow(['Sumber Sheet', 'Order ID', 'Email', 'License Key', 'Nama Pelanggan']);
+  }
+  try {
+    if (!snapSheet.isSheetHidden()) {
+      snapSheet.hideSheet();
+    }
+  } catch (e) {}
+  return snapSheet;
+}
+
+function appendOrderSnapshotRow(ss, tabName, orderId, email, licenseKey, customerName) {
+  try {
+    const targetSs = ss || getTargetSpreadsheet();
+    const snapSheet = ensureOrderSnapshotSheet(targetSs);
+    snapSheet.appendRow([
+      tabName,
+      String(orderId || '').trim(),
+      String(email || '').trim().toLowerCase(),
+      String(licenseKey || '').trim().toUpperCase(),
+      String(customerName || '').trim()
+    ]);
+  } catch (err) {
+    Logger.log('Warning appendOrderSnapshotRow: ' + err.toString());
+  }
+}
+
+function syncOrderSnapshot(ss) {
+  try {
+    const targetSs = ss || getTargetSpreadsheet();
+    const snapSheet = ensureOrderSnapshotSheet(targetSs);
+    const snapshotRows = [];
+
+    [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
+      const sh = targetSs.getSheetByName(tabName);
+      if (!sh || sh.getLastRow() <= 1) return;
+      const data = sh.getRange(2, 1, sh.getLastRow() - 1, Math.min(8, sh.getLastColumn())).getValues();
+      for (let i = 0; i < data.length; i++) {
+        const orderId = String(data[i][1] || '').trim();
+        const email = String(data[i][2] || '').trim().toLowerCase();
+        const lic = String(data[i][3] || '').trim().toUpperCase();
+        const custName = String(data[i][7] || '').trim();
+        if (lic || email) {
+          snapshotRows.push([tabName, orderId, email, lic, custName]);
+        }
+      }
+    });
+
+    const lastSnapRow = snapSheet.getLastRow();
+    if (lastSnapRow > 1) {
+      snapSheet.getRange(2, 1, lastSnapRow - 1, 5).clearContent();
+    }
+    if (snapshotRows.length > 0) {
+      snapSheet.getRange(2, 1, snapshotRows.length, 5).setValues(snapshotRows);
+    }
+  } catch (err) {
+    Logger.log('Warning syncOrderSnapshot: ' + err.toString());
+  }
+}
+
+function reconcileDeletedOrderRows(ss, reasonLabel) {
+  const targetSs = ss || getTargetSpreadsheet();
+  const snapSheet = targetSs.getSheetByName(TAB_ORDERS_SNAPSHOT);
+  if (!snapSheet || snapSheet.getLastRow() <= 1) {
+    syncOrderSnapshot(targetSs);
+    return 0;
+  }
+
+  const activeLicenses = new Set();
+  const activeEmails = new Set();
+  [TAB_SCALEV_ORDERS, TAB_LYNK_ORDERS].forEach(function(tabName) {
+    const sh = targetSs.getSheetByName(tabName);
+    if (!sh || sh.getLastRow() <= 1) return;
+    const data = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+    for (let i = 0; i < data.length; i++) {
+      const email = String(data[i][2] || '').trim().toLowerCase();
+      const lic = String(data[i][3] || '').trim().toUpperCase();
+      if (lic) activeLicenses.add(lic);
+      if (email) activeEmails.add(email);
+    }
+  });
+
+  const snapRows = snapSheet.getRange(2, 1, snapSheet.getLastRow() - 1, 5).getValues();
+  let archivedCount = 0;
+
+  for (let i = 0; i < snapRows.length; i++) {
+    const sourceTab = String(snapRows[i][0] || '').trim();
+    const orderId = String(snapRows[i][1] || '').trim();
+    const email = String(snapRows[i][2] || '').trim().toLowerCase();
+    const lic = String(snapRows[i][3] || '').trim().toUpperCase();
+    const custName = String(snapRows[i][4] || '').trim();
+
+    if (!lic && !email) continue;
+
+    const licStillExists = lic && activeLicenses.has(lic);
+    const emailStillExists = email && activeEmails.has(email);
+
+    if (!licStillExists && (!email || !emailStillExists)) {
+      const added = archiveBlockedLicenseRow(targetSs, {
+        licenseKey: lic,
+        email: email,
+        orderId: orderId,
+        sourceSheet: sourceTab,
+        customerName: custName,
+        reason: reasonLabel || ('Dihapus manual dari ' + (sourceTab || 'Sheet'))
+      });
+      if (added) archivedCount++;
+    }
+  }
+
+  syncOrderSnapshot(targetSs);
+  return archivedCount;
+}
+
+function onBlockedRowChange(e) {
+  try {
+    const changeType = e && e.changeType ? String(e.changeType).toUpperCase() : '';
+    if (changeType === 'REMOVE_ROW' || changeType === 'EDIT' || changeType === 'OTHER') {
+      const ss = (e && e.source) ? e.source : getTargetSpreadsheet();
+      reconcileDeletedOrderRows(ss, 'Dihapus manual dari Google Sheet (' + changeType + ')');
+    }
+  } catch (err) {
+    Logger.log('Warning onBlockedRowChange: ' + err.toString());
+  }
+}
+
+function setupBlockedLicenseMonitorTrigger(silent) {
+  const ss = getTargetSpreadsheet();
+  ensureBlockedLicensesSheet(ss);
+  syncOrderSnapshot(ss);
+
+  const existing = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === 'onBlockedRowChange') {
+      ScriptApp.deleteTrigger(existing[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('onBlockedRowChange')
+    .forSpreadsheet(ss)
+    .onChange()
+    .create();
+
+  if (!silent) {
+    SpreadsheetApp.getUi().alert(
+      '🚫 Auto-Deteksi Lisensi terblokir Aktif!',
+      'Setiap kali Anda menghapus baris lisensi (baik lewat menu Admin maupun klik kanan Delete Row di Scalev_Orders / Lynk_Orders), kode lisensi & email sebaris otomatis masuk ke tab "' + TAB_BLOCKED_LICENSES + '".',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+}
+
+function menuSetupBlockedLicenseMonitorTrigger() {
+  setupBlockedLicenseMonitorTrigger(false);
+}
+
 function deleteMatchingLicenseRows(ss, target) {
   const cleanTarget = String(target || '').trim();
   let deletedCount = 0;
@@ -3289,25 +4176,37 @@ function deleteMatchingLicenseRows(ss, target) {
       const orderId = String(data[i][1] || '').trim();
       const email = String(data[i][2] || '').trim().toLowerCase();
       const license = String(data[i][3] || '').trim().toUpperCase();
+      const custName = String(data[i][7] || '').trim();
 
       if (
         license === cleanTarget.toUpperCase() ||
         email === cleanTarget.toLowerCase() ||
         orderId === cleanTarget
       ) {
+        archiveBlockedLicenseRow(ss, {
+          licenseKey: license,
+          email: email,
+          orderId: orderId,
+          sourceSheet: tabName,
+          customerName: custName,
+          reason: 'Dihapus via Pencarian / API (' + cleanTarget + ')'
+        });
         sh.deleteRow(i + 1);
         deletedCount++;
       }
     }
   });
 
+  if (deletedCount > 0) {
+    syncOrderSnapshot(ss);
+  }
   return deletedCount;
 }
 
 function menuDeleteLicenseSearch() {
   const ui = SpreadsheetApp.getUi();
   const prompt = ui.prompt(
-    '🗑️ Hapus Lisensi (Scalev & Lynk)',
+    '🗑️ Hapus & Blokir Lisensi (Scalev & Lynk)',
     'Masukkan Kode Lisensi (misal: WALI-7K9P), Email Pembeli, atau Order ID:',
     ui.ButtonSet.OK_CANCEL
   );
@@ -3323,7 +4222,7 @@ function menuDeleteLicenseSearch() {
     generateScalevReport(true);
     generateLynkReport(true);
     generateDashboard(true);
-    ui.alert('✅ Berhasil Dihapus', deletedCount + ' baris data yang cocok dengan "' + target + '" telah dihapus.', ui.ButtonSet.OK);
+    ui.alert('✅ Berhasil Dihapus & Diblokir', deletedCount + ' baris data yang cocok dengan "' + target + '" telah dihapus dan dicatat ke tab "' + TAB_BLOCKED_LICENSES + '".', ui.ButtonSet.OK);
   } else {
     ui.alert('Tidak ditemukan data dengan kriteria: ' + target);
   }
@@ -3346,19 +4245,28 @@ function menuDeleteSelectedRow() {
     return;
   }
 
-  const rowData = activeSheet.getRange(row, 1, 1, 4).getValues()[0];
+  const rowData = activeSheet.getRange(row, 1, 1, Math.min(8, activeSheet.getLastColumn())).getValues()[0];
   const confirm = ui.alert(
-    '⚠️ Konfirmasi Hapus Baris #' + row + ' (' + sheetName + ')',
-    'Yakin ingin menghapus permanen?\nOrder ID: ' + rowData[1] + '\nEmail: ' + rowData[2] + '\nLisensi: ' + rowData[3],
+    '⚠️ Konfirmasi Hapus & Blokir Baris #' + row + ' (' + sheetName + ')',
+    'Yakin ingin menghapus dan memblokir?\nOrder ID: ' + rowData[1] + '\nEmail: ' + rowData[2] + '\nLisensi: ' + rowData[3] + '\n\nLisensi & Email akan dipindahkan ke tab "' + TAB_BLOCKED_LICENSES + '".',
     ui.ButtonSet.YES_NO
   );
 
   if (confirm === ui.Button.YES) {
+    archiveBlockedLicenseRow(ss, {
+      licenseKey: rowData[3],
+      email: rowData[2],
+      orderId: rowData[1],
+      sourceSheet: sheetName,
+      customerName: rowData[7],
+      reason: 'Dihapus manual baris terpilih (' + sheetName + ')'
+    });
     activeSheet.deleteRow(row);
+    syncOrderSnapshot(ss);
     generateScalevReport(true);
     generateLynkReport(true);
     generateDashboard(true);
-    ui.alert('🗑️ Baris berhasil dihapus.');
+    ui.alert('🗑️ Baris berhasil dihapus dan dimasukkan ke "' + TAB_BLOCKED_LICENSES + '".');
   }
 }
 
@@ -3382,7 +4290,7 @@ function menuDeleteAllOrders() {
   const confirm = ui.alert(
     '⚠️ KONFIRMASI RESET TOTAL (' + targetSheetName + ')',
     'Apakah Anda yakin ingin MENGHAPUS SEMUA ' + count + ' baris data di tab "' + targetSheetName + '"?\n\n' +
-    'Semua lisensi di tab tersebut akan terhapus dan header akan dipertahankan.\nTindakan ini tidak dapat dibatalkan!',
+    'Semua lisensi & email akan dipindahkan ke tab "' + TAB_BLOCKED_LICENSES + '" dan header akan dipertahankan.\nTindakan ini tidak dapat dibatalkan!',
     ui.ButtonSet.YES_NO
   );
 
@@ -3391,11 +4299,24 @@ function menuDeleteAllOrders() {
     return;
   }
 
+  const rows = targetSheet.getRange(2, 1, count, Math.min(8, targetSheet.getLastColumn())).getValues();
+  for (let r = 0; r < rows.length; r++) {
+    archiveBlockedLicenseRow(ss, {
+      licenseKey: rows[r][3],
+      email: rows[r][2],
+      orderId: rows[r][1],
+      sourceSheet: targetSheetName,
+      customerName: rows[r][7],
+      reason: 'Reset Total (' + targetSheetName + ')'
+    });
+  }
+
   targetSheet.deleteRows(2, count);
+  syncOrderSnapshot(ss);
   generateScalevReport(true);
   generateLynkReport(true);
   generateDashboard(true);
-  ui.alert('✅ Reset Berhasil!', 'Seluruh ' + count + ' data di tab "' + targetSheetName + '" telah dihapus.', ui.ButtonSet.OK);
+  ui.alert('✅ Reset Berhasil!', 'Seluruh ' + count + ' data di tab "' + targetSheetName + '" telah dihapus dan dicatat di "' + TAB_BLOCKED_LICENSES + '".', ui.ButtonSet.OK);
 }
 
 // ============================================================================
@@ -3632,7 +4553,7 @@ function isScalevOrderPaidAndValid(order) {
 
   if (orderStatus === 'COMPLETED') return true;
   if (payStatus === 'PAID' || payStatus === 'SETTLED' || payStatus === 'COMPLETED' || payStatus === 'SUCCESS') return true;
-  if (!payStatus && (orderStatus === 'PAID' || orderStatus === 'SETTLED' || orderStatus === 'CONFIRMED' || orderStatus === 'SHIPPED')) {
+  if (!payStatus && (orderStatus === 'PAID' || orderStatus === 'SETTLED')) {
     return true;
   }
   return false;
@@ -3642,7 +4563,8 @@ function verifyScalevPayment(orderIdOrEmail) {
   if (!SCALEV_API_KEY) {
     return {
       configured: false,
-      verified: true,
+      verified: false,
+      notOrdered: true,
       message: 'SCALEV_API_KEY belum dipasang di Script Properties.'
     };
   }
@@ -3652,6 +4574,20 @@ function verifyScalevPayment(orderIdOrEmail) {
     if (!cleanTarget) {
       return { configured: true, verified: false, message: 'Parameter target kosong.' };
     }
+
+    const cleanLower = cleanTarget.toLowerCase();
+    const cacheKey = 'sclv_v3_' + Utilities.base64EncodeWebSafe(cleanLower).slice(0, 60);
+    let cacheObj = null;
+    try {
+      cacheObj = CacheService.getScriptCache();
+      const cachedRaw = cacheObj.get(cacheKey);
+      if (cachedRaw) {
+        const parsedCache = JSON.parse(cachedRaw);
+        if (parsedCache && parsedCache.verified) {
+          return parsedCache;
+        }
+      }
+    } catch (e) {}
 
     const options = {
       method: 'get',
@@ -3668,14 +4604,14 @@ function verifyScalevPayment(orderIdOrEmail) {
 
     if (cleanTarget.includes('@')) {
       const emailLower = cleanTarget.toLowerCase();
-      let response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100&search=' + encodeURIComponent(emailLower), options);
+      let response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=15&search=' + encodeURIComponent(emailLower), options);
       statusCode = response.getResponseCode();
       let listJson = null;
       try { listJson = JSON.parse(response.getContentText()); } catch (e) {}
       let orderList = extractScalevOrderList(listJson);
 
       if (orderList.length === 0) {
-        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100', options);
+        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=20', options);
         statusCode = response.getResponseCode();
         try { listJson = JSON.parse(response.getContentText()); } catch (e) {}
         orderList = extractScalevOrderList(listJson);
@@ -3708,11 +4644,19 @@ function verifyScalevPayment(orderIdOrEmail) {
       }
 
       if (statusCode === 404 || !orderObj || (rawJson && rawJson.errors)) {
-        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=100&search=' + encodeURIComponent(cleanTarget), options);
+        response = UrlFetchApp.fetch('https://api.scalev.com/v3/orders?limit=20&search=' + encodeURIComponent(cleanTarget), options);
         statusCode = response.getResponseCode();
         let searchJson = null;
         try { searchJson = JSON.parse(response.getContentText()); } catch (e) {}
-        const searchList = extractScalevOrderList(searchJson);
+        const searchList = extractScalevOrderList(searchJson).filter(function(item) {
+          const candidates = [
+            String(item.order_id || '').trim(),
+            String(item.order_number || '').trim(),
+            String(item.code || '').trim(),
+            String(item.id || '').trim()
+          ];
+          return candidates.indexOf(cleanTarget) !== -1;
+        });
         if (searchList.length > 0) {
           const paidItem = searchList.find(function(item) {
             return isScalevOrderPaidAndValid(item);
@@ -3746,7 +4690,7 @@ function verifyScalevPayment(orderIdOrEmail) {
       const grossRevenue = extractGrossRevenue(orderObj);
       const paymentTime = extractPaymentTime(orderObj);
 
-      return {
+      const resultPayload = {
         configured: true,
         verified: isPaid,
         statusCode: statusCode,
@@ -3760,6 +4704,10 @@ function verifyScalevPayment(orderIdOrEmail) {
           ? 'Pembayaran terverifikasi lunas di Scalev (Rp ' + formatNumberId(grossRevenue) + ').'
           : 'Pesanan (' + (customerEmail || cleanTarget) + ') berstatus ' + (orderObj.status || paymentStatus || 'unpaid') + '.'
       };
+      if (isPaid && cacheObj) {
+        try { cacheObj.put(cacheKey, JSON.stringify(resultPayload), 300); } catch (e) {}
+      }
+      return resultPayload;
     } else {
       return {
         configured: true,
@@ -4258,6 +5206,38 @@ function menuTestLynkWebhook() {
 // ============================================================================
 // 🛠️ HELPER UMUM: IDEMPOTENCY, ANTI-DUPLIKAT LINTAS SHEET, PARSER & FORMATTER
 // ============================================================================
+function getOrderSheetColumnIndices(headerRow, sheetName) {
+  const isLynk = String(sheetName || '').trim() === TAB_LYNK_ORDERS;
+  const cols = {
+    time: 0,
+    orderId: 1,
+    email: 2,
+    license: 3,
+    status: 4,
+    paymentStatus: 5,
+    revenue: 6,
+    name: 7,
+    catatan: isLynk ? 10 : 8
+  };
+
+  if (!headerRow || !headerRow.length) return cols;
+
+  for (let c = 0; c < headerRow.length; c++) {
+    const h = String(headerRow[c] || '').trim().toLowerCase();
+    if (!h) continue;
+    if (h.includes('waktu') || h.includes('tanggal')) cols.time = c;
+    else if (h.includes('order id') || h === 'order_id' || h === 'refid') cols.orderId = c;
+    else if (h === 'email' || h.includes('email pembeli')) cols.email = c;
+    else if (h === 'license key' || h === 'lisensi' || h.includes('license')) cols.license = c;
+    else if (h === 'status lisensi' || h === 'status') cols.status = c;
+    else if (h === 'payment status' || h.includes('pembayaran')) cols.paymentStatus = c;
+    else if (h.includes('revenue') || h.includes('omzet') || h.includes('harga')) cols.revenue = c;
+    else if (h.includes('nama pelanggan') || h === 'nama pembeli' || h === 'nama') cols.name = c;
+    else if (h === 'catatan' || h.includes('notes')) cols.catatan = c;
+  }
+  return cols;
+}
+
 /**
  * Mencari lisensi paten milik sebuah email di seluruh tab order (`Scalev_Orders` & `Lynk_Orders`).
  * Selalu memprioritaskan baris `ACTIVE` paling awal agar kode lisensi tiap email tetap fix selamanya.
@@ -4274,22 +5254,24 @@ function findFixedLicenseForEmail(ss, email) {
     if (!sh || sh.getLastRow() <= 1) continue;
 
     const data = sh.getDataRange().getValues();
+    const cols = getOrderSheetColumnIndices(data[0], tabs[t]);
     for (let i = 1; i < data.length; i++) {
-      const rowEmail = String(data[i][2] || '').trim().toLowerCase();
-      const rowLicense = String(data[i][3] || '').trim().toUpperCase();
-      const rowStatus = String(data[i][4] || '').trim().toUpperCase();
+      const rowEmail = String(data[i][cols.email] || '').trim().toLowerCase();
+      const rowLicense = String(data[i][cols.license] || '').trim().toUpperCase();
+      const rowStatus = String(data[i][cols.status] || '').trim().toUpperCase();
 
       if (rowEmail === targetEmail && rowLicense && rowLicense.startsWith('WALI-')) {
         const matchObj = {
           tabName: tabs[t],
           rowIndex: i + 1,
-          paymentTime: data[i][0],
-          orderId: String(data[i][1] || '').trim(),
+          noteCol: cols.catatan + 1,
+          paymentTime: data[i][cols.time],
+          orderId: String(data[i][cols.orderId] || '').trim(),
           email: rowEmail,
           licenseKey: rowLicense,
           status: rowStatus,
-          customerName: String(data[i][7] || '').trim(),
-          catatan: String(data[i][data[i].length - 1] || '').trim()
+          customerName: String(data[i][cols.name] || '').trim(),
+          catatan: String(data[i][cols.catatan] || '').trim()
         };
         if (rowStatus === 'ACTIVE') {
           return matchObj;
@@ -4305,8 +5287,9 @@ function findFixedLicenseForEmail(ss, email) {
 }
 
 function findExistingOrder(sheet, orderId, email) {
-  if (!sheet) return null;
+  if (!sheet || sheet.getLastRow() <= 1) return null;
   const data = sheet.getDataRange().getValues();
+  const cols = getOrderSheetColumnIndices(data[0], sheet.getName());
   const targetOrder = String(orderId || '').trim();
   const targetEmail = String(email || '').trim().toLowerCase();
 
@@ -4315,12 +5298,13 @@ function findExistingOrder(sheet, orderId, email) {
   let anyEmailMatch = null;
 
   for (let i = 1; i < data.length; i++) {
-    const rowOrder = String(data[i][1] || '').trim();
-    const rowEmail = String(data[i][2] || '').trim().toLowerCase();
-    const rowLicense = String(data[i][3] || '').trim().toUpperCase();
-    const rowStatus = String(data[i][4] || '').trim().toUpperCase();
-    const rowName = String(data[i][7] || '').trim();
-    const rowCatatan = String(data[i][data[i].length - 1] || '').trim();
+    const rowOrder = String(data[i][cols.orderId] || '').trim();
+    const rowEmail = String(data[i][cols.email] || '').trim().toLowerCase();
+    const rowLicense = String(data[i][cols.license] || '').trim().toUpperCase();
+    const rowStatus = String(data[i][cols.status] || '').trim().toUpperCase();
+    const rowPaymentStatus = String(data[i][cols.paymentStatus] || '').trim().toUpperCase();
+    const rowName = String(data[i][cols.name] || '').trim();
+    const rowCatatan = String(data[i][cols.catatan] || '').trim();
 
     if (!rowLicense) continue;
 
@@ -4330,19 +5314,22 @@ function findExistingOrder(sheet, orderId, email) {
 
     const matchObj = {
       rowIndex: i + 1,
-      paymentTime: data[i][0],
+      noteCol: cols.catatan + 1,
+      paymentTime: data[i][cols.time],
       orderId: rowOrder,
       email: rowEmail,
       licenseKey: rowLicense,
       status: rowStatus,
+      paymentStatus: rowPaymentStatus,
       customerName: rowName,
       catatan: rowCatatan
     };
 
-    if (orderMatched && rowStatus === 'ACTIVE') {
+    const isClaimable = rowStatus === 'ACTIVE' && isPaidPaymentStatus(rowPaymentStatus);
+    if (orderMatched && isClaimable) {
       return matchObj;
     }
-    if (emailMatched && rowStatus === 'ACTIVE' && !activeEmailMatch) {
+    if (emailMatched && isClaimable && !activeEmailMatch) {
       activeEmailMatch = matchObj;
     }
     if (orderMatched && !anyOrderMatch) {
@@ -4383,7 +5370,14 @@ function collectAllExistingLicenseKeys(ss) {
   });
   allSheets.forEach(function(sh) {
     const nm = sh.getName();
-    if (priorityTabs.indexOf(nm) === -1 && nm !== TAB_REPORT_SCALEV && nm !== TAB_REPORT_LYNK && nm !== TAB_DASHBOARD && nm !== 'Licenses') {
+    if (
+      priorityTabs.indexOf(nm) === -1 &&
+      nm !== TAB_REPORT_SCALEV &&
+      nm !== TAB_REPORT_LYNK &&
+      nm !== TAB_DASHBOARD &&
+      nm !== TAB_ORDERS_SNAPSHOT &&
+      nm !== 'Licenses'
+    ) {
       sheetsToScan.push(sh);
     }
   });

@@ -1,16 +1,16 @@
+// Build-Version: v.1.0.2
 /**
  * ============================================================================
- * WALIPINTAR PWA SERVICE WORKER (service-worker.js)
+ * WALIPINTAR PWA SERVICE WORKER (/service-worker.js)
  * ============================================================================
- * - CACHE_NAME mengikuti versi terkunci dari Sheet / manifest.json:
- *   "walipintar-[versi-terkunci]"
- * - Cache lama TIDAK dihapus sebelum cache baru selesai ter-download,
- *   sehingga jika internet terputus di tengah update, aplikasi tidak blank.
- * - Tidak menyentuh localStorage sehingga user tidak perlu uninstall / login ulang.
+ * - CACHE_NAME selalu mengikuti LOCKED_VERSION ("walipintar-v.1.0.X")
+ * - Cache lama otomatis dihapus saat activate (hanya setelah cache baru berhasil)
+ * - skipWaiting() + clients.claim() memastikan app langsung terganti ke versi baru
+ * - localStorage tidak disentuh sehingga user tidak perlu uninstall / login ulang
  * ============================================================================
  */
 
-const LOCKED_VERSION = 'v.1.0.1';
+const LOCKED_VERSION = 'v.1.0.2';
 const CACHE_NAME = 'walipintar-' + LOCKED_VERSION;
 
 const CORE_ASSETS = [
@@ -27,7 +27,7 @@ const CORE_ASSETS = [
 
 async function cacheAllAssetsSafely(cacheName, assetList) {
   const cache = await caches.open(cacheName);
-  const requests = assetList.map((url) => new Request(url, { cache: 'reload' }));
+  const requests = assetList.map((url) => new Request(url, { cache: 'no-store' }));
   const responses = await Promise.all(
     requests.map(async (req) => {
       const res = await fetch(req);
@@ -40,16 +40,15 @@ async function cacheAllAssetsSafely(cacheName, assetList) {
   await Promise.all(responses.map(({ req, res }) => cache.put(req, res)));
 }
 
-// 1. INSTALL: Unduh penuh ke cache baru terlebih dahulu.
-//    JANGAN hapus cache lama di sini. Jika download gagal/putus internet, install batal
-//    dan versi lama tetap aman melayani aplikasi.
+// 1. INSTALL: Unduh aset ke cache baru terlebih dahulu dengan cache: 'no-store'
+//    JANGAN hapus cache lama di sini supaya app tidak blank jika internet putus.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     cacheAllAssetsSafely(CACHE_NAME, CORE_ASSETS).then(() => self.skipWaiting())
   );
 });
 
-// 2. ACTIVATE: Baru hapus cache lama SETELAH cache baru 100% berhasil ter-download & aktif.
+// 2. ACTIVATE: Hapus SEMUA cache lama setelah SW baru aktif, lalu ambil alih kontrol klien
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -57,7 +56,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames.map((name) => {
-            if (name.startsWith('walipintar-') && name !== CACHE_NAME) {
+            if (name !== CACHE_NAME) {
               return caches.delete(name);
             }
             return Promise.resolve(false);
@@ -68,20 +67,24 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. MESSAGE: Izinkan aplikasi memicu cek versi / aktivasi bersih
+// 3. MESSAGE: Trigger aktifkan SW baru secara langsung dari aplikasi
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// 4. FETCH: Network-first untuk HTML/manifest agar update langsung terdeteksi,
-//    Cache-first + update latar untuk aset statis, dan selalu lewati script.google.com / API.
+// 4. FETCH:
+//    - Lewati /service-worker.js, script.google.com, dan /api/* agar selalu live
+//    - Network-first (no-store) untuk navigasi HTML & manifest.json agar update langsung terdeteksi
+//    - Cache-first dengan fallback network untuk aset statis same-origin
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
   if (
+    url.pathname === '/service-worker.js' ||
+    url.pathname === '/sw.js' ||
     url.hostname.includes('script.google.com') ||
     url.hostname.includes('script.googleusercontent.com') ||
     url.pathname.startsWith('/api/')
@@ -89,10 +92,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Untuk navigasi halaman & manifest.json: utamakan network dengan fallback cache offline
-  if (event.request.mode === 'navigate' || url.pathname === '/manifest.json') {
+  if (
+    event.request.mode === 'navigate' ||
+    url.pathname === '/manifest.json' ||
+    url.pathname === '/manifest.webmanifest'
+  ) {
     event.respondWith(
-      fetch(event.request)
+      fetch(new Request(event.request.url, { cache: 'no-store' }))
         .then((networkResponse) => {
           if (networkResponse && networkResponse.ok && url.origin === self.location.origin) {
             const clone = networkResponse.clone();
@@ -107,7 +113,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Untuk aset lain (JS, CSS, gambar, suara): Cache-first dengan fallback network & penyimpanan ke cache aktif
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
